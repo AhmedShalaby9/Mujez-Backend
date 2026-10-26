@@ -1,0 +1,190 @@
+{
+  "openapi": "3.1.0",
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "properties": {
+                    "status": { "type": "string", "enum": ["ok"] }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Process liveness",
+        "tags": ["Health"]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "properties": {
+                    "status": { "type": "string", "enum": ["ready"] }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or Redis unavailable; details are never exposed"
+          }
+        },
+        "summary": "Restricted database connections and Redis readiness",
+        "tags": ["Health"]
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "TenantMeController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProfileDto" }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid tenant access token" },
+          "403": { "description": "Company or access is unavailable" }
+        },
+        "security": [{ "tenant": [] }],
+        "tags": ["Tenant identity"]
+      }
+    },
+    "/api/v1/me/permissions": {
+      "get": {
+        "operationId": "TenantMeController_permissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantPermissionsDto"
+                }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid tenant access token" },
+          "403": { "description": "Company or access is unavailable" }
+        },
+        "security": [{ "tenant": [] }],
+        "tags": ["Tenant identity"]
+      }
+    },
+    "/admin/api/v1/me": {
+      "get": {
+        "operationId": "PlatformMeController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProfileDto" }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid platform access token" },
+          "403": { "description": "MFA or IP policy denied access" }
+        },
+        "security": [{ "platform": [] }],
+        "tags": ["Platform identity"]
+      }
+    },
+    "/admin/api/v1/me/permissions": {
+      "get": {
+        "operationId": "PlatformMeController_permissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PermissionsDto" }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid platform access token" },
+          "403": { "description": "MFA or IP policy denied access" }
+        },
+        "security": [{ "platform": [] }],
+        "tags": ["Platform identity"]
+      }
+    }
+  },
+  "info": {
+    "title": "Mujez CRM Foundation API",
+    "description": "Foundation endpoints only. Business modules and controlled support access are not implemented yet.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "tenant": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" },
+      "platform": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" }
+    },
+    "schemas": {
+      "ProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "pool": {
+            "type": "string",
+            "enum": ["company_admin", "company_user", "platform"]
+          },
+          "companyId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "role": { "type": "string" },
+          "scope": {
+            "type": "string",
+            "enum": ["own", "team", "company", "platform"]
+          },
+          "teamId": { "type": ["string", "null"], "format": "uuid" }
+        },
+        "required": ["id", "pool", "name", "email", "role", "scope"]
+      },
+      "TenantPermissionsDto": {
+        "type": "object",
+        "properties": {
+          "permissions": { "type": "array", "items": { "type": "string" } },
+          "scope": { "type": "string", "enum": ["own", "team", "company"] },
+          "teamId": { "type": ["string", "null"], "format": "uuid" }
+        },
+        "required": ["permissions", "scope", "teamId"]
+      },
+      "PermissionsDto": {
+        "type": "object",
+        "properties": {
+          "permissions": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["permissions"]
+      }
+    }
+  }
+}

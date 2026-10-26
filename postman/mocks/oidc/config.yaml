@@ -1,0 +1,10 @@
+version: 1
+name: Mujez OIDC JWKS test provider
+slug: mujez-oidc-test
+protocol: http
+port: 4919
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true
