@@ -1,0 +1,61 @@
+name: Deploy backend to staging
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: backend-staging
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: ${{ vars.API_URL || 'https://api-stg.mujez.net' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install and test
+        run: npm ci && npm test
+      - name: Configure verified SSH access
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_PORT: ${{ vars.SSH_PORT || '22' }}
+        run: bash deploy/staging/setup-ssh.sh
+      - name: Upload configuration, migrate, and deploy
+        env:
+          STAGING_ENV: ${{ secrets.STAGING_ENV }}
+          BACKEND_PATH: ${{ vars.BACKEND_PATH || '/opt/mujez-staging/backend' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          : "${STAGING_ENV:?Add the STAGING_ENV secret before deploying}"
+          [[ "$BACKEND_PATH" =~ ^/opt/[a-zA-Z0-9_/-]+$ && "$BACKEND_PATH" != */ && "$BACKEND_PATH" != /opt ]] || exit 2
+          release_id="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          incoming="/tmp/mujez-backend-$release_id"
+          trap 'rm -f "$RUNNER_TEMP/staging.env"; ssh staging-actions "rm -f $incoming/staging.env" || true' EXIT
+          printf '%s\n' "$STAGING_ENV" > "$RUNNER_TEMP/staging.env"
+          tar --exclude='*.env' --exclude='.env*' --exclude='__pycache__' -czf "$RUNNER_TEMP/source.tar.gz" \
+            Dockerfile .dockerignore package.json package-lock.json tsconfig.json src scripts database deploy
+          ssh staging-actions "install -d -m 700 $incoming"
+          scp "$RUNNER_TEMP/source.tar.gz" "$RUNNER_TEMP/staging.env" deploy/staging/deploy.sh "staging-actions:$incoming/"
+          ssh staging-actions "bash $incoming/deploy.sh $BACKEND_PATH $release_id"
+      - name: Verify public readiness
+        env:
+          API_URL: ${{ vars.API_URL || 'https://api-stg.mujez.net' }}
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --max-time 15 "${API_URL%/}/health/ready"
+      - name: Remove runner SSH credentials
+        if: always()
+        run: rm -f "$HOME/.ssh/staging_key" "$HOME/.ssh/staging_known_hosts" "$HOME/.ssh/config"
