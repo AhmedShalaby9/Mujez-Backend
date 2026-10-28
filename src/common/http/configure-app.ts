@@ -5,6 +5,8 @@ import type { Request, Response, NextFunction } from "express";
 import type { Environment } from "../../config/env.js";
 import { ApiErrorFilter } from "./api-error.filter.js";
 
+import { OperationalMetrics } from "../../modules/platform/health/system-health.js";
+
 export function configureApp(app: INestApplication, env: Environment): void {
   const server = app.getHttpAdapter().getInstance();
   server.disable("x-powered-by");
@@ -19,13 +21,15 @@ export function configureApp(app: INestApplication, env: Environment): void {
     allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key"],
     exposedHeaders: ["X-Request-Id"],
   });
+  const metrics = app.get(OperationalMetrics);
   const logger = new Logger("HTTP");
   app.use((_req: Request, res: Response, next: NextFunction) => {
     const start = performance.now();
     const requestId = randomUUID();
     res.setHeader("X-Request-Id", requestId);
     res.setHeader("Cache-Control", "no-store");
-    res.on("finish", () =>
+    res.on("finish", () => {
+      metrics.record(res.statusCode, performance.now() - start);
       logger.log(
         JSON.stringify({
           requestId,
@@ -33,8 +37,8 @@ export function configureApp(app: INestApplication, env: Environment): void {
           status: res.statusCode,
           durationMs: Math.round(performance.now() - start),
         }),
-      ),
-    );
+      );
+    });
     next();
   });
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -42,12 +46,10 @@ export function configureApp(app: INestApplication, env: Environment): void {
       !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
       !env.CORS_ORIGINS.split(",").includes(req.headers.origin ?? "")
     ) {
-      res
-        .status(403)
-        .json({
-          code: "origin_denied",
-          message: "Request origin is not allowed",
-        });
+      res.status(403).json({
+        code: "origin_denied",
+        message: "Request origin is not allowed",
+      });
       return;
     }
     next();

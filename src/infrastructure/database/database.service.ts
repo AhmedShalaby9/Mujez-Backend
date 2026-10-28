@@ -76,6 +76,14 @@ export class DatabaseService implements OnApplicationShutdown {
       client.release();
     }
   }
+  poolStats() {
+    return {
+      total: this.tenantPool.totalCount + this.platformPool.totalCount,
+      idle: this.tenantPool.idleCount + this.platformPool.idleCount,
+      waiting: this.tenantPool.waitingCount + this.platformPool.waitingCount,
+      max: 20,
+    };
+  }
   async ready(): Promise<void> {
     await Promise.all([
       this.transaction(this.tenantPool, "mujez_tenant", async (c) => {

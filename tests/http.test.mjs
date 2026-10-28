@@ -12,6 +12,7 @@ import { SessionService } from "../dist/common/auth/session.service.js";
 import { UnauthorizedException } from "@nestjs/common";
 let app;
 let active = false;
+let permissions = ["co.view"];
 const env = parseEnvironment({
   NODE_ENV: "production",
   DATABASE_URL: "postgres://tenant:password@localhost/db",
@@ -24,7 +25,10 @@ before(async () => {
     .overrideProvider(ENV)
     .useValue(env)
     .overrideProvider(DatabaseService)
-    .useValue({ ready: async () => {} })
+    .useValue({
+      ready: async () => {},
+      poolStats: () => ({ total: 0, max: 20 }),
+    })
     .overrideProvider(CacheService)
     .useValue({ ready: async () => {} })
     .overrideProvider(SessionService)
@@ -45,7 +49,7 @@ before(async () => {
           name: "Test",
           email: "test@example.test",
           role: "platform_admin",
-          permissions: ["co.view"],
+          permissions,
         };
       },
       logout: async () => {
@@ -214,4 +218,55 @@ test("feature and usage endpoints require their explicit permissions", async () 
       .set("Origin", env.CORS_ORIGINS)
       .send({})
       .expect(403);
+});
+
+test("integrations and health enforce authentication, permissions, origin and payload validation", async () => {
+  const cookie = "__Host-mujez_session=" + "a".repeat(64);
+  for (const path of [
+    "/admin/api/v1/integrations",
+    "/admin/api/v1/system-health",
+  ]) {
+    await request(app.getHttpServer()).get(path).expect(401);
+    await request(app.getHttpServer())
+      .get(path)
+      .set("Cookie", cookie)
+      .expect(403);
+  }
+  await request(app.getHttpServer())
+    .post("/admin/api/v1/integrations/whatsapp/update")
+    .set("Cookie", cookie)
+    .set("Origin", env.CORS_ORIGINS)
+    .send({})
+    .expect(403);
+  permissions = ["health", "integrations"];
+  try {
+    await request(app.getHttpServer())
+      .get("/admin/api/v1/system-health")
+      .set("Cookie", cookie)
+      .expect(200);
+    for (const body of [
+      {},
+      { version: 0, enabled: true, reason: "  " },
+      {
+        version: 0,
+        enabled: true,
+        reason: "Valid reason",
+        secret: "no plaintext secrets",
+      },
+    ])
+      await request(app.getHttpServer())
+        .post("/admin/api/v1/integrations/whatsapp/update")
+        .set("Cookie", cookie)
+        .set("Origin", env.CORS_ORIGINS)
+        .send(body)
+        .expect(400);
+    await request(app.getHttpServer())
+      .post("/admin/api/v1/integrations/whatsapp/update")
+      .set("Cookie", cookie)
+      .set("Origin", "https://hostile.test")
+      .send({ version: 0, enabled: true, reason: "Valid reason" })
+      .expect(403);
+  } finally {
+    permissions = ["co.view"];
+  }
 });

@@ -833,6 +833,45 @@
         "responses": { "201": { "description": "" } },
         "tags": ["Features"]
       }
+    },
+    "/admin/api/v1/integrations": {
+      "get": {
+        "operationId": "IntegrationsController_catalog",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Integrations"]
+      }
+    },
+    "/admin/api/v1/integrations/{key}/update": {
+      "post": {
+        "operationId": "IntegrationsController_update",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/IntegrationChange" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Integrations"]
+      }
+    },
+    "/admin/api/v1/system-health": {
+      "get": {
+        "operationId": "SystemHealthController_snapshot",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["SystemHealth"]
+      }
     }
   },
   "info": {
@@ -1211,6 +1250,15 @@
           "resource": { "type": "string" }
         },
         "required": ["version", "reason", "resource"]
+      },
+      "IntegrationChange": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "enabled": { "type": "boolean" },
+          "reason": { "type": "string" }
+        },
+        "required": ["version", "enabled", "reason"]
       }
     }
   }
