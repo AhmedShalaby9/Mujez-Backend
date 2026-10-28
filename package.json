@@ -21,7 +21,8 @@
     "db:provision:local": "node --env-file-if-exists=.env scripts/provision-local-roles.mjs",
     "openapi:validate": "node scripts/validate-openapi.mjs",
     "db:seed:companies": "npm run build && node --env-file-if-exists=.env scripts/seed-companies.mjs",
-    "db:seed:subscriptions": "npm run build && node --env-file-if-exists=.env scripts/seed-subscriptions.mjs"
+    "db:seed:subscriptions": "npm run build && node --env-file-if-exists=.env scripts/seed-subscriptions.mjs",
+    "db:seed:billing": "npm run build && node --env-file-if-exists=.env scripts/seed-billing.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.2.0",

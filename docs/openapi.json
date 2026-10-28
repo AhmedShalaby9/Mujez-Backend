@@ -470,6 +470,230 @@
         "responses": { "201": { "description": "" } },
         "tags": ["Subscriptions"]
       }
+    },
+    "/admin/api/v1/invoices": {
+      "get": {
+        "operationId": "BillingController_invoices",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Billing"]
+      },
+      "post": {
+        "operationId": "BillingController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InvoiceInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Billing"]
+      }
+    },
+    "/admin/api/v1/payments": {
+      "get": {
+        "operationId": "BillingController_payments",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Billing"]
+      }
+    },
+    "/admin/api/v1/invoices/{number}": {
+      "get": {
+        "operationId": "BillingController_invoiceDetails",
+        "parameters": [
+          {
+            "name": "number",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Billing"]
+      }
+    },
+    "/admin/api/v1/payments/{id}": {
+      "get": {
+        "operationId": "BillingController_paymentDetails",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Billing"]
+      }
+    },
+    "/admin/api/v1/invoices/{number}/issue": {
+      "post": {
+        "operationId": "BillingController_issue",
+        "parameters": [
+          {
+            "name": "number",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InvoiceVersion" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Billing"]
+      }
+    },
+    "/admin/api/v1/invoices/{number}/payments": {
+      "post": {
+        "operationId": "BillingController_record",
+        "parameters": [
+          {
+            "name": "number",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PaymentInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Billing"]
+      }
+    },
+    "/admin/api/v1/invoices/{number}/void": {
+      "post": {
+        "operationId": "BillingController_void",
+        "parameters": [
+          {
+            "name": "number",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SensitiveInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Billing"]
+      }
+    },
+    "/admin/api/v1/invoices/{number}/credits": {
+      "post": {
+        "operationId": "BillingController_credit",
+        "parameters": [
+          {
+            "name": "number",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AdjustmentInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Billing"]
+      }
+    },
+    "/admin/api/v1/payments/{id}/refunds": {
+      "post": {
+        "operationId": "BillingController_refund",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AdjustmentInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Billing"]
+      }
+    },
+    "/admin/api/v1/payments/{id}/reconcile": {
+      "post": {
+        "operationId": "BillingController_reconcile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReconcileInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Billing"]
+      }
     }
   },
   "info": {
@@ -707,6 +931,92 @@
         "type": "object",
         "properties": { "version": { "type": "number" } },
         "required": ["version"]
+      },
+      "InvoiceInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string" },
+          "companyId": { "type": "string" },
+          "subscriptionId": { "type": "string" },
+          "description": { "type": "string" },
+          "issueDate": { "type": "string" },
+          "dueDate": { "type": "string" },
+          "subtotalMinor": { "type": "string" },
+          "taxBps": { "type": "number" }
+        },
+        "required": [
+          "requestId",
+          "companyId",
+          "subscriptionId",
+          "description",
+          "issueDate",
+          "dueDate",
+          "subtotalMinor",
+          "taxBps"
+        ]
+      },
+      "InvoiceVersion": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string" },
+          "version": { "type": "number" }
+        },
+        "required": ["requestId", "version"]
+      },
+      "PaymentInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string" },
+          "version": { "type": "number" },
+          "amountMinor": { "type": "string" },
+          "method": { "type": "string" },
+          "reference": { "type": "string" },
+          "paidAt": { "type": "string" }
+        },
+        "required": [
+          "requestId",
+          "version",
+          "amountMinor",
+          "method",
+          "reference",
+          "paidAt"
+        ]
+      },
+      "SensitiveInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string" },
+          "version": { "type": "number" },
+          "reason": { "type": "string" },
+          "password": { "type": "string" }
+        },
+        "required": ["requestId", "version", "reason", "password"]
+      },
+      "AdjustmentInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string" },
+          "version": { "type": "number" },
+          "reason": { "type": "string" },
+          "password": { "type": "string" },
+          "amountMinor": { "type": "string" }
+        },
+        "required": [
+          "requestId",
+          "version",
+          "reason",
+          "password",
+          "amountMinor"
+        ]
+      },
+      "ReconcileInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string" },
+          "version": { "type": "number" },
+          "reconciliation": { "type": "string" }
+        },
+        "required": ["requestId", "version", "reconciliation"]
       }
     }
   }

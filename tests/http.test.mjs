@@ -163,3 +163,30 @@ test("catalog and subscription writes require explicit permissions", async () =>
       .send({})
       .expect(403);
 });
+
+test("billing and payments require billing permission", async () => {
+  await request(app.getHttpServer())
+    .post("/admin/api/v1/auth/login")
+    .set("Origin", env.CORS_ORIGINS)
+    .send({ email: "test@example.test", password: "correct" })
+    .expect(200);
+  const cookie = "__Host-mujez_session=" + "a".repeat(64);
+  for (const path of ["/admin/api/v1/invoices", "/admin/api/v1/payments"]) {
+    await request(app.getHttpServer())
+      .get(path)
+      .set("Cookie", cookie)
+      .expect(403);
+  }
+  for (const path of [
+    "/admin/api/v1/invoices",
+    "/admin/api/v1/invoices/test/payments",
+    "/admin/api/v1/payments/test/refunds",
+    "/admin/api/v1/invoices/test/credits",
+  ])
+    await request(app.getHttpServer())
+      .post(path)
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({})
+      .expect(403);
+});
