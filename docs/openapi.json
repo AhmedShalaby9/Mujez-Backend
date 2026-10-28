@@ -165,6 +165,131 @@
         "security": [{ "platform": [] }],
         "tags": ["Platform identity"]
       }
+    },
+    "/admin/api/v1/companies": {
+      "get": {
+        "operationId": "CompaniesController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "onboarding",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Companies"]
+      },
+      "post": {
+        "operationId": "CompaniesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompanyInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
+    "/admin/api/v1/companies/{id}": {
+      "get": {
+        "operationId": "CompaniesController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
+    "/admin/api/v1/companies/{id}/update": {
+      "post": {
+        "operationId": "CompaniesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompanyUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
+    "/admin/api/v1/companies/{id}/status": {
+      "post": {
+        "operationId": "CompaniesController_status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StatusInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
+    "/admin/api/v1/companies/{id}/onboarding": {
+      "post": {
+        "operationId": "CompaniesController_step",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StepInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Companies"]
+      }
     }
   },
   "info": {
@@ -221,6 +346,76 @@
           "permissions": { "type": "array", "items": { "type": "string" } }
         },
         "required": ["permissions"]
+      },
+      "CompanyInput": {
+        "type": "object",
+        "properties": {
+          "nameEn": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "slug": { "type": "string" },
+          "type": { "type": "string" },
+          "city": { "type": "string" },
+          "adminEmail": { "type": "string" },
+          "phone": { "type": "string" },
+          "website": { "type": "string" },
+          "plan": { "type": "string" }
+        },
+        "required": [
+          "nameEn",
+          "nameAr",
+          "slug",
+          "type",
+          "city",
+          "adminEmail",
+          "phone",
+          "website",
+          "plan"
+        ]
+      },
+      "CompanyUpdate": {
+        "type": "object",
+        "properties": {
+          "nameEn": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "slug": { "type": "string" },
+          "type": { "type": "string" },
+          "city": { "type": "string" },
+          "adminEmail": { "type": "string" },
+          "phone": { "type": "string" },
+          "website": { "type": "string" },
+          "plan": { "type": "string" },
+          "version": { "type": "number" }
+        },
+        "required": [
+          "nameEn",
+          "nameAr",
+          "slug",
+          "type",
+          "city",
+          "adminEmail",
+          "phone",
+          "website",
+          "plan",
+          "version"
+        ]
+      },
+      "StatusInput": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string" },
+          "version": { "type": "number" },
+          "reason": { "type": "string" }
+        },
+        "required": ["action", "version", "reason"]
+      },
+      "StepInput": {
+        "type": "object",
+        "properties": {
+          "step": { "type": "string" },
+          "completed": { "type": "boolean" },
+          "version": { "type": "number" }
+        },
+        "required": ["step", "completed", "version"]
       }
     }
   }

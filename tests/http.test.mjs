@@ -122,3 +122,23 @@ test("login sets secure cookie, restores role, rejects tenant access, and logout
     .set("Cookie", cookie)
     .expect(401);
 });
+
+test("company mutations require server-side permissions", async () => {
+  await request(app.getHttpServer())
+    .post("/admin/api/v1/auth/login")
+    .set("Origin", env.CORS_ORIGINS)
+    .send({ email: "test@example.test", password: "correct" })
+    .expect(200);
+  const cookie = "__Host-mujez_session=" + "a".repeat(64);
+  for (const path of [
+    "/admin/api/v1/companies",
+    "/admin/api/v1/companies/test/status",
+    "/admin/api/v1/companies/test/onboarding",
+  ])
+    await request(app.getHttpServer())
+      .post(path)
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({})
+      .expect(403);
+});
