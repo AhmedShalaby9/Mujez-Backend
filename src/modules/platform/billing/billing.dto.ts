@@ -31,12 +31,18 @@ export class InvoiceInput extends RequestInput {
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   @IsDateString({ strict: true })
   declare issueDate: string;
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   @IsDateString({ strict: true })
-  declare dueDate: string;
+  @IsOptional()
+  declare dueDate?: string;
   @ApiProperty() @Matches(/^[1-9]\d{0,12}$/) declare subtotalMinor: string;
-  @ApiProperty() @IsInt() @Min(0) @Max(10000) declare taxBps: number;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  declare taxBps?: number;
 }
 export class InvoiceVersion extends RequestInput {
   @ApiProperty() @IsInt() @Min(0) declare version: number;

@@ -1,3 +1,5 @@
+import { auditContext } from "../../common/http/audit-context.js";
+import { sanitizeAudit, severityFor } from "./audit-sanitize.js";
 import type { PoolClient } from "pg";
 export interface DomainEvent {
   companyId: string;
@@ -24,9 +26,9 @@ export async function recordTenantEvent(
       event.action,
       event.resourceType,
       event.resourceId,
-      event.before ?? null,
-      event.after ?? null,
-      event.ip ?? null,
+      sanitizeAudit(event.before ?? null),
+      sanitizeAudit(event.after ?? null),
+      event.ip ?? auditContext.getStore()?.ip ?? null,
       event.userAgent ?? null,
     ],
   );
@@ -37,7 +39,7 @@ export async function recordTenantEvent(
       event.action,
       event.resourceType,
       event.resourceId,
-      event.payload,
+      sanitizeAudit(event.payload),
     ],
   );
 }
@@ -47,16 +49,17 @@ export async function recordPlatformEvent(
   event: Omit<DomainEvent, "companyId"> & { companyId?: string },
 ): Promise<void> {
   await client.query(
-    `INSERT INTO platform.audit_logs (actor_platform_user_id, action, company_id, resource, resource_id, before, after, result, severity, ip) VALUES ($1,$2,$3,$4,$5,$6,$7,'success','low',$8)`,
+    `INSERT INTO platform.audit_logs (actor_platform_user_id, action, company_id, resource, resource_id, before, after, result, severity, ip) VALUES ($1,$2,$3,$4,$5,$6,$7,'success',$8,$9)`,
     [
       event.actorId,
       event.action,
       event.companyId ?? null,
       event.resourceType,
       event.resourceId,
-      event.before ?? null,
-      event.after ?? null,
-      event.ip ?? null,
+      sanitizeAudit(event.before ?? null),
+      sanitizeAudit(event.after ?? null),
+      severityFor(event.action),
+      event.ip ?? auditContext.getStore()?.ip ?? null,
     ],
   );
   await client.query(
@@ -66,7 +69,7 @@ export async function recordPlatformEvent(
       event.action,
       event.resourceType,
       event.resourceId,
-      event.payload,
+      sanitizeAudit(event.payload),
     ],
   );
 }

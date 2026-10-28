@@ -1,3 +1,4 @@
+import { PlatformAuditModule } from "./modules/platform/audit/audit.module.js";
 import { SalesLeadsModule } from "./modules/sales/leads/leads.module.js";
 import { SalesContactsModule } from "./modules/sales/contacts/contacts.module.js";
 import { SalesPipelineModule } from "./modules/sales/pipeline/pipeline.module.js";
@@ -28,6 +29,7 @@ import { PlatformSettingsModule } from "./modules/platform/settings/settings.mod
 import { PlatformHealthModule } from "./modules/platform/health/health.module.js";
 
 export const DOMAIN_MODULES = [
+  PlatformAuditModule,
   SalesLeadsModule,
   SalesContactsModule,
   SalesPipelineModule,

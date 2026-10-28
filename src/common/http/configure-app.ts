@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+import { auditContext } from "./audit-context.js";
 import { randomUUID } from "node:crypto";
 import { Logger, ValidationPipe, type INestApplication } from "@nestjs/common";
 import helmet from "helmet";
@@ -13,6 +15,11 @@ export function configureApp(app: INestApplication, env: Environment): void {
   server.set(
     "trust proxy",
     env.TRUST_PROXY_CIDRS ? env.TRUST_PROXY_CIDRS.split(",") : false,
+  );
+  app.use((req: Request, _res: Response, next: NextFunction) =>
+    auditContext.run({ ip: isIP(req.ip ?? "") ? req.ip : undefined }, () =>
+      next(),
+    ),
   );
   app.use(helmet());
   app.enableCors({

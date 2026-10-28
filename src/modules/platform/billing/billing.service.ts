@@ -1,3 +1,6 @@
+import { Optional } from "@nestjs/common";
+import { SettingsService } from "../settings/settings.service.js";
+import { DEFAULT_SETTINGS } from "../settings/settings.model.js";
 import {
   Injectable,
   ConflictException,
@@ -108,6 +111,7 @@ export class BillingService {
   constructor(
     private readonly db: DatabaseService,
     private readonly cache: CacheService,
+    @Optional() private readonly settings?: SettingsService,
   ) {}
   async reauth(actor: string, password: string) {
     if (!(await this.cache.consume("billing:reauth:" + actor, 10, 900)))
@@ -254,8 +258,20 @@ export class BillingService {
     return i;
   }
   async create(input: InvoiceInput, actor: string, seedKey?: string) {
+    const policy = this.settings
+      ? await this.settings.value()
+      : DEFAULT_SETTINGS;
+    const dueDate =
+      input.dueDate ??
+      new Date(
+        new Date(input.issueDate + "T00:00:00Z").getTime() +
+          policy.paymentTerms * 86400000,
+      )
+        .toISOString()
+        .slice(0, 10);
+    const taxBps = input.taxBps ?? Math.round(policy.taxRate * 100);
     return this.transaction(actor, "invoice.create", input, async (c) => {
-      if (input.dueDate < input.issueDate)
+      if (dueDate < input.issueDate)
         throw new BadRequestException("Due date must not precede issue date");
       if (input.issueDate > new Date().toISOString().slice(0, 10))
         throw new BadRequestException("Issue date cannot be in the future");
@@ -283,7 +299,7 @@ export class BillingService {
         subId = sub.id;
       }
       const subtotal = minor(input.subtotalMinor),
-        tax = (subtotal * BigInt(input.taxBps) + 5000n) / 10000n;
+        tax = (subtotal * BigInt(taxBps) + 5000n) / 10000n;
       if (subtotal + tax > 1000000000000n)
         throw new BadRequestException(
           "Invoice total exceeds the allowed range",
@@ -301,9 +317,9 @@ export class BillingService {
             company.name,
             input.description.trim(),
             input.issueDate,
-            input.dueDate,
+            dueDate,
             String(subtotal),
-            input.taxBps,
+            taxBps,
             String(tax),
             String(subtotal + tax),
           ],

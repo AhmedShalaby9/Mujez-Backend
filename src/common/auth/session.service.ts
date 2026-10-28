@@ -1,3 +1,6 @@
+import { Optional } from "@nestjs/common";
+import { SettingsService } from "../../modules/platform/settings/settings.service.js";
+import { DEFAULT_SETTINGS } from "../../modules/platform/settings/settings.model.js";
 import { CacheService } from "../../infrastructure/cache/cache.module.js";
 import {
   Injectable,
@@ -15,6 +18,7 @@ export class SessionService {
   constructor(
     private readonly db: DatabaseService,
     private readonly cache: CacheService,
+    @Optional() private readonly settings?: SettingsService,
   ) {}
   async login(
     email: string,
@@ -23,11 +27,14 @@ export class SessionService {
     previous?: string,
     ip = "unknown",
   ) {
+    const policy = this.settings
+      ? await this.settings.value()
+      : DEFAULT_SETTINGS;
     if (
       !(await this.cache.consume("login:ip:" + digest(ip), 100, 900)) ||
       !(await this.cache.consume(
         "login:email:" + digest(email.trim().toLowerCase()),
-        10,
+        policy.lockoutAttempts,
         900,
       ))
     )
@@ -48,7 +55,7 @@ export class SessionService {
     if (!user || !valid)
       throw new UnauthorizedException("Invalid email or password");
     const token = randomBytes(32).toString("hex");
-    const seconds = remember ? 2592000 : 28800;
+    const seconds = remember ? 2592000 : policy.sessionLength * 60;
     await this.db.platform(async (c) => {
       const current = (
         await c.query(

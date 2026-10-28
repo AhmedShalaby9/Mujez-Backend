@@ -1,3 +1,4 @@
+import { SettingsService } from "../dist/modules/platform/settings/settings.service.js";
 import "reflect-metadata";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -45,6 +46,15 @@ before(async () => {
     })
     .overrideProvider(AnnouncementsService)
     .useValue({ visible: async (company, lang) => [{ company, lang }] })
+    .overrideProvider(SettingsService)
+    .useValue({
+      branding: async () => ({
+        platformName: "Mujez",
+        defaultLang: "en",
+        primaryColor: "#4945CC",
+      }),
+      value: async () => ({ sessionLength: 480, lockoutAttempts: 10 }),
+    })
     .overrideProvider(SessionService)
     .useValue({
       login: async (email, password) => {
@@ -426,6 +436,61 @@ test("platform access endpoints require admins permission; activation is public 
         permission: "admins",
         password: "value",
         reason: "  ",
+      })
+      .expect(400);
+  } finally {
+    permissions = ["co.view"];
+  }
+});
+
+test("audit/settings enforce permissions, validate exports and never expose security settings through branding", async () => {
+  const server = app.getHttpServer(),
+    cookie = "__Host-mujez_session=" + "a".repeat(64);
+  for (const path of ["/admin/api/v1/audit-logs", "/admin/api/v1/settings"]) {
+    await request(server).get(path).expect(401);
+    await request(server).get(path).set("Cookie", cookie).expect(403);
+  }
+  for (const path of [
+    "/admin/api/v1/audit-logs/export",
+    "/admin/api/v1/settings",
+  ])
+    await request(server)
+      .post(path)
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({})
+      .expect(403);
+  const brand = await request(server).get("/admin/api/v1/branding").expect(200);
+  assert.ok(!("sessionLength" in brand.body));
+  permissions = ["audit", "settings"];
+  try {
+    await request(server)
+      .get("/admin/api/v1/audit-logs?limit=101")
+      .set("Cookie", cookie)
+      .expect(400);
+    await request(server)
+      .get("/admin/api/v1/audit-logs/not-a-uuid")
+      .set("Cookie", cookie)
+      .expect(400);
+    await request(server)
+      .post("/admin/api/v1/audit-logs/export")
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({
+        password: "value",
+        reason: "valid reason",
+        filters: { filter: "invented" },
+      })
+      .expect(400);
+    await request(server)
+      .post("/admin/api/v1/settings")
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({
+        version: 0,
+        password: "value",
+        reason: "valid reason",
+        value: { sessionLength: 0, unknown: true },
       })
       .expect(400);
   } finally {

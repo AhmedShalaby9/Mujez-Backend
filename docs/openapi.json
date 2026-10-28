@@ -166,6 +166,82 @@
         "tags": ["Platform identity"]
       }
     },
+    "/admin/api/v1/audit-logs": {
+      "get": {
+        "operationId": "PlatformAuditController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "filter",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "until",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["PlatformAudit"]
+      }
+    },
+    "/admin/api/v1/audit-logs/{id}": {
+      "get": {
+        "operationId": "PlatformAuditController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["PlatformAudit"]
+      }
+    },
+    "/admin/api/v1/audit-logs/export": {
+      "post": {
+        "operationId": "PlatformAuditController_export",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AuditExport" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAudit"]
+      }
+    },
     "/admin/api/v1/companies": {
       "get": {
         "operationId": "CompaniesController_list",
@@ -1306,6 +1382,44 @@
         "tags": ["PlatformAccess"]
       }
     },
+    "/admin/api/v1/settings": {
+      "get": {
+        "operationId": "SettingsController_read",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Settings"]
+      },
+      "post": {
+        "operationId": "SettingsController_save",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SettingsChange" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Settings"]
+      }
+    },
+    "/admin/api/v1/platform-defaults": {
+      "get": {
+        "operationId": "SettingsController_defaults",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Settings"]
+      }
+    },
+    "/admin/api/v1/branding": {
+      "get": {
+        "operationId": "SettingsController_branding",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Settings"]
+      }
+    },
     "/admin/api/v1/system-health": {
       "get": {
         "operationId": "SystemHealthController_snapshot",
@@ -1369,6 +1483,26 @@
           "permissions": { "type": "array", "items": { "type": "string" } }
         },
         "required": ["permissions"]
+      },
+      "AuditQuery": {
+        "type": "object",
+        "properties": {
+          "q": { "type": "string" },
+          "filter": { "type": "string" },
+          "limit": { "type": "number" },
+          "cursor": { "type": "string" },
+          "from": { "type": "string" },
+          "until": { "type": "string" }
+        }
+      },
+      "AuditExport": {
+        "type": "object",
+        "properties": {
+          "password": { "type": "string" },
+          "reason": { "type": "string" },
+          "filters": { "$ref": "#/components/schemas/AuditQuery" }
+        },
+        "required": ["password", "reason", "filters"]
       },
       "CompanyInput": {
         "type": "object",
@@ -1569,9 +1703,7 @@
           "subscriptionId",
           "description",
           "issueDate",
-          "dueDate",
-          "subtotalMinor",
-          "taxBps"
+          "subtotalMinor"
         ]
       },
       "InvoiceVersion": {
@@ -1851,6 +1983,67 @@
           "password": { "type": "string" }
         },
         "required": ["token", "password"]
+      },
+      "SettingsValue": {
+        "type": "object",
+        "properties": {
+          "platformName": { "type": "string" },
+          "supportEmail": { "type": "string" },
+          "defaultLang": { "type": "string" },
+          "defaultTimezone": { "type": "string" },
+          "trialDays": { "type": "number" },
+          "defaultPlan": { "type": "string" },
+          "defaultCurrency": { "type": "string" },
+          "invoiceFormat": { "type": "string" },
+          "paymentTerms": { "type": "number" },
+          "taxRate": { "type": "number" },
+          "taxProfile": { "type": "string" },
+          "requireMfa": { "type": "boolean" },
+          "sessionLength": { "type": "number" },
+          "managementMaxMinutes": { "type": "number" },
+          "ipAllowlist": { "type": "string" },
+          "lockoutAttempts": { "type": "number" },
+          "notifyPaymentFailed": { "type": "boolean" },
+          "notifyTrialEnding": { "type": "boolean" },
+          "notifyTicketAssigned": { "type": "boolean" },
+          "notifyIncident": { "type": "boolean" },
+          "supportUrl": { "type": "string" },
+          "primaryColor": { "type": "string" }
+        },
+        "required": [
+          "platformName",
+          "supportEmail",
+          "defaultLang",
+          "defaultTimezone",
+          "trialDays",
+          "defaultPlan",
+          "defaultCurrency",
+          "invoiceFormat",
+          "paymentTerms",
+          "taxRate",
+          "taxProfile",
+          "requireMfa",
+          "sessionLength",
+          "managementMaxMinutes",
+          "ipAllowlist",
+          "lockoutAttempts",
+          "notifyPaymentFailed",
+          "notifyTrialEnding",
+          "notifyTicketAssigned",
+          "notifyIncident",
+          "supportUrl",
+          "primaryColor"
+        ]
+      },
+      "SettingsChange": {
+        "type": "object",
+        "properties": {
+          "password": { "type": "string" },
+          "reason": { "type": "string" },
+          "version": { "type": "number" },
+          "value": { "$ref": "#/components/schemas/SettingsValue" }
+        },
+        "required": ["password", "reason", "version", "value"]
       }
     }
   }

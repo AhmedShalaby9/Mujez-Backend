@@ -1,3 +1,6 @@
+import { Optional } from "@nestjs/common";
+import { SettingsService } from "../settings/settings.service.js";
+import { DEFAULT_SETTINGS } from "../settings/settings.model.js";
 import {
   Injectable,
   ConflictException,
@@ -53,7 +56,10 @@ export function subDto(s: any) {
 }
 @Injectable()
 export class SubscriptionsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    @Optional() private readonly settings?: SettingsService,
+  ) {}
   async event(
     c: PoolClient,
     actor: string,
@@ -302,7 +308,10 @@ export class SubscriptionsService {
         const id = randomUUID();
         const period =
           input.status === "trialing"
-            ? "14 days"
+            ? (this.settings
+                ? await this.settings.forClient(c)
+                : DEFAULT_SETTINGS
+              ).trialDays + " days"
             : input.cycle === "annual"
               ? "1 year"
               : "1 month";
