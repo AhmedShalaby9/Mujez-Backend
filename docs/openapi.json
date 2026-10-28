@@ -694,6 +694,145 @@
         "responses": { "201": { "description": "" } },
         "tags": ["Billing"]
       }
+    },
+    "/admin/api/v1/features": {
+      "get": {
+        "operationId": "FeaturesController_catalog",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Features"]
+      }
+    },
+    "/admin/api/v1/features/{key}/update": {
+      "post": {
+        "operationId": "FeaturesController_change",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FeatureChange" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Features"]
+      }
+    },
+    "/admin/api/v1/feature-overrides": {
+      "post": {
+        "operationId": "FeaturesController_override",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FeatureOverride" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Features"]
+      }
+    },
+    "/admin/api/v1/feature-overrides/{id}/remove": {
+      "post": {
+        "operationId": "FeaturesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReasonVersion" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Features"]
+      }
+    },
+    "/admin/api/v1/features/effective/{company}": {
+      "get": {
+        "operationId": "FeaturesController_effective",
+        "parameters": [
+          {
+            "name": "company",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Features"]
+      }
+    },
+    "/admin/api/v1/usage": {
+      "get": {
+        "operationId": "FeaturesController_usage",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Features"]
+      }
+    },
+    "/admin/api/v1/usage/{id}/override": {
+      "post": {
+        "operationId": "FeaturesController_limit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LimitOverride" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Features"]
+      }
+    },
+    "/admin/api/v1/usage/{id}/remove": {
+      "post": {
+        "operationId": "FeaturesController_removeLimit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LimitOverride" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Features"]
+      }
     }
   },
   "info": {
@@ -1017,6 +1156,61 @@
           "reconciliation": { "type": "string" }
         },
         "required": ["requestId", "version", "reconciliation"]
+      },
+      "FeatureChange": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "action": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "rollout": { "type": "number" },
+          "plan": { "type": "string" },
+          "reason": { "type": "string" }
+        },
+        "required": [
+          "version",
+          "action",
+          "enabled",
+          "rollout",
+          "plan",
+          "reason"
+        ]
+      },
+      "FeatureOverride": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "companyId": { "type": "string" },
+          "featureKey": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "expiresAt": { "type": "string" },
+          "reason": { "type": "string" }
+        },
+        "required": [
+          "version",
+          "companyId",
+          "featureKey",
+          "enabled",
+          "expiresAt",
+          "reason"
+        ]
+      },
+      "ReasonVersion": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "reason": { "type": "string" }
+        },
+        "required": ["version", "reason"]
+      },
+      "LimitOverride": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "reason": { "type": "string" },
+          "resource": { "type": "string" }
+        },
+        "required": ["version", "reason", "resource"]
       }
     }
   }

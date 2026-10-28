@@ -190,3 +190,28 @@ test("billing and payments require billing permission", async () => {
       .send({})
       .expect(403);
 });
+
+test("feature and usage endpoints require their explicit permissions", async () => {
+  await request(app.getHttpServer())
+    .post("/admin/api/v1/auth/login")
+    .set("Origin", env.CORS_ORIGINS)
+    .send({ email: "test@example.test", password: "correct" })
+    .expect(200);
+  const cookie = "__Host-mujez_session=" + "a".repeat(64);
+  for (const path of ["/admin/api/v1/features", "/admin/api/v1/usage"])
+    await request(app.getHttpServer())
+      .get(path)
+      .set("Cookie", cookie)
+      .expect(403);
+  for (const path of [
+    "/admin/api/v1/features/test/update",
+    "/admin/api/v1/feature-overrides",
+    "/admin/api/v1/usage/test/override",
+  ])
+    await request(app.getHttpServer())
+      .post(path)
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({})
+      .expect(403);
+});

@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
-
-@Module({})
+import { FeaturesController } from "./features.controller.js";
+import { FeaturesService } from "./features.service.js";
+@Module({ controllers: [FeaturesController], providers: [FeaturesService] })
 export class PlatformFeaturesModule {}
