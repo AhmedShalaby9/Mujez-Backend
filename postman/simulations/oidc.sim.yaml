@@ -1,5 +1,0 @@
-simulation: mujez-oidc
-routing: path
-mocks:
-  - routeKey: oidc
-    path: ../mocks/oidc/config.yaml

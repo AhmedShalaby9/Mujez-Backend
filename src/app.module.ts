@@ -5,8 +5,9 @@ import { ENV, parseEnvironment } from "./config/env.js";
 import { DatabaseModule } from "./infrastructure/database/database.module.js";
 import { CacheModule } from "./infrastructure/cache/cache.module.js";
 import { AccessGuard } from "./common/auth/access.guard.js";
-import { TokenVerifier } from "./common/auth/token-verifier.service.js";
-import { PrincipalService } from "./common/auth/principal.service.js";
+import { SessionService } from "./common/auth/session.service.js";
+import { AuthController } from "./modules/identity/auth.controller.js";
+
 import { TokenThrottlerGuard } from "./common/auth/token-throttler.guard.js";
 import { HealthController } from "./modules/health/health.controller.js";
 import {
@@ -30,10 +31,14 @@ class EnvironmentModule {}
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
     ...DOMAIN_MODULES,
   ],
-  controllers: [HealthController, TenantMeController, PlatformMeController],
+  controllers: [
+    AuthController,
+    HealthController,
+    TenantMeController,
+    PlatformMeController,
+  ],
   providers: [
-    TokenVerifier,
-    PrincipalService,
+    SessionService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: TokenThrottlerGuard },
     { provide: APP_GUARD, useClass: AccessGuard },

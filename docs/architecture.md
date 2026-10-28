@@ -46,12 +46,10 @@ routing pointers and job queues. No queue/worker is active in this foundation.
 
 ## Security implementation status
 
-OIDC verification, local identity checks, permission metadata, IP/MFA gates,
-company isolation and immutable audit storage are implemented. Full auth UX,
-revocation, sensitive-action reauthentication, support-access approval, denial
-audit projection, document scanning, observability exporters and provider
-integrations remain implementation slices. Never describe the foundation as
-passing all production acceptance checks from the specification.
+Platform login uses password hashes and server-side sessions. OIDC verification
+and external identity/MFA configuration are removed. See foundation-contract.md.
+Tenant RLS and permission checks remain. Password recovery, optional MFA,
+observability exporters and business integrations remain implementation slices.
 
 Money in future migrations must be integer minor units plus ISO currency;
 return large integer amounts as JSON strings to avoid JavaScript precision loss.

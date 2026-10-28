@@ -18,6 +18,7 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(await readFile(new URL('../database/migrations/002_password_sessions.sql',import.meta.url),'utf8'));
   await db.exec(
     `INSERT INTO platform.companies(id,public_id,slug,name,status) VALUES ('${A}','MJ-1001','alpha','{"en":"Alpha","ar":"ألفا"}','active'),('${B}','MJ-1002','beta','{"en":"Beta","ar":"بيتا"}','active');`,
   );

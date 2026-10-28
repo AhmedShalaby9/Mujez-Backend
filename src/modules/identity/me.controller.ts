@@ -1,5 +1,5 @@
 import { Controller, Get, Req } from "@nestjs/common";
-import { ApiBearerAuth, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiCookieAuth, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { RequireAccess } from "../../common/auth/access.js";
 import {
   ProfileDto,
@@ -8,7 +8,7 @@ import {
 } from "./identity.dto.js";
 import type { AuthRequest } from "../../common/auth/access.guard.js";
 @ApiTags("Tenant identity")
-@ApiBearerAuth("tenant")
+@ApiCookieAuth("tenant")
 @ApiResponse({
   status: 401,
   description: "Missing or invalid tenant access token",
@@ -31,7 +31,7 @@ export class TenantMeController {
   }
 }
 @ApiTags("Platform identity")
-@ApiBearerAuth("platform")
+@ApiCookieAuth("platform")
 @ApiResponse({
   status: 401,
   description: "Missing or invalid platform access token",

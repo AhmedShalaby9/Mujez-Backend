@@ -18,14 +18,12 @@ try {
       "Foundation endpoints only. Business modules and controlled support access are not implemented yet.",
     )
     .setVersion("0.1.0")
-    .addBearerAuth(
-      { type: "http", scheme: "bearer", bearerFormat: "JWT" },
-      "tenant",
-    )
-    .addBearerAuth(
-      { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+    .addCookieAuth(
+      "__Host-mujez_session",
+      { type: "apiKey", in: "cookie" },
       "platform",
     )
+    .addCookieAuth("mujez_session", { type: "apiKey", in: "cookie" }, "tenant")
     .build();
   const document = SwaggerModule.createDocument(app, options);
   document.openapi = "3.1.0";

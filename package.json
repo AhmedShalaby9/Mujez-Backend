@@ -19,8 +19,6 @@
     "format": "prettier --write src tests scripts docs tsconfig.json package.json",
     "format:check": "prettier --check src tests scripts docs tsconfig.json package.json",
     "db:provision:local": "node --env-file-if-exists=.env scripts/provision-local-roles.mjs",
-    "test:oidc:prepare": "node scripts/prepare-oidc-test.mjs",
-    "test:oidc": "node --test tests/oidc.simulation.mjs",
     "openapi:validate": "node scripts/validate-openapi.mjs"
   },
   "dependencies": {
@@ -33,7 +31,6 @@
     "class-validator": "^0.15.1",
     "helmet": "^8.3.0",
     "ipaddr.js": "^2.5.0",
-    "jose": "^6.2.13",
     "pg": "^8.23.1",
     "redis": "^6.3.0",
     "reflect-metadata": "^0.2.2",

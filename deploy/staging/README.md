@@ -44,9 +44,12 @@ server configuration: editing a secret does not rotate PostgreSQL credentials.
 Coordinate those changes separately. New application setting names must also be
 added to `validate-env.py`'s validation policy.
 
-Login is intentionally pending: `.invalid` OIDC URLs fail closed. Replace the
-three issuer/audience/JWKS groups when the provider is ready. Local identity
-provisioning and trusted proxy/IP allowlist configuration are still required.
+Login uses email/password sessions. Old AUTH_* and PLATFORM_IP_ALLOWLIST entries
+are stripped during deployment; re-copy the cleaned local .env.staging into the
+GitHub STAGING_ENV secret when convenient. No new runtime secret is required.
+Platform accounts are provisioned explicitly after migration using stdin JSON;
+passwords must not be committed or reset automatically on every deployment.
+TRUST_PROXY_CIDRS in the server Compose .env identifies the trusted ingress gateway.
 
 ## Deployment sequence
 

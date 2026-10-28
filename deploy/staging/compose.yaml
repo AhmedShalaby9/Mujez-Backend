@@ -36,6 +36,8 @@ services:
     build:
       context: ../..
     restart: unless-stopped
+    environment:
+      TRUST_PROXY_CIDRS: ${TRUST_PROXY_CIDRS:-}
     env_file:
       - path: ./api.env
         format: raw

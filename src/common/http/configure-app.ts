@@ -8,9 +8,13 @@ import { ApiErrorFilter } from "./api-error.filter.js";
 export function configureApp(app: INestApplication, env: Environment): void {
   const server = app.getHttpAdapter().getInstance();
   server.disable("x-powered-by");
-  server.set("trust proxy", false);
+  server.set(
+    "trust proxy",
+    env.TRUST_PROXY_CIDRS ? env.TRUST_PROXY_CIDRS.split(",") : false,
+  );
   app.use(helmet());
   app.enableCors({
+    credentials: true,
     origin: env.CORS_ORIGINS.split(",").map((s) => s.trim()),
     allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key"],
     exposedHeaders: ["X-Request-Id"],
@@ -31,6 +35,21 @@ export function configureApp(app: INestApplication, env: Environment): void {
         }),
       ),
     );
+    next();
+  });
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (
+      !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
+      !env.CORS_ORIGINS.split(",").includes(req.headers.origin ?? "")
+    ) {
+      res
+        .status(403)
+        .json({
+          code: "origin_denied",
+          message: "Request origin is not allowed",
+        });
+      return;
+    }
     next();
   });
   app.useGlobalFilters(new ApiErrorFilter());

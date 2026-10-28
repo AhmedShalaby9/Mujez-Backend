@@ -1,6 +1,38 @@
 {
   "openapi": "3.1.0",
   "paths": {
+    "/admin/api/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginDto" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/admin/api/v1/auth/session": {
+      "get": {
+        "operationId": "AuthController_session",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/admin/api/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
     "/health/live": {
       "get": {
         "operationId": "HealthController_live",
@@ -145,10 +177,15 @@
   "servers": [],
   "components": {
     "securitySchemes": {
-      "tenant": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" },
-      "platform": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" }
+      "platform": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-mujez_session"
+      },
+      "tenant": { "type": "apiKey", "in": "cookie", "name": "mujez_session" }
     },
     "schemas": {
+      "LoginDto": { "type": "object", "properties": {} },
       "ProfileDto": {
         "type": "object",
         "properties": {

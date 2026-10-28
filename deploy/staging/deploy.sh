@@ -17,6 +17,10 @@ test -s "$active/.env" && test -s "$active/admin.env" && test -s "$active/api.en
 test ! -e "$release"
 install -d -m 700 "$release"
 tar -xzf "$incoming/source.tar.gz" -C "$release"
+python3 - "$incoming/staging.env" <<'PYENV'
+import pathlib,sys
+p=pathlib.Path(sys.argv[1]);p.write_text('\n'.join(line for line in p.read_text().splitlines() if not line.startswith(('AUTH_','PLATFORM_IP_ALLOWLIST=')))+'\n')
+PYENV
 python3 "$candidate/validate-env.py" "$incoming/staging.env" "$active/api.env"
 install -m 600 "$incoming/staging.env" "$candidate/api.env"
 install -m 600 "$active/admin.env" "$candidate/admin.env"
