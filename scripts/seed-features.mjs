@@ -67,7 +67,7 @@ try {
           [key, plan, tiers.indexOf(plan) >= tiers.indexOf(minTier)],
         );
     }
-    await service.audit(client, actor, "feature.seeded", null, {
+    await service.audit(client, actor.id, "feature.seeded", null, {
       key,
       platformOn: false,
       reason:
