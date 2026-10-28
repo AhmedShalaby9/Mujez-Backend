@@ -166,6 +166,44 @@
         "tags": ["Platform identity"]
       }
     },
+    "/admin/api/v1/overview": {
+      "get": {
+        "operationId": "OverviewController_snapshot",
+        "parameters": [
+          {
+            "name": "range",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["30d", "90d", "12m", "custom"]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Overview"]
+      }
+    },
+    "/admin/api/v1/overview/alerts": {
+      "get": {
+        "operationId": "OverviewController_alerts",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Overview"]
+      }
+    },
     "/admin/api/v1/audit-logs": {
       "get": {
         "operationId": "PlatformAuditController_list",

@@ -1,3 +1,4 @@
+import { OverviewService } from "../dist/modules/platform/overview/overview.service.js";
 import { SettingsService } from "../dist/modules/platform/settings/settings.service.js";
 import "reflect-metadata";
 import { test, before, after } from "node:test";
@@ -54,6 +55,14 @@ before(async () => {
         primaryColor: "#4945CC",
       }),
       value: async () => ({ sessionLength: 480, lockoutAttempts: 10 }),
+    })
+    .overrideProvider(OverviewService)
+    .useValue({
+      snapshot: async (input, permissions) => ({
+        range: input.range,
+        receivedPermissions: permissions,
+      }),
+      alerts: async () => ({ items: [] }),
     })
     .overrideProvider(SessionService)
     .useValue({
@@ -495,5 +504,34 @@ test("audit/settings enforce permissions, validate exports and never expose secu
       .expect(400);
   } finally {
     permissions = ["co.view"];
+  }
+});
+
+test("overview requires a platform session and validates ranges without adding financial permissions", async () => {
+  const server = app.getHttpServer(),
+    cookie = "__Host-mujez_session=" + "a".repeat(64);
+  await request(server).get("/admin/api/v1/overview").expect(401);
+  await request(server).get("/admin/api/v1/overview/alerts").expect(401);
+  const r = await request(server)
+    .get("/admin/api/v1/overview?range=30d")
+    .set("Cookie", cookie)
+    .expect(200);
+  assert.deepEqual(r.body.receivedPermissions, ["co.view"]);
+  await request(server)
+    .get("/admin/api/v1/overview?range=invented")
+    .set("Cookie", cookie)
+    .expect(400);
+  await request(server)
+    .get("/admin/api/v1/overview?range=30d&billing=true")
+    .set("Cookie", cookie)
+    .expect(400);
+  principalPool = "company_user";
+  try {
+    await request(server)
+      .get("/admin/api/v1/overview")
+      .set("Cookie", cookie)
+      .expect(403);
+  } finally {
+    principalPool = "platform";
   }
 });
