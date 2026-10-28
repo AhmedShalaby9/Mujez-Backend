@@ -13,6 +13,7 @@ before(async () => {
     "001_foundation.sql",
     "002_password_sessions.sql",
     "003_companies_onboarding.sql",
+    "004_plans_subscriptions.sql",
   ])
     await db.exec(
       await readFile(

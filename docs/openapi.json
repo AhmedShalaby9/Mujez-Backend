@@ -290,6 +290,186 @@
         "responses": { "201": { "description": "" } },
         "tags": ["Companies"]
       }
+    },
+    "/admin/api/v1/plan-options": {
+      "get": {
+        "operationId": "SubscriptionsController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
+    },
+    "/admin/api/v1/plans": {
+      "get": {
+        "operationId": "SubscriptionsController_plans",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Subscriptions"]
+      },
+      "post": {
+        "operationId": "SubscriptionsController_createPlan",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PlanCreate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
+    },
+    "/admin/api/v1/plans/{key}/update": {
+      "post": {
+        "operationId": "SubscriptionsController_editPlan",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PlanEdit" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
+    },
+    "/admin/api/v1/plans/{key}/archive": {
+      "post": {
+        "operationId": "SubscriptionsController_archive",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PlanArchive" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
+    },
+    "/admin/api/v1/subscriptions": {
+      "get": {
+        "operationId": "SubscriptionsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Subscriptions"]
+      },
+      "post": {
+        "operationId": "SubscriptionsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SubscriptionCreate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
+    },
+    "/admin/api/v1/subscriptions/{id}/change": {
+      "post": {
+        "operationId": "SubscriptionsController_change",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SubscriptionChange" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
+    },
+    "/admin/api/v1/subscriptions/{id}/cancel": {
+      "post": {
+        "operationId": "SubscriptionsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Revision" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
+    },
+    "/admin/api/v1/subscriptions/{id}/renew": {
+      "post": {
+        "operationId": "SubscriptionsController_renew",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Revision" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
     }
   },
   "info": {
@@ -416,6 +596,117 @@
           "version": { "type": "number" }
         },
         "required": ["step", "completed", "version"]
+      },
+      "PlanCreate": {
+        "type": "object",
+        "properties": {
+          "nameEn": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "descEn": { "type": "string" },
+          "descAr": { "type": "string" },
+          "monthlyMinor": { "type": "number" },
+          "annualMinor": { "type": "number" },
+          "users": { "type": "object" },
+          "listings": { "type": "object" },
+          "projects": { "type": "object" },
+          "storageGb": { "type": "object" },
+          "featsEn": { "type": "string" },
+          "featsAr": { "type": "string" },
+          "key": { "type": "string" }
+        },
+        "required": [
+          "nameEn",
+          "nameAr",
+          "descEn",
+          "descAr",
+          "monthlyMinor",
+          "annualMinor",
+          "users",
+          "listings",
+          "projects",
+          "storageGb",
+          "featsEn",
+          "featsAr",
+          "key"
+        ]
+      },
+      "PlanEdit": {
+        "type": "object",
+        "properties": {
+          "nameEn": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "descEn": { "type": "string" },
+          "descAr": { "type": "string" },
+          "monthlyMinor": { "type": "number" },
+          "annualMinor": { "type": "number" },
+          "users": { "type": "object" },
+          "listings": { "type": "object" },
+          "projects": { "type": "object" },
+          "storageGb": { "type": "object" },
+          "featsEn": { "type": "string" },
+          "featsAr": { "type": "string" },
+          "version": { "type": "number" },
+          "scope": { "type": "string" },
+          "selectedIds": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": [
+          "nameEn",
+          "nameAr",
+          "descEn",
+          "descAr",
+          "monthlyMinor",
+          "annualMinor",
+          "users",
+          "listings",
+          "projects",
+          "storageGb",
+          "featsEn",
+          "featsAr",
+          "version",
+          "scope",
+          "selectedIds"
+        ]
+      },
+      "PlanArchive": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "archived": { "type": "boolean" }
+        },
+        "required": ["version", "archived"]
+      },
+      "SubscriptionCreate": {
+        "type": "object",
+        "properties": {
+          "companyId": { "type": "string" },
+          "plan": { "type": "string" },
+          "cycle": { "type": "string" },
+          "payment": { "type": "string" },
+          "status": { "type": "string" },
+          "planVersionId": { "type": "string" }
+        },
+        "required": [
+          "companyId",
+          "plan",
+          "cycle",
+          "payment",
+          "status",
+          "planVersionId"
+        ]
+      },
+      "SubscriptionChange": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "plan": { "type": "string" },
+          "planVersionId": { "type": "string" }
+        },
+        "required": ["version", "plan", "planVersionId"]
+      },
+      "Revision": {
+        "type": "object",
+        "properties": { "version": { "type": "number" } },
+        "required": ["version"]
       }
     }
   }

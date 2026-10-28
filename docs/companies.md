@@ -21,7 +21,7 @@ Updates require the current integer version; stale changes return 409.
 Each mutation locks its company and records audit + outbox in the same transaction.
 Public IDs are generated; slugs are unique. User counts come from tenant users via
 an aggregate-only view; the platform role still cannot read individual tenant users.
-Revenue is unavailable until subscriptions/billing are implemented.
+MRR and the current plan come from the latest subscription when one exists; otherwise MRR is zero. These figures describe active contract terms, not collected payments.
 
 ## Seeder
 

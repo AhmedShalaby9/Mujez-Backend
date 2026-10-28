@@ -142,3 +142,24 @@ test("company mutations require server-side permissions", async () => {
       .send({})
       .expect(403);
 });
+
+test("catalog and subscription writes require explicit permissions", async () => {
+  await request(app.getHttpServer())
+    .post("/admin/api/v1/auth/login")
+    .set("Origin", env.CORS_ORIGINS)
+    .send({ email: "test@example.test", password: "correct" })
+    .expect(200);
+  const cookie = "__Host-mujez_session=" + "a".repeat(64);
+  for (const path of [
+    "/admin/api/v1/plans",
+    "/admin/api/v1/subscriptions",
+    "/admin/api/v1/plans/starter/update",
+    "/admin/api/v1/subscriptions/test/renew",
+  ])
+    await request(app.getHttpServer())
+      .post(path)
+      .set("Origin", env.CORS_ORIGINS)
+      .set("Cookie", cookie)
+      .send({})
+      .expect(403);
+});

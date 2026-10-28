@@ -14,7 +14,7 @@ import type {
   StatusInput,
   StepInput,
 } from "./companies.dto.js";
-const SELECT = `SELECT c.*,coalesce(u.users,0) AS users FROM platform.companies c LEFT JOIN platform.company_user_counts u ON u.company_id=c.id`;
+const SELECT = `SELECT c.*,coalesce(u.users,0) AS users,ss.plan_key AS subscription_plan,ss.mrr AS subscription_mrr FROM platform.companies c LEFT JOIN platform.company_user_counts u ON u.company_id=c.id LEFT JOIN platform.company_subscription_summary ss ON ss.company_id=c.id`;
 export function companyDto(c: any) {
   return {
     id: c.public_id,
@@ -27,10 +27,10 @@ export function companyDto(c: any) {
     adminEmail: c.admin_email,
     phone: c.phone,
     website: c.website,
-    plan: c.selected_plan,
+    plan: c.subscription_plan ?? c.selected_plan,
     status: c.status,
     users: c.users ?? 0,
-    mrr: 0,
+    mrr: Number(c.subscription_mrr ?? 0),
     createdAt: new Date(c.created_at).toISOString(),
     lastActivity: new Date(c.updated_at).toISOString(),
     signedUp: new Date(c.created_at).toISOString(),
