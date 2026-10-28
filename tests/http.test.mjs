@@ -10,6 +10,10 @@ import { DatabaseService } from "../dist/infrastructure/database/database.servic
 import { CacheService } from "../dist/infrastructure/cache/cache.module.js";
 import { SessionService } from "../dist/common/auth/session.service.js";
 import { UnauthorizedException } from "@nestjs/common";
+import { SupportService } from "../dist/modules/platform/support/support.service.js";
+import { AnnouncementsService } from "../dist/modules/platform/announcements/announcements.service.js";
+let principalPool = "platform";
+let principalCompany;
 let app;
 let active = false;
 let permissions = ["co.view"];
@@ -31,6 +35,16 @@ before(async () => {
     })
     .overrideProvider(CacheService)
     .useValue({ ready: async () => {} })
+    .overrideProvider(SupportService)
+    .useValue({
+      list: async () => ({ items: [], total: 0 }),
+      requestWorkspace: async () => ({
+        status: "pending",
+        accessGranted: false,
+      }),
+    })
+    .overrideProvider(AnnouncementsService)
+    .useValue({ visible: async (company, lang) => [{ company, lang }] })
     .overrideProvider(SessionService)
     .useValue({
       login: async (email, password) => {
@@ -44,7 +58,8 @@ before(async () => {
         return {
           id: "1",
           subject: "1",
-          pool: "platform",
+          pool: principalPool,
+          companyId: principalCompany,
           scope: "platform",
           name: "Test",
           email: "test@example.test",
@@ -268,5 +283,101 @@ test("integrations and health enforce authentication, permissions, origin and pa
       .expect(403);
   } finally {
     permissions = ["co.view"];
+  }
+});
+
+test("support and announcements protect reads, mutations and the tenant audience boundary", async () => {
+  const cookie = "__Host-mujez_session=" + "a".repeat(64),
+    server = app.getHttpServer();
+  for (const p of [
+    "/admin/api/v1/support-tickets",
+    "/admin/api/v1/support-tickets/options",
+    "/admin/api/v1/support-tickets/test",
+    "/admin/api/v1/announcements",
+  ]) {
+    await request(server).get(p).expect(401);
+    await request(server).get(p).set("Cookie", cookie).expect(403);
+  }
+  for (const p of [
+    "/admin/api/v1/support-tickets",
+    "/admin/api/v1/support-tickets/test/entries",
+    "/admin/api/v1/support-tickets/test/update",
+    "/admin/api/v1/support-tickets/test/workspace-requests",
+    "/admin/api/v1/announcements",
+    "/admin/api/v1/announcements/test/update",
+  ])
+    await request(server)
+      .post(p)
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({})
+      .expect(403);
+  permissions = ["support", "ann"];
+  try {
+    await request(server)
+      .get("/admin/api/v1/support-tickets?limit=101")
+      .set("Cookie", cookie)
+      .expect(400);
+    await request(server)
+      .post("/admin/api/v1/support-tickets/test/entries")
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({ version: 0, kind: "internal", text: "  " })
+      .expect(400);
+    await request(server)
+      .post("/admin/api/v1/support-tickets/test/update")
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({ version: 0, action: "assign", assignedTo: "invalid-uuid" })
+      .expect(400);
+    await request(server)
+      .post("/admin/api/v1/announcements")
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({ version: 0, published: true, unexpected: true })
+      .expect(400);
+    const workspace = {
+      version: 0,
+      reason: "Investigate ticket safely",
+      durationMinutes: 30,
+    };
+    await request(server)
+      .post("/admin/api/v1/support-tickets/test/workspace-requests")
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send(workspace)
+      .expect(403);
+    permissions.push("ws.read");
+    const r = await request(server)
+      .post("/admin/api/v1/support-tickets/test/workspace-requests")
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send(workspace)
+      .expect(201);
+    assert.equal(r.body.accessGranted, false);
+    await request(server)
+      .get("/api/v1/announcements")
+      .set("Cookie", cookie)
+      .expect(403);
+    principalPool = "company_user";
+    principalCompany = "own-company";
+    permissions = [];
+    await request(server)
+      .get("/admin/api/v1/support-tickets")
+      .set("Cookie", cookie)
+      .expect(403);
+    const feed = await request(server)
+      .get("/api/v1/announcements?lang=ar&companyId=another-company")
+      .set("Cookie", cookie)
+      .expect(200);
+    assert.deepEqual(feed.body, [{ company: "own-company", lang: "ar" }]);
+    await request(server)
+      .get("/api/v1/announcements?lang=invalid")
+      .set("Cookie", cookie)
+      .expect(400);
+  } finally {
+    permissions = ["co.view"];
+    principalPool = "platform";
+    principalCompany = undefined;
   }
 });

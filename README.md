@@ -36,7 +36,7 @@ resets the supplied accounts and revokes their sessions.
 
 super_admin includes every platform permission. platform_admin excludes billing,
 plans, platform user administration and settings. Permissions remain server-side.
-The existing business screens contain preview data; CRUD APIs are still pending.
+Company onboarding, plans/subscriptions, billing/payments, features/usage, integration settings, support tickets and announcements have persisted APIs. See the module documents in docs/ for scope and delivery limitations.
 Password recovery delivery and MFA are not implemented. The UI directs users to
 the administrator for password reset; it does not claim to send email.
 
@@ -44,3 +44,5 @@ the administrator for password reset; it does not claim to send email.
 
 npm test; npm run typecheck; npm run openapi:generate; npm run openapi:validate.
 See docs/foundation-contract.md and deploy/staging/README.md.
+
+See [support and announcements](docs/support-announcements.md) for the API workflows, SLA rules, scheduling and initial seed command.

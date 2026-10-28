@@ -24,7 +24,8 @@
     "db:seed:subscriptions": "npm run build && node --env-file-if-exists=.env scripts/seed-subscriptions.mjs",
     "db:seed:billing": "npm run build && node --env-file-if-exists=.env scripts/seed-billing.mjs",
     "db:seed:features": "npm run build && node --env-file-if-exists=.env scripts/seed-features.mjs",
-    "db:seed:integrations": "npm run build && node --env-file-if-exists=.env scripts/seed-integrations.mjs"
+    "db:seed:integrations": "npm run build && node --env-file-if-exists=.env scripts/seed-integrations.mjs",
+    "db:seed:support": "npm run build && node --env-file-if-exists=.env scripts/seed-support-announcements.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.2.0",

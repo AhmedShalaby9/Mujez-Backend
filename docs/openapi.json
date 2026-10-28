@@ -865,6 +865,236 @@
         "tags": ["Integrations"]
       }
     },
+    "/admin/api/v1/support-tickets": {
+      "get": {
+        "operationId": "SupportController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Support"]
+      },
+      "post": {
+        "operationId": "SupportController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TicketInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Support"]
+      }
+    },
+    "/admin/api/v1/support-tickets/options": {
+      "get": {
+        "operationId": "SupportController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Support"]
+      }
+    },
+    "/admin/api/v1/support-tickets/summary": {
+      "get": {
+        "operationId": "SupportController_summary",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Support"]
+      }
+    },
+    "/admin/api/v1/support-tickets/{id}": {
+      "get": {
+        "operationId": "SupportController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Support"]
+      }
+    },
+    "/admin/api/v1/support-tickets/{id}/update": {
+      "post": {
+        "operationId": "SupportController_change",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TicketChange" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Support"]
+      }
+    },
+    "/admin/api/v1/support-tickets/{id}/entries": {
+      "post": {
+        "operationId": "SupportController_entry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EntryInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Support"]
+      }
+    },
+    "/admin/api/v1/support-tickets/{id}/workspace-requests": {
+      "post": {
+        "operationId": "SupportController_request",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WorkspaceInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Support"]
+      }
+    },
+    "/admin/api/v1/support-tickets/{id}/workspace-requests/{requestId}/cancel": {
+      "post": {
+        "operationId": "SupportController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Version" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Support"]
+      }
+    },
+    "/admin/api/v1/announcements": {
+      "get": {
+        "operationId": "AnnouncementsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Announcements"]
+      },
+      "post": {
+        "operationId": "AnnouncementsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AnnouncementInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Announcements"]
+      }
+    },
+    "/admin/api/v1/announcements/{id}/update": {
+      "post": {
+        "operationId": "AnnouncementsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AnnouncementInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Announcements"]
+      }
+    },
+    "/api/v1/announcements": {
+      "get": {
+        "operationId": "CompanyAnnouncementsController_visible",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CompanyAnnouncements"]
+      }
+    },
     "/admin/api/v1/system-health": {
       "get": {
         "operationId": "SystemHealthController_snapshot",
@@ -1259,6 +1489,88 @@
           "reason": { "type": "string" }
         },
         "required": ["version", "enabled", "reason"]
+      },
+      "TicketInput": {
+        "type": "object",
+        "properties": {
+          "companyId": { "type": "string" },
+          "subjectEn": { "type": "string" },
+          "subjectAr": { "type": "string" },
+          "category": { "type": "string" },
+          "priority": { "type": "string" },
+          "requester": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": [
+          "companyId",
+          "subjectEn",
+          "subjectAr",
+          "category",
+          "priority",
+          "requester",
+          "message"
+        ]
+      },
+      "TicketChange": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "action": { "type": "string" },
+          "status": { "type": "string" },
+          "assignedTo": { "type": "object" },
+          "priority": { "type": "string" }
+        },
+        "required": ["version", "action", "status", "assignedTo", "priority"]
+      },
+      "EntryInput": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "kind": { "type": "string" },
+          "text": { "type": "string" }
+        },
+        "required": ["version", "kind", "text"]
+      },
+      "WorkspaceInput": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "reason": { "type": "string" },
+          "durationMinutes": { "type": "number" }
+        },
+        "required": ["version", "reason", "durationMinutes"]
+      },
+      "Version": {
+        "type": "object",
+        "properties": { "version": { "type": "number" } },
+        "required": ["version"]
+      },
+      "AnnouncementInput": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "titleEn": { "type": "string" },
+          "titleAr": { "type": "string" },
+          "bodyEn": { "type": "string" },
+          "bodyAr": { "type": "string" },
+          "type": { "type": "string" },
+          "target": { "type": "string" },
+          "lang": { "type": "string" },
+          "from": { "type": ["object", "null"] },
+          "to": { "type": ["object", "null"] },
+          "published": { "type": "boolean" }
+        },
+        "required": [
+          "version",
+          "titleEn",
+          "titleAr",
+          "bodyEn",
+          "bodyAr",
+          "type",
+          "target",
+          "lang",
+          "published"
+        ]
       }
     }
   }
