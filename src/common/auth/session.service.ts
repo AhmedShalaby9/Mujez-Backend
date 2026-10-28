@@ -50,6 +50,22 @@ export class SessionService {
     const token = randomBytes(32).toString("hex");
     const seconds = remember ? 2592000 : 28800;
     await this.db.platform(async (c) => {
+      const current = (
+        await c.query(
+          "SELECT u.status,p.password_hash FROM platform.users u JOIN platform.credentials p ON p.user_id=u.id WHERE u.id=$1 FOR UPDATE OF u",
+          [user.id],
+        )
+      ).rows[0];
+      if (
+        !current ||
+        current.status !== "active" ||
+        current.password_hash !== user.password_hash
+      )
+        throw new UnauthorizedException("Invalid email or password");
+      await c.query(
+        "UPDATE platform.users SET last_login_at=now() WHERE id=$1",
+        [user.id],
+      );
       if (previous)
         await c.query("DELETE FROM platform.sessions WHERE digest=$1", [
           digest(previous),
@@ -68,14 +84,16 @@ export class SessionService {
       async (c) =>
         (
           await c.query(
-            "SELECT u.id,u.name,u.email,r.key AS role,r.permissions FROM platform.sessions s JOIN platform.users u ON u.id=s.user_id JOIN platform.roles r ON r.id=u.role_id WHERE s.digest=$1 AND s.expires_at>now() AND u.status='active'",
+            "SELECT u.id,u.name,u.email,r.key AS role,r.name AS role_name,r.permissions FROM platform.sessions s JOIN platform.users u ON u.id=s.user_id JOIN platform.roles r ON r.id=u.role_id WHERE s.digest=$1 AND s.expires_at>now() AND u.status='active'",
             [digest(token)],
           )
         ).rows[0],
     );
     if (!user) throw new UnauthorizedException();
+    const { role_name, ...profile } = user;
     return {
-      ...user,
+      ...profile,
+      roleName: role_name,
       pool: "platform" as const,
       scope: "platform" as const,
       subject: user.id,

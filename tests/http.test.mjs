@@ -381,3 +381,54 @@ test("support and announcements protect reads, mutations and the tenant audience
     principalCompany = undefined;
   }
 });
+
+test("platform access endpoints require admins permission; activation is public but origin and payload validated", async () => {
+  const server = app.getHttpServer(),
+    cookie = "__Host-mujez_session=" + "a".repeat(64);
+  for (const path of ["/admin/api/v1/platform-users", "/admin/api/v1/roles"]) {
+    await request(server).get(path).expect(401);
+    await request(server).get(path).set("Cookie", cookie).expect(403);
+  }
+  for (const path of [
+    "/admin/api/v1/platform-users",
+    "/admin/api/v1/roles",
+    "/admin/api/v1/roles/custom/permission",
+  ])
+    await request(server)
+      .post(path)
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({})
+      .expect(403);
+  await request(server)
+    .post("/admin/api/v1/auth/activate")
+    .set("Origin", "https://hostile.test")
+    .send({ token: "a".repeat(64), password: "long-enough-password" })
+    .expect(403);
+  await request(server)
+    .post("/admin/api/v1/auth/activate")
+    .set("Origin", env.CORS_ORIGINS)
+    .send({ token: "short", password: "weak" })
+    .expect(400);
+  permissions = ["admins"];
+  try {
+    await request(server)
+      .get("/admin/api/v1/platform-users?limit=101")
+      .set("Cookie", cookie)
+      .expect(400);
+    await request(server)
+      .post("/admin/api/v1/roles/custom/permission")
+      .set("Cookie", cookie)
+      .set("Origin", env.CORS_ORIGINS)
+      .send({
+        version: 0,
+        enabled: true,
+        permission: "admins",
+        password: "value",
+        reason: "  ",
+      })
+      .expect(400);
+  } finally {
+    permissions = ["co.view"];
+  }
+});

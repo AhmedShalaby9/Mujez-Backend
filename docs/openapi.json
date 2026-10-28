@@ -1095,6 +1095,217 @@
         "tags": ["CompanyAnnouncements"]
       }
     },
+    "/admin/api/v1/platform-users": {
+      "get": {
+        "operationId": "PlatformAccessController_users",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      },
+      "post": {
+        "operationId": "PlatformAccessController_invite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InviteAdmin" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      }
+    },
+    "/admin/api/v1/roles": {
+      "get": {
+        "operationId": "PlatformAccessController_roles",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      },
+      "post": {
+        "operationId": "PlatformAccessController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NewRole" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      }
+    },
+    "/admin/api/v1/platform-users/{id}/reissue": {
+      "post": {
+        "operationId": "PlatformAccessController_reissue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AdminVersion" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      }
+    },
+    "/admin/api/v1/platform-users/{id}/role": {
+      "post": {
+        "operationId": "PlatformAccessController_assign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AssignRole" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      }
+    },
+    "/admin/api/v1/platform-users/{id}/status": {
+      "post": {
+        "operationId": "PlatformAccessController_status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UserStatus" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      }
+    },
+    "/admin/api/v1/platform-users/{id}/revoke": {
+      "post": {
+        "operationId": "PlatformAccessController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AdminVersion" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      }
+    },
+    "/admin/api/v1/roles/{key}/permission": {
+      "post": {
+        "operationId": "PlatformAccessController_permission",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PermissionChange" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      }
+    },
+    "/admin/api/v1/roles/{key}/archive": {
+      "post": {
+        "operationId": "PlatformAccessController_archive",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AdminVersion" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      }
+    },
+    "/admin/api/v1/auth/activate": {
+      "post": {
+        "operationId": "PlatformAccessController_activate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ActivateAdmin" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAccess"]
+      }
+    },
     "/admin/api/v1/system-health": {
       "get": {
         "operationId": "SystemHealthController_snapshot",
@@ -1571,6 +1782,75 @@
           "lang",
           "published"
         ]
+      },
+      "InviteAdmin": {
+        "type": "object",
+        "properties": {
+          "password": { "type": "string" },
+          "reason": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string" }
+        },
+        "required": ["password", "reason", "name", "email", "role"]
+      },
+      "AdminVersion": {
+        "type": "object",
+        "properties": {
+          "password": { "type": "string" },
+          "reason": { "type": "string" },
+          "version": { "type": "number" }
+        },
+        "required": ["password", "reason", "version"]
+      },
+      "AssignRole": {
+        "type": "object",
+        "properties": {
+          "password": { "type": "string" },
+          "reason": { "type": "string" },
+          "version": { "type": "number" },
+          "role": { "type": "string" }
+        },
+        "required": ["password", "reason", "version", "role"]
+      },
+      "UserStatus": {
+        "type": "object",
+        "properties": {
+          "password": { "type": "string" },
+          "reason": { "type": "string" },
+          "version": { "type": "number" },
+          "status": { "type": "string" }
+        },
+        "required": ["password", "reason", "version", "status"]
+      },
+      "NewRole": {
+        "type": "object",
+        "properties": {
+          "password": { "type": "string" },
+          "reason": { "type": "string" },
+          "nameEn": { "type": "string" },
+          "nameAr": { "type": "string" }
+        },
+        "required": ["password", "reason", "nameEn", "nameAr"]
+      },
+      "PermissionChange": {
+        "type": "object",
+        "properties": {
+          "password": { "type": "string" },
+          "reason": { "type": "string" },
+          "version": { "type": "number" },
+          "permission": { "type": "string" },
+          "enabled": { "type": "boolean" }
+        },
+        "required": ["password", "reason", "version", "permission", "enabled"]
+      },
+      "ActivateAdmin": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string" },
+          "password": { "type": "string" }
+        },
+        "required": ["token", "password"]
       }
     }
   }
