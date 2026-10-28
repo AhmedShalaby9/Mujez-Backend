@@ -30,6 +30,7 @@ before(async () => {
     ["annual", "active"],
     ["trial", "trial"],
     ["empty", "suspended"],
+    ["pending", "pending"],
   ]) {
     const c = (
       await db.query(
@@ -106,14 +107,23 @@ before(async () => {
 after(() => db.close());
 test("current counts use persisted statuses and eligible CRM accounts, never fixture statistics", async () => {
   const r = await service.snapshot({ range: "30d" }, all);
-  assert.equal(r.companies.total, 4);
+  assert.equal(r.companies.total, 5);
+  assert.equal(r.companies.pending, 1);
+  assert.equal(
+    r.companies.total,
+    r.companies.pending +
+      r.companies.active +
+      r.companies.trial +
+      r.companies.suspended +
+      r.companies.archived,
+  );
   assert.equal(r.companies.active, 2);
   assert.equal(r.companies.trial, 1);
   assert.equal(r.companies.suspended, 1);
   assert.equal(r.companies.crmUsers, "2");
-  assert.equal(r.companies.added, 4);
+  assert.equal(r.companies.added, 5);
   assert.equal(r.plans[0].companies, 3);
-  assert.equal(r.growth.length, 4);
+  assert.equal(r.growth.length, 5);
   assert.equal(r.sampleDataIncluded, false);
 });
 test("MRR normalizes agreed annual terms and excludes trials; recorded cash is not contract MRR", async () => {

@@ -4,7 +4,7 @@
 
 ## Definitions
 
-Company totals reflect persisted company statuses and include archived records. CRM account count uses the existing restricted aggregate view for non-archived companies: active/invited/locked, non-deleted users. It is not invented usage or a count of unique humans logging in today. Recently registered companies show registration date and current eligible CRM accounts, not untracked user-growth percentages.
+Company totals reflect persisted company statuses and include archived records. Status counts cover pending onboarding, active, trial, suspended and archived companies. CRM account count uses the existing restricted aggregate view for non-archived companies: active/invited/locked, non-deleted users. It is not invented usage or a count of unique humans logging in today. Recently registered companies show registration date and current eligible CRM accounts, not untracked user-growth percentages.
 
 Current MRR is the sum of active subscriptions with a future period end on active companies, using each subscription's agreed immutable plan version. Monthly contracts use their monthly amount; annual contracts use annual amount/12. ARR uses the equivalent annual terms. Each aggregate is rounded once to integer minor units, so annual terms retain exact totals and ARR may differ slightly from rounded MRR x12. Trials, inactive companies, past-due/suspended/cancelled/expired or elapsed subscriptions do not contribute to MRR. These are contract-value projections, not proof of collected cash.
 

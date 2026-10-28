@@ -80,7 +80,7 @@ export class OverviewService {
       if (canCompanies) {
         companies = (
           await c.query(
-            `SELECT count(*)::int AS total,count(*) FILTER(WHERE status='active')::int AS active,count(*) FILTER(WHERE status='trial')::int AS trial,count(*) FILTER(WHERE status='suspended')::int AS suspended,count(*) FILTER(WHERE status='archived')::int AS archived,count(*) FILTER(WHERE created_at>=($1::date::timestamp AT TIME ZONE 'Africa/Cairo') AND created_at<(($2::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS added FROM platform.companies`,
+            `SELECT count(*)::int AS total,count(*) FILTER(WHERE status='pending')::int AS pending,count(*) FILTER(WHERE status='active')::int AS active,count(*) FILTER(WHERE status='trial')::int AS trial,count(*) FILTER(WHERE status='suspended')::int AS suspended,count(*) FILTER(WHERE status='archived')::int AS archived,count(*) FILTER(WHERE created_at>=($1::date::timestamp AT TIME ZONE 'Africa/Cairo') AND created_at<(($2::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS added FROM platform.companies`,
             [window.from, window.to],
           )
         ).rows[0];
