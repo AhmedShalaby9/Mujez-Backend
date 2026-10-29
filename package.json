@@ -28,7 +28,8 @@
     "db:seed:support": "npm run build && node --env-file-if-exists=.env scripts/seed-support-announcements.mjs",
     "db:seed:access": "npm run build && node --env-file-if-exists=.env scripts/seed-platform-access.mjs",
     "db:seed:settings": "npm run build && node --env-file-if-exists=.env scripts/seed-settings.mjs",
-    "db:seed:overview": "npm run build && node --env-file-if-exists=.env scripts/seed-overview.mjs"
+    "db:seed:overview": "npm run build && node --env-file-if-exists=.env scripts/seed-overview.mjs",
+    "db:seed:sales": "npm run build && node --env-file-if-exists=.env scripts/seed-sales.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.2.0",

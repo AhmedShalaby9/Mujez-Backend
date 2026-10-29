@@ -20,4 +20,4 @@ origins. Password recovery email is not configured.
 
 Database changes use new numbered migrations and immutable applied checksums.
 Company isolation and append-only audit guarantees remain in the foundation.
-Company CRM business CRUD endpoints are not yet implemented; platform administration modules use their documented APIs.
+Company Leads/Pipeline CRUD is implemented with tenant permissions and isolation; see leads-pipeline.md. Other company CRM APIs remain pending. Platform modules use their documented APIs.

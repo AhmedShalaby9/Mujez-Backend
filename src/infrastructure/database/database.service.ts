@@ -45,10 +45,15 @@ export class DatabaseService implements OnApplicationShutdown {
   async tenant<T>(
     companyId: string,
     work: (client: PoolClient) => Promise<T>,
+    snapshot = false,
   ): Promise<T> {
     if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(companyId))
       throw new Error("Invalid tenant context");
     return this.transaction(this.tenantPool, "mujez_tenant", async (client) => {
+      if (snapshot)
+        await client.query(
+          "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+        );
       await client.query(`SELECT set_config('app.company_id', $1, true)`, [
         companyId,
       ]);

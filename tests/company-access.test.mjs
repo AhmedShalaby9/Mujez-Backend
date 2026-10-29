@@ -250,7 +250,13 @@ test("reissuing invalidates old links and activation is single use with a real t
   assert.equal(u.identity_pool, "company_admin");
   assert.equal(u.key, "company_owner");
   assert.equal(u.status, "active");
-  assert.deepEqual(u.permissions, ["workspace.view"]);
+  assert.deepEqual(u.permissions, [
+    "workspace.view",
+    "leads.read",
+    "leads.manage",
+    "pipeline.read",
+    "pipeline.manage",
+  ]);
   assert.equal(
     (
       await db.query(

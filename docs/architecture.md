@@ -1,7 +1,7 @@
 # Backend architecture
 
 Implementation reference: user-supplied Mujez CRM technical specification v1.0,
-2026-10-25. The repository currently implements foundations only.
+2026-10-25. The repository implements platform administration, company owner access and Leads/Pipeline. Other tenant CRM domains remain implementation slices.
 
 ## Database boundary
 

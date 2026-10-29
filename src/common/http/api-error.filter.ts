@@ -45,6 +45,9 @@ export class ApiErrorFilter implements ExceptionFilter {
         status >= 500
           ? "Service temporarily unavailable"
           : (detail.message ?? "Request could not be completed"),
+      ...(detail.code === "duplicate_lead" && Array.isArray(detail.duplicates)
+        ? { duplicates: detail.duplicates }
+        : {}),
       ...(detail.field ? { field: detail.field } : {}),
       ...(detail.permission ? { permission: detail.permission } : {}),
     });
