@@ -11,8 +11,7 @@ GET /admin/api/v1/auth/session returns the active platform user, role and permis
 POST /admin/api/v1/auth/logout revokes the session and clears its cookie.
 GET /admin/api/v1/me and /permissions require the same session.
 
-Platform sessions are rejected from /api/v1/me tenant endpoints. There is no
-company password login yet. Bearer/JWT/OIDC authentication is unsupported.
+Platform sessions are rejected from /api/v1/me tenant endpoints. Company owners use the shared /api/v1/auth login/session/logout routes and explicit admin invitations. See [company access](company-access.md). Bearer/JWT/OIDC authentication is unsupported.
 
 Sessions expire server-side and are invalid for disabled accounts. Role changes
 apply on the next request. Cookies are HttpOnly, SameSite=Lax, Path=/ and Secure
@@ -21,4 +20,4 @@ origins. Password recovery email is not configured.
 
 Database changes use new numbered migrations and immutable applied checksums.
 Company isolation and append-only audit guarantees remain in the foundation.
-Business CRUD endpoints are not yet implemented.
+Company CRM business CRUD endpoints are not yet implemented; platform administration modules use their documented APIs.

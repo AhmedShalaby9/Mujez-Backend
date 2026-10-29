@@ -48,7 +48,7 @@ routing pointers and job queues. No queue/worker is active in this foundation.
 
 Platform login uses password hashes and server-side sessions. OIDC verification
 and external identity/MFA configuration are removed. See foundation-contract.md.
-Tenant RLS and permission checks remain. Password recovery, optional MFA,
+Tenant RLS and permission checks remain. Company owner password sessions and explicit admin invitations are documented in [company access](company-access.md), including the narrow migration-owned provisioning bridge. Password recovery, optional MFA,
 observability exporters and business integrations remain implementation slices.
 
 Money in future migrations must be integer minor units plus ISO currency;

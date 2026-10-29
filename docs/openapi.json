@@ -3,7 +3,23 @@
   "paths": {
     "/admin/api/v1/auth/login": {
       "post": {
-        "operationId": "AuthController_login",
+        "operationId": "AuthController_login[0]",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginDto" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login[1]",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -19,7 +35,15 @@
     },
     "/admin/api/v1/auth/session": {
       "get": {
-        "operationId": "AuthController_session",
+        "operationId": "AuthController_session[0]",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/api/v1/auth/session": {
+      "get": {
+        "operationId": "AuthController_session[1]",
         "parameters": [],
         "responses": { "200": { "description": "" } },
         "tags": ["Auth"]
@@ -27,10 +51,95 @@
     },
     "/admin/api/v1/auth/logout": {
       "post": {
-        "operationId": "AuthController_logout",
+        "operationId": "AuthController_logout[0]",
         "parameters": [],
         "responses": { "200": { "description": "" } },
         "tags": ["Auth"]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout[1]",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/admin/api/v1/companies/{id}/owner": {
+      "get": {
+        "operationId": "CompanyAccessController_owner",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CompanyAccess"]
+      }
+    },
+    "/admin/api/v1/companies/{id}/owner/invite": {
+      "post": {
+        "operationId": "CompanyAccessController_invite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OwnerInvite" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["CompanyAccess"]
+      }
+    },
+    "/admin/api/v1/companies/{id}/owner/revoke": {
+      "post": {
+        "operationId": "CompanyAccessController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OwnerRevoke" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["CompanyAccess"]
+      }
+    },
+    "/api/v1/auth/activate": {
+      "post": {
+        "operationId": "OwnerActivationController_activate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OwnerActivate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["OwnerActivation"]
       }
     },
     "/health/live": {
@@ -1486,6 +1595,9 @@
     },
     "schemas": {
       "LoginDto": { "type": "object", "properties": {} },
+      "OwnerInvite": { "type": "object", "properties": {} },
+      "OwnerRevoke": { "type": "object", "properties": {} },
+      "OwnerActivate": { "type": "object", "properties": {} },
       "ProfileDto": {
         "type": "object",
         "properties": {

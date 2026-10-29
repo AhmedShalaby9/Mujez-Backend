@@ -23,7 +23,9 @@ export function sanitizeAudit(value: unknown, depth = 0): any {
 }
 export function severityFor(action: string): "low" | "med" | "high" {
   if (
-    /^(platform_user\.|platform_role\.|settings\.)/.test(action) &&
+    /^(platform_user\.|platform_role\.|company_owner\.|settings\.)/.test(
+      action,
+    ) &&
     !action.endsWith("seeded")
   )
     return "high";

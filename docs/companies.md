@@ -38,6 +38,4 @@ an existing active Super Admin for audit attribution. It never resets passwords,
 creates subscriptions or sends emails. Do not treat sample contact addresses as
 real customers. Seeding is explicit and not repeated on every deployment.
 
-Email reminders and tenant workspace support sessions remain unavailable; their
-buttons are disabled. The Companies and Onboarding screens use live API data;
-other screens still contain preview data.
+Owner invitations are available from company creation and Companies → View; see [company access](company-access.md). Invitation links are shared manually; email delivery and platform impersonation/support sessions remain unavailable. The new Company CRM pages are labeled design previews.

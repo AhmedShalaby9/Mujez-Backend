@@ -165,9 +165,10 @@ export class PlatformAccessService {
         );
       if (
         (
-          await c.query("SELECT 1 FROM platform.users WHERE email=$1", [
-            input.email,
-          ])
+          await c.query(
+            "SELECT 1 FROM platform.users WHERE email=$1 UNION ALL SELECT 1 FROM platform.company_owner_accounts WHERE email=$1",
+            [input.email],
+          )
         ).rowCount
       )
         throw new ConflictException(
@@ -189,6 +190,10 @@ export class PlatformAccessService {
         { role: role.key, reason: input.reason },
       );
       return { id: u.id, ...invitation };
+    }).catch((e: unknown) => {
+      if ((e as { code?: string }).code === "23505")
+        throw new ConflictException("Email already belongs to an account");
+      throw e;
     });
   }
   async reissue(id: string, input: AdminVersion, actor: string) {

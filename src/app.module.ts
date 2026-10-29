@@ -1,3 +1,8 @@
+import {
+  CompanyAccessController,
+  OwnerActivationController,
+} from "./modules/identity/company-access/company-access.controller.js";
+import { CompanyAccessService } from "./modules/identity/company-access/company-access.service.js";
 import { Global, Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
@@ -33,12 +38,15 @@ class EnvironmentModule {}
   ],
   controllers: [
     AuthController,
+    CompanyAccessController,
+    OwnerActivationController,
     HealthController,
     TenantMeController,
     PlatformMeController,
   ],
   providers: [
     SessionService,
+    CompanyAccessService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: TokenThrottlerGuard },
     { provide: APP_GUARD, useClass: AccessGuard },

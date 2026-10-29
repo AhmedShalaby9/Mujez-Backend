@@ -5,6 +5,7 @@ import {
   HttpCode,
   Inject,
   Post,
+  ForbiddenException,
   Req,
   Res,
 } from "@nestjs/common";
@@ -30,7 +31,7 @@ class LoginDto {
   @IsString() @MinLength(1) @MaxLength(256) declare password: string;
   @IsOptional() @IsBoolean() declare remember?: boolean;
 }
-@Controller("admin/api/v1/auth")
+@Controller(["admin/api/v1/auth", "api/v1/auth"])
 export class AuthController {
   constructor(
     private readonly sessions: SessionService,
@@ -50,7 +51,11 @@ export class AuthController {
     @Req() req: AuthRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.sessions.login(
+    const session = await (
+      req.path.startsWith("/admin/")
+        ? this.sessions.login.bind(this.sessions)
+        : this.sessions.loginAny.bind(this.sessions)
+    )(
       body.email,
       body.password,
       body.remember ?? false,
@@ -66,9 +71,11 @@ export class AuthController {
     });
     return { status: "authenticated" };
   }
-  @RequireAccess(["platform"]) @Get("session") session(
-    @Req() req: AuthRequest,
-  ) {
+  @RequireAccess(["platform", "company_admin", "company_user"])
+  @Get("session")
+  session(@Req() req: AuthRequest) {
+    if (req.path.startsWith("/admin/") && req.principal.pool !== "platform")
+      throw new ForbiddenException();
     const { subject, ...user } = req.principal;
     return user;
   }
