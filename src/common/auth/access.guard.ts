@@ -40,6 +40,17 @@ export class AccessGuard implements CanActivate {
     const token = sessionCookie(req);
     if (!token) throw new UnauthorizedException();
     const principal = await this.sessions.resolve(token);
+    if (
+      principal.mustChangePassword &&
+      !["/api/v1/auth/session", "/api/v1/auth/change-password"].includes(
+        req.path,
+      )
+    )
+      throw new ForbiddenException({
+        code: "password_change_required",
+        message:
+          "Change your temporary password before accessing the workspace.",
+      });
     if (!access.pools.includes(principal.pool)) throw new ForbiddenException();
     if (access.permission && !principal.permissions.includes(access.permission))
       throw new ForbiddenException();

@@ -1,3 +1,4 @@
+import { OwnerWelcomeService } from "../welcome/welcome.service.js";
 import {
   Injectable,
   BadRequestException,
@@ -23,6 +24,7 @@ export class CompanyAccessService {
   constructor(
     private readonly db: DatabaseService,
     private readonly cache: CacheService,
+    private readonly welcome: OwnerWelcomeService,
   ) {}
   async owner(publicId: string) {
     return this.db.platform(async (c) => {
@@ -34,11 +36,19 @@ export class CompanyAccessService {
       if (!company) throw new NotFoundException("Company not found");
       const a = (
         await c.query(
-          `SELECT a.id,a.name,a.email,a.status,(SELECT expires_at FROM platform.company_owner_invitations i WHERE i.account_id=a.id AND i.used_at IS NULL AND i.revoked_at IS NULL ORDER BY created_at DESC LIMIT 1) AS invitation_expires_at FROM platform.company_owner_accounts a WHERE company_id=$1`,
+          `SELECT a.id,a.name,a.email,a.status,p.must_change_password,(SELECT expires_at FROM platform.company_owner_invitations i WHERE i.account_id=a.id AND i.used_at IS NULL AND i.revoked_at IS NULL ORDER BY created_at DESC LIMIT 1) AS invitation_expires_at FROM platform.company_owner_accounts a LEFT JOIN platform.company_owner_credentials p ON p.account_id=a.id WHERE company_id=$1`,
           [company.id],
         )
       ).rows[0];
-      return { owner: a ?? null, delivery: "manual" };
+      const mail = a
+        ? (
+            await c.query(
+              "SELECT status,attempts,accepted_at,error_code,next_attempt_at FROM platform.owner_welcome_emails WHERE account_id=$1",
+              [a.id],
+            )
+          ).rows[0]
+        : null;
+      return { owner: a ?? null, delivery: mail ?? { status: "manual" } };
     });
   }
   async mutate(
@@ -155,6 +165,64 @@ export class CompanyAccessService {
           );
         throw e;
       });
+  }
+  async resend(publicId: string, input: OwnerRevoke, actor: string) {
+    this.welcome.ready();
+    if (!(await this.cache.consume("owner-email:" + actor, 10, 900)))
+      throw new HttpException("Too many resend attempts", 429);
+    return this.db.platform(async (c) => {
+      const co = (
+        await c.query(
+          "SELECT * FROM platform.companies WHERE public_id=$1 FOR UPDATE",
+          [publicId],
+        )
+      ).rows[0];
+      if (!co) throw new NotFoundException();
+      if (co.version !== input.version)
+        throw new ConflictException("Company changed. Refresh first.");
+      if (!["pending", "trial", "active"].includes(co.status))
+        throw new ConflictException("Company unavailable.");
+      const admin = (
+        await c.query(
+          "SELECT p.password_hash FROM platform.users u JOIN platform.roles r ON r.id=u.role_id JOIN platform.credentials p ON p.user_id=u.id WHERE u.id=$1 AND u.status='active' AND 'co.create'=ANY(r.permissions) FOR SHARE OF u,r",
+          [actor],
+        )
+      ).rows[0];
+      if (!admin) throw new ForbiddenException();
+      if (!(await verifyPassword(input.password, admin.password_hash)))
+        throw new UnauthorizedException("Password verification failed");
+      const a = (
+        await c.query(
+          "SELECT a.*,p.must_change_password FROM platform.company_owner_accounts a JOIN platform.company_owner_credentials p ON p.account_id=a.id WHERE a.company_id=$1 FOR UPDATE OF a,p",
+          [co.id],
+        )
+      ).rows[0];
+      if (!a || a.status !== "active" || !a.must_change_password)
+        throw new ConflictException(
+          "Welcome email cannot reset an owner who has completed their first login.",
+        );
+      if (a.email !== co.admin_email)
+        throw new ConflictException(
+          "Owner email differs from the company contact. Ownership transfer requires a separate operation.",
+        );
+      const mail = (
+        await c.query(
+          "SELECT status,lease_until FROM platform.owner_welcome_emails WHERE account_id=$1 FOR UPDATE",
+          [a.id],
+        )
+      ).rows[0];
+      if (
+        mail?.status === "processing" &&
+        new Date(mail.lease_until).getTime() > Date.now()
+      )
+        throw new ConflictException("Email is being submitted. Retry shortly.");
+      await this.welcome.queue(c, a.id, co, actor);
+      await c.query(
+        "UPDATE platform.companies SET version=version+1,updated_at=now() WHERE id=$1",
+        [co.id],
+      );
+      return { status: "queued", email: a.email };
+    });
   }
   async activate(input: OwnerActivate, ip: string) {
     if (!(await this.cache.consume("owner-activate:" + digest(ip), 20, 900)))

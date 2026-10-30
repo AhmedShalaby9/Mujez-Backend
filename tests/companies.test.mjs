@@ -1,7 +1,8 @@
+import { OwnerWelcomeService } from "../dist/modules/identity/welcome/welcome.service.js";
 import "reflect-metadata";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { CompaniesService } from "../dist/modules/platform/companies/companies.service.js";
 const db = new PGlite();
@@ -9,36 +10,44 @@ let service;
 let actor;
 let company;
 before(async () => {
-  for (const migration of [
-    "001_foundation.sql",
-    "002_password_sessions.sql",
-    "003_companies_onboarding.sql",
-    "004_plans_subscriptions.sql",
-  ])
+  for (const migration of (
+    await readdir(new URL("../database/migrations/", import.meta.url))
+  ).sort())
     await db.exec(
       await readFile(
         new URL("../database/migrations/" + migration, import.meta.url),
         "utf8",
       ),
     );
+
   actor = (
     await db.query(
       "INSERT INTO platform.users(name,email,status,role_id) SELECT 'Test','test@mujez.com','active',id FROM platform.roles WHERE key='super_admin' RETURNING id",
     )
   ).rows[0].id;
-  service = new CompaniesService({
-    platform: async (work) => {
-      await db.exec("BEGIN; SET LOCAL ROLE mujez_platform;");
-      try {
-        const result = await work(db);
-        await db.exec("COMMIT");
-        return result;
-      } catch (e) {
-        await db.exec("ROLLBACK");
-        throw e;
-      }
+  service = new CompaniesService(
+    {
+      platform: async (work) => {
+        await db.exec("BEGIN; SET LOCAL ROLE mujez_platform;");
+        try {
+          const result = await work(db);
+          await db.exec("COMMIT");
+          return result;
+        } catch (e) {
+          await db.exec("ROLLBACK");
+          throw e;
+        }
+      },
     },
-  });
+    new OwnerWelcomeService({
+      MAIL_ENABLED: true,
+      SMTP_HOST: "localhost",
+      SMTP_USER: "info@mujez.net",
+      SMTP_PASSWORD: "test-only",
+      WELCOME_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
+      DASHBOARD_URL: "https://dashboard.example.test/",
+    }),
+  );
 });
 after(() => db.close());
 const input = {
@@ -52,10 +61,19 @@ const input = {
   website: "",
   plan: "starter",
 };
-test("create persists company with audit/outbox, no fabricated users or revenue", async () => {
+test("create persists company with audit/outbox, real owner and queued welcome email", async () => {
   company = await service.create(input, actor);
   assert.equal(company.status, "pending");
-  assert.equal(company.users, 0);
+  assert.equal(company.users, 1);
+  assert.equal(company.ownerProvisioned, true);
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::int AS n FROM platform.company_owner_accounts",
+      )
+    ).rows[0].n,
+    1,
+  );
   assert.equal(company.mrr, 0);
   assert.equal((await service.list()).total, 1);
   assert.equal(

@@ -2,6 +2,20 @@ import ipaddr from "ipaddr.js";
 import { z } from "zod";
 export const ENV = Symbol("ENV");
 const schema = z.object({
+  MAIL_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  SMTP_USER: z.string().email().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_PASSWORD_FILE: z.literal("/run/mujez-mail-smtp/password").optional(),
+  WELCOME_ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9+/]{43}=$/)
+    .optional(),
+  DASHBOARD_URL: z.string().url().optional(),
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
@@ -21,6 +35,13 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
         result.error.issues.map((i) => i.path.join(".")).join(","),
     );
   const env = result.data;
+  if (
+    env.DASHBOARD_URL &&
+    (new URL(env.DASHBOARD_URL).origin + "/" !== env.DASHBOARD_URL ||
+      (env.NODE_ENV === "production" &&
+        !env.DASHBOARD_URL.startsWith("https://")))
+  )
+    throw new Error("Invalid DASHBOARD_URL");
   for (const cidr of env.TRUST_PROXY_CIDRS.split(",").filter(Boolean)) {
     const range = ipaddr.parseCIDR(cidr);
     if (range[1] === 0)

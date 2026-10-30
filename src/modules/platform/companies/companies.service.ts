@@ -1,3 +1,4 @@
+import { OwnerWelcomeService } from "../../identity/welcome/welcome.service.js";
 import {
   ConflictException,
   Injectable,
@@ -47,7 +48,10 @@ export function companyDto(c: any) {
 }
 @Injectable()
 export class CompaniesService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly welcome: OwnerWelcomeService,
+  ) {}
   async list(page = 1, limit = 100, onboarding = false) {
     return this.db.platform(async (c) => {
       const where = onboarding ? " WHERE c.status IN ('pending','trial')" : "";
@@ -93,6 +97,7 @@ export class CompaniesService {
     });
   }
   async create(input: CompanyInput, actor: string) {
+    this.welcome.ready();
     try {
       return await this.db.platform(async (c) => {
         const id = randomUUID();
@@ -114,11 +119,20 @@ export class CompaniesService {
           )
         ).rows[0];
         await this.event(c, actor, "company.created", null, row);
-        return companyDto(row);
+        const emailDelivery = await this.welcome.provision(c, row, actor);
+        const current = (await c.query(SELECT + " WHERE c.id=$1", [row.id]))
+          .rows[0];
+        return {
+          ...companyDto(current),
+          ownerProvisioned: true,
+          emailDelivery,
+        };
       });
     } catch (error: any) {
       if (error.code === "23505")
-        throw new ConflictException("Company slug already exists");
+        throw new ConflictException(
+          "Company slug or owner email already exists",
+        );
       throw error;
     }
   }

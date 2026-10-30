@@ -132,7 +132,7 @@ export class SessionService {
       async (c) =>
         (
           await c.query(
-            `SELECT a.*,p.password_hash,co.status AS company_status FROM platform.company_owner_accounts a JOIN platform.company_owner_credentials p ON p.account_id=a.id JOIN platform.companies co ON co.id=a.company_id WHERE a.email=$1 AND a.status='active'`,
+            `SELECT a.*,p.password_hash,p.must_change_password,p.temporary_expires_at,co.status AS company_status FROM platform.company_owner_accounts a JOIN platform.company_owner_credentials p ON p.account_id=a.id JOIN platform.companies co ON co.id=a.company_id WHERE a.email=$1 AND a.status='active'`,
             [email.trim().toLowerCase()],
           )
         ).rows[0],
@@ -145,9 +145,20 @@ export class SessionService {
       throw new UnauthorizedException("Invalid email or password");
     if (!["pending", "trial", "active"].includes(a.company_status))
       throw new ForbiddenException("Company access unavailable");
+    if (
+      a.must_change_password &&
+      new Date(a.temporary_expires_at).getTime() <= Date.now()
+    )
+      throw new UnauthorizedException(
+        "Temporary password expired. Ask the platform administrator to resend access details.",
+      );
     await this.ownerProfile(a);
     const token = "c_" + randomBytes(32).toString("hex"),
-      seconds = remember ? 2592000 : policy.sessionLength * 60;
+      seconds = a.must_change_password
+        ? 600
+        : remember
+          ? 2592000
+          : policy.sessionLength * 60;
     await this.db.platform(async (c) => {
       const current = (
         await c.query(
@@ -185,8 +196,8 @@ export class SessionService {
       async (c) =>
         (
           await c.query(
-            `SELECT u.id,u.name,u.email,u.team_id,r.key AS role,r.name AS role_name,r.permissions,r.scope FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=$2 AND u.status='active' AND u.deleted_at IS NULL AND u.identity_pool='company_admin' AND r.key='company_owner' AND r.scope='company'`,
-            [a.company_id, a.user_id],
+            `SELECT u.id,u.name,u.email,u.team_id,r.key AS role,r.name AS role_name,r.permissions,r.scope FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=$2 AND (u.status='active' OR (u.status='invited' AND $3::boolean)) AND u.deleted_at IS NULL AND u.identity_pool='company_admin' AND r.key='company_owner' AND r.scope='company'`,
+            [a.company_id, a.user_id, !!a.must_change_password],
           )
         ).rows[0],
     );
@@ -211,7 +222,7 @@ export class SessionService {
       async (c) =>
         (
           await c.query(
-            `SELECT a.*,co.public_id,co.slug,co.name AS company_name,co.status AS company_status FROM platform.company_owner_sessions s JOIN platform.company_owner_accounts a ON a.id=s.account_id JOIN platform.companies co ON co.id=a.company_id WHERE s.digest=$1 AND s.expires_at>now() AND a.status='active'`,
+            `SELECT a.*,p.must_change_password,p.temporary_expires_at,co.public_id,co.slug,co.name AS company_name,co.status AS company_status FROM platform.company_owner_sessions s JOIN platform.company_owner_accounts a ON a.id=s.account_id JOIN platform.company_owner_credentials p ON p.account_id=a.id JOIN platform.companies co ON co.id=a.company_id WHERE s.digest=$1 AND s.expires_at>now() AND a.status='active'`,
             [digest(token)],
           )
         ).rows[0],
@@ -219,9 +230,15 @@ export class SessionService {
     if (!a) throw new UnauthorizedException();
     if (!["pending", "trial", "active"].includes(a.company_status))
       throw new ForbiddenException("Company access unavailable");
+    if (
+      a.must_change_password &&
+      new Date(a.temporary_expires_at).getTime() <= Date.now()
+    )
+      throw new UnauthorizedException("Temporary password expired.");
     const profile = await this.ownerProfile(a);
     return {
       ...profile,
+      mustChangePassword: !!a.must_change_password,
       company: {
         id: a.public_id,
         slug: a.slug,
@@ -229,6 +246,54 @@ export class SessionService {
         status: a.company_status,
       },
     };
+  }
+  async changeOwnerPassword(
+    principal: { id: string; companyId?: string },
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    if (currentPassword === newPassword)
+      throw new ForbiddenException("Choose a different password.");
+    const hashed = await hashPassword(newPassword);
+    await this.db.platform(async (c) => {
+      if (
+        !(
+          await c.query(
+            "SELECT 1 FROM platform.companies WHERE id=$1 AND status IN ('pending','trial','active') FOR SHARE",
+            [principal.companyId],
+          )
+        ).rowCount
+      )
+        throw new ForbiddenException("Company access unavailable");
+      const a = (
+        await c.query(
+          "SELECT a.id,p.* FROM platform.company_owner_accounts a JOIN platform.company_owner_credentials p ON p.account_id=a.id WHERE a.company_id=$1 AND a.user_id=$2 AND a.status='active' FOR UPDATE OF a,p",
+          [principal.companyId, principal.id],
+        )
+      ).rows[0];
+      if (!a || !(await verifyPassword(currentPassword, a.password_hash)))
+        throw new UnauthorizedException("Current password is incorrect.");
+      if (
+        a.must_change_password &&
+        new Date(a.temporary_expires_at).getTime() <= Date.now()
+      )
+        throw new UnauthorizedException("Temporary password expired.");
+      await c.query(
+        "UPDATE platform.company_owner_credentials SET password_hash=$2,must_change_password=false,temporary_expires_at=NULL WHERE account_id=$1",
+        [a.id, hashed],
+      );
+      await c.query(
+        "DELETE FROM platform.company_owner_sessions WHERE account_id=$1",
+        [a.id],
+      );
+      await c.query(
+        "UPDATE platform.owner_welcome_emails SET status=CASE WHEN status='accepted' THEN status ELSE 'cancelled' END,ciphertext=NULL,lease_token=NULL,lease_until=NULL,updated_at=now() WHERE account_id=$1",
+        [a.id],
+      );
+      await c.query("SELECT platform.record_owner_password_changed($1)", [
+        a.id,
+      ]);
+    });
   }
   async resolve(token: string) {
     if (token.startsWith("c_")) return this.resolveOwner(token);

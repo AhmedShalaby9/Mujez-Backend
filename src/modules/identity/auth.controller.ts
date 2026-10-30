@@ -26,6 +26,10 @@ import {
 } from "../../common/auth/access.guard.js";
 import { SessionService } from "../../common/auth/session.service.js";
 import { ENV, type Environment } from "../../config/env.js";
+class ChangeOwnerPasswordDto {
+  @IsString() @MinLength(1) @MaxLength(256) declare currentPassword: string;
+  @IsString() @MinLength(12) @MaxLength(256) declare newPassword: string;
+}
 class LoginDto {
   @IsEmail() @MaxLength(254) declare email: string;
   @IsString() @MinLength(1) @MaxLength(256) declare password: string;
@@ -78,6 +82,39 @@ export class AuthController {
       throw new ForbiddenException();
     const { subject, ...user } = req.principal;
     return user;
+  }
+  @RequireAccess(["company_admin"])
+  @Post("change-password")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async changePassword(
+    @Body() body: ChangeOwnerPasswordDto,
+    @Req() req: AuthRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (
+      req.path.startsWith("/admin/") ||
+      req.principal.role !== "company_owner"
+    )
+      throw new ForbiddenException();
+    await this.sessions.changeOwnerPassword(
+      req.principal,
+      body.currentPassword,
+      body.newPassword,
+    );
+    const next = await this.sessions.loginOwner(
+      req.principal.email,
+      body.newPassword,
+      false,
+      req.ip ?? "unknown",
+    );
+    res.cookie(this.name, next.token, {
+      httpOnly: true,
+      secure: this.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+    return { status: "password_changed" };
   }
   @Public() @Post("logout") @HttpCode(200) async logout(
     @Req() req: AuthRequest,

@@ -30,8 +30,10 @@ dc() { docker compose --project-directory "$candidate" -f "$candidate/compose.ya
 old_dc() { docker compose --project-directory "$active" -f "$active/compose.yaml" "$@"; }
 dc config --quiet
 dc build api
-docker run --rm --env-file "$candidate/api.env" "mujez-staging-api:$release_id" \
-  node --input-type=module -e "import {parseEnvironment} from './dist/config/env.js'; parseEnvironment(process.env); console.log('Application environment validated')"
+welcome_mail_args=()
+if [[ -s /opt/mujez-staging/shared/welcome-mail.env ]]; then welcome_mail_args+=(--env-file /opt/mujez-staging/shared/welcome-mail.env); fi
+docker run --rm --env-file "$candidate/api.env" "${welcome_mail_args[@]}" "mujez-staging-api:$release_id" \
+  node --input-type=module -e "import {parseEnvironment} from './dist/config/env.js'; import {OwnerWelcomeService} from './dist/modules/identity/welcome/welcome.service.js'; new OwnerWelcomeService(parseEnvironment(process.env)).ready(); console.log('Application and mail environment validated')"
 
 # A failed backup or migration stops deployment before the running API changes.
 backup_dir="$(dirname "$backend_path")/backups"
@@ -40,9 +42,12 @@ old_dc exec -T postgres pg_dump -U mujez_owner -d mujez -Fc > "$backup_dir/$rele
 test -s "$backup_dir/$release_id.dump"
 dc run --rm -T --interactive=false maintenance node scripts/migrate.mjs
 
-if ! dc up -d --no-build --wait --wait-timeout 120 api routing-worker; then
-  echo 'New API or routing worker failed readiness; restoring previous services.' >&2
-  if old_dc config --services | grep -qx 'routing-worker'; then
+if ! dc up -d --no-build --wait --wait-timeout 120 api routing-worker mail-worker; then
+  echo 'New API or background worker failed readiness; restoring previous services.' >&2
+  dc stop mail-worker || true
+  if old_dc config --services | grep -qx 'mail-worker'; then
+    old_dc up -d --no-build --force-recreate --wait --wait-timeout 120 api routing-worker mail-worker
+  elif old_dc config --services | grep -qx 'routing-worker'; then
     old_dc up -d --no-build --force-recreate --wait --wait-timeout 120 api routing-worker
   else
     dc stop routing-worker || true

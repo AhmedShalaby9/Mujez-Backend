@@ -1,3 +1,4 @@
+import { OwnerWelcomeModule } from "./modules/identity/welcome/welcome.module.js";
 import {
   CompanyAccessController,
   OwnerActivationController,
@@ -31,6 +32,7 @@ class EnvironmentModule {}
 @Module({
   imports: [
     EnvironmentModule,
+    OwnerWelcomeModule,
     DatabaseModule,
     CacheModule,
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),

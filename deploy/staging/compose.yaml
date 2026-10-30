@@ -10,7 +10,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U mujez_owner -d mujez']
+      test: [CMD-SHELL, "pg_isready -U mujez_owner -d mujez"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -18,11 +18,11 @@ services:
       driver: json-file
       options:
         max-size: 10m
-        max-file: '3'
+        max-file: "3"
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: [redis-server, --appendonly, 'yes']
+    command: [redis-server, --appendonly, "yes"]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -41,15 +41,24 @@ services:
     env_file:
       - path: ./api.env
         format: raw
+      - path: /opt/mujez-staging/shared/welcome-mail.env
+        format: raw
+        required: false
     ports:
-      - '127.0.0.1:3000:3000'
+      - "127.0.0.1:3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -66,7 +75,40 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: [CMD, node, -e, "try{process.exit(Date.now()-require('fs').statSync('/tmp/mujez-routing-heartbeat').mtimeMs<120000?0:1)}catch{process.exit(1)}"]
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "try{process.exit(Date.now()-require('fs').statSync('/tmp/mujez-routing-heartbeat').mtimeMs<120000?0:1)}catch{process.exit(1)}",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *logging
+  mail-worker:
+    image: ${API_IMAGE:-mujez-staging-api:current}
+    command: [node, dist/modules/identity/welcome/mail.worker.js]
+    volumes:
+      - /opt/mujez-mail/secrets/smtp:/run/mujez-mail-smtp:ro
+    restart: unless-stopped
+    env_file:
+      - path: ./api.env
+        format: raw
+      - path: /opt/mujez-staging/shared/welcome-mail.env
+        format: raw
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "try{process.exit(Date.now()-require('fs').statSync('/tmp/mujez-mail-heartbeat').mtimeMs<120000?0:1)}catch{process.exit(1)}",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3

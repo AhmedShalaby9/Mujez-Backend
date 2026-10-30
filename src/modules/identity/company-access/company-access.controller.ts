@@ -16,6 +16,13 @@ export class CompanyAccessController {
   ) {
     return this.service.owner(id);
   }
+  @Post("welcome/resend") @RequireAccess(["platform"], "co.create") resend(
+    @Param("id") id: string,
+    @Body() body: OwnerRevoke,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.resend(id, body, req.principal.id);
+  }
   @Post("invite") @RequireAccess(["platform"], "co.create") invite(
     @Param("id") id: string,
     @Body() input: OwnerInvite,

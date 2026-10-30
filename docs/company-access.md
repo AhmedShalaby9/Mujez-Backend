@@ -2,15 +2,11 @@
 
 ## Admin workflow
 
-An administrator with `co.create` creates a company with its owner's contact email, then explicitly invites the owner from the next dialog or Companies → View → Invite owner. This is not public registration. Invitation mutations require the admin's current password, a reason of 10–500 characters and the current company version. The endpoint rechecks the active administrator and permission inside the transaction. `co.view` permits reading the owner contact and activation state, never tokens, digests or credentials.
+An administrator with `co.create` creates a company using its contact email. Company creation now atomically provisions a Company Owner, generates a unique temporary password, and queues a welcome email from `info@mujez.net`. No password is returned to the dashboard. If provisioning fails, the company transaction rolls back. See [automatic owner welcome](owner-welcome.md).
 
-- `GET /admin/api/v1/companies/:publicId/owner`: owner contact/status and latest unrevoked, unused invitation expiry, or null.
-- `POST .../owner/invite`: `{version,name,password,reason}`. Creates the single Company Owner if absent, or reissues a pending invitation. Returns `{status,token,expiresAt,delivery:"manual",email}` once.
-- `POST .../owner/revoke`: `{version,password,reason}`. Revokes pending activation links. It does not reset or disable an activated owner.
+Companies → View displays the real owner and email queue status. Administrators can resend while the first-login password change is pending, using their current password, a reason, and the current company version. Resending rotates the temporary password and revokes prior owner sessions. Established owners cannot be reset through this workflow.
 
-The create-company dialog opens the invitation step after successful company creation; creating a company alone does not grant an account. Invitation failure leaves the company available for retry. A new invitation invalidates earlier unused links. Reissue and revoke cannot take over or reset an activated owner. Owner transfer, recovery, additional company accounts and team management are separate future workflows.
-
-Email delivery is not configured. The admin must copy and share the generated link with the named recipient. The dashboard does not claim to send an email. Tokens are cryptographically random, stored only as SHA-256 digests, expire in 24 hours and are single use. The UI keeps the link only in the current dialog, clears it on close and uses `/activate/company#token=...` so the token is not sent in the page URL. The activation page removes the fragment immediately and submits the token only to the API. Never put links in logs, committed files or audit payloads.
+Legacy unprovisioned companies retain explicit manual invitations (`POST .../owner/invite`) and revocation (`POST .../owner/revoke`), with current admin password and reason required. Manual activation links are single use, expire in 24 hours, and use `/activate/company#token=...`; no token is stored in logs or audit payloads. New companies do not require this manual step.
 
 ## Activation and login
 
@@ -22,7 +18,7 @@ Login routes platform users to `/admin/dashboard`, Company Owners to `/company/d
 
 This first version supports **one owner per company and one company per owner login email**. Platform and owner emails share a unique login namespace, enforced with cross-table triggers and transaction advisory locks to prevent ambiguous identities, including concurrent provisioning. A platform staff email cannot be invited as an owner. Changing the company contact after invitation does not silently move an existing account or change its login; account transfer is not implemented.
 
-Pending, trial and active companies can access their workspace so onboarding can begin. Suspended, expired and archived companies are blocked at login and every session resolution. Disabled/deleted tenant owners and disabled auth accounts are rejected; role/permission changes are read on each request. Subscription status is not automatically changed by invitation or activation. This release does not activate CRM business permissions or infer feature entitlements from the preview pages.
+Pending, trial and active companies can access their workspace so onboarding can begin. Suspended, expired and archived companies are blocked at login and every session resolution. Disabled/deleted tenant owners and disabled auth accounts are rejected; role/permission changes are read on each request. Subscription status is not automatically changed by invitation or activation. Creating an owner does not create a subscription or override existing module entitlements.
 
 ## Boundary and role
 
@@ -38,6 +34,6 @@ Invitation issuance/revocation is recorded in platform audit/outbox in the same 
 
 The company shell displays the authenticated owner and actual company, supports sign-out and bilingual navigation, removes fictional header counts/notifications and displays only connected CRM screens. Leads/Pipeline/Tasks/Projects/Units/Reservations/Contracts/Documents/Commissions/Marketing/Lead Routing/Reports/Audit Log/company overview use real tenant APIs. Search is disabled rather than pretending to search real company records. The platform admin screens retain their backend connections and permissions.
 
-Both route trees load components lazily to keep the initial production bundle under the existing budget. No budget increases, new environment variables or shared owner passwords are needed. Apply migration 012 through normal staging deployment. No owner is seeded with a public/default password; admins invite owners explicitly.
+Both route trees load components lazily to keep the initial production bundle under the existing budget. Apply migrations through 021 through normal staging deployment. SMTP configuration and the encryption key are required for automatic creation; no owner uses a shared or seeded default password.
 
 Tests exercise the real HTTP controller/session path against the restricted database roles, invitation expiry/reuse/reissue/revocation, transactional failure, email collisions, trusted tenant context, platform/owner separation, disabled and unavailable-company access, logout/rotation, UI guards, owner identity and the admin invitation dialog. Live deployment verification uses clearly marked verification companies and archives them after testing.
