@@ -470,3 +470,21 @@ test("ciphertext is bound to the account and generation and tenant runtime canno
     (e) => e.code === "42501",
   );
 });
+
+test("mail worker can persist its heartbeat using the restricted platform runtime", async () => {
+  await database.platform((c) =>
+    c.query(
+      "INSERT INTO platform.worker_heartbeats(key,seen_at,details) VALUES('owner-email',now(),$1) ON CONFLICT(key) DO UPDATE SET seen_at=excluded.seen_at,details=excluded.details",
+      [{ processed: 0 }],
+    ),
+  );
+  const row = await database.platform(
+    async (c) =>
+      (
+        await c.query(
+          "SELECT details FROM platform.worker_heartbeats WHERE key='owner-email'",
+        )
+      ).rows[0],
+  );
+  assert.deepEqual(row.details, { processed: 0 });
+});
