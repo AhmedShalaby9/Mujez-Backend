@@ -17,11 +17,13 @@ import type {
   ReservationAction,
 } from "./reservations.dto.js";
 import { expireUnitReservations } from "./reservation-expiry.js";
-const SELECT = `SELECT r.*,r.deposit_minor::text AS deposit_minor,CASE WHEN r.status IN ('hold','reserved') AND r.expires_at<=now() THEN 'expired' ELSE r.status END AS effective_status,u.code AS unit_code,l.name AS lead_name,l.public_id AS lead_ref,l.archived_at AS lead_archived_at,a.name AS assignee_name,now() AS as_of FROM tenant.reservations r JOIN tenant.units u ON u.company_id=r.company_id AND u.id=r.unit_id JOIN tenant.leads l ON l.company_id=r.company_id AND l.id=r.lead_id LEFT JOIN tenant.users a ON a.company_id=r.company_id AND a.id=r.assignee_id`;
+const SELECT = `SELECT r.*,r.deposit_minor::text AS deposit_minor,CASE WHEN r.status IN ('hold','reserved') AND r.expires_at<=now() THEN 'expired' ELSE r.status END AS effective_status,u.code AS unit_code,l.name AS lead_name,l.public_id AS lead_ref,l.archived_at AS lead_archived_at,a.name AS assignee_name,ct.id AS contract_id,ct.public_id AS contract_ref,now() AS as_of FROM tenant.reservations r JOIN tenant.units u ON u.company_id=r.company_id AND u.id=r.unit_id JOIN tenant.leads l ON l.company_id=r.company_id AND l.id=r.lead_id LEFT JOIN tenant.users a ON a.company_id=r.company_id AND a.id=r.assignee_id LEFT JOIN tenant.contracts ct ON ct.company_id=r.company_id AND ct.reservation_id=r.id`;
 export function reservationDto(r: any) {
   return {
     id: r.id,
     reference: r.public_id,
+    contractId: r.contract_id ?? null,
+    contractReference: r.contract_ref ?? null,
     unitId: r.unit_id,
     unit: r.unit_code,
     leadId: r.lead_id,

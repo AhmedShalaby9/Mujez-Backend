@@ -27,6 +27,7 @@ export class ApiErrorFilter implements ExceptionFilter {
       403: "permission_denied",
       404: "not_found",
       409: "conflict",
+      413: "payload_too_large",
       429: "rate_limited",
       503: "service_unavailable",
     };

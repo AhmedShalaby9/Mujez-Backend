@@ -196,12 +196,12 @@ test("expired exceptions and unavailable company/subscription fail closed", asyn
     (e) => e.getStatus() === 400,
   );
 });
-test("usage reads real users/listings, leaves storage unknown, and expires quota overrides", async () => {
+test("usage reads real users/listings, measures storage, and expires quota overrides", async () => {
   let row = (await service.usage())[0];
   assert.equal(row.users.used, 0);
   assert.equal(row.users.limit, 5);
   assert.equal(row.listings.used, 0);
-  assert.equal(row.storage.used, null);
+  assert.equal(row.storage.used, 0);
   assert.equal(row.listings.measured, true);
   await service.limit(
     "MJ-POLICY",

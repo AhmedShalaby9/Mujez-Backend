@@ -1482,6 +1482,325 @@
         "tags": ["Reservations"]
       }
     },
+    "/api/v1/contracts": {
+      "get": {
+        "operationId": "ContractsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 1, "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 50, "type": "number" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "stage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "qualified",
+                "viewing",
+                "offer",
+                "contract",
+                "won",
+                "lost"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "leadId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Contracts"]
+      },
+      "post": {
+        "operationId": "ContractsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContractInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Contracts"]
+      }
+    },
+    "/api/v1/contracts/{id}": {
+      "get": {
+        "operationId": "ContractsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Contracts"]
+      }
+    },
+    "/api/v1/contracts/{id}/update": {
+      "post": {
+        "operationId": "ContractsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContractUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Contracts"]
+      }
+    },
+    "/api/v1/contracts/{id}/action": {
+      "post": {
+        "operationId": "ContractsController_action",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContractAction" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Contracts"]
+      }
+    },
+    "/api/v1/contracts/{id}/requirements/{requirement}/attach": {
+      "post": {
+        "operationId": "ContractsController_attach",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "requirement",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RequirementAttach" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Contracts"]
+      }
+    },
+    "/api/v1/documents": {
+      "get": {
+        "operationId": "DocumentsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 1, "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 50, "type": "number" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "stage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "qualified",
+                "viewing",
+                "offer",
+                "contract",
+                "won",
+                "lost"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "leadId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "contractId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Documents"]
+      },
+      "post": {
+        "operationId": "DocumentsController_upload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["requestId", "kind", "title", "file"],
+                "properties": {
+                  "requestId": { "type": "string", "format": "uuid" },
+                  "kind": { "type": "string" },
+                  "title": { "type": "string" },
+                  "leadId": { "type": "string", "format": "uuid" },
+                  "contractId": { "type": "string", "format": "uuid" },
+                  "expiresDate": { "type": "string", "format": "date" },
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Documents"]
+      }
+    },
+    "/api/v1/documents/{id}": {
+      "get": {
+        "operationId": "DocumentsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Documents"]
+      }
+    },
+    "/api/v1/documents/{id}/download": {
+      "get": {
+        "operationId": "DocumentsController_download",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Documents"]
+      }
+    },
+    "/api/v1/documents/{id}/archive": {
+      "post": {
+        "operationId": "DocumentsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DocumentArchive" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Documents"]
+      }
+    },
     "/admin/api/v1/companies": {
       "get": {
         "operationId": "CompaniesController_list",
@@ -3121,6 +3440,113 @@
             "description": "Manually recorded deposit; no external collection"
           },
           "reason": { "type": "string" }
+        },
+        "required": ["requestId", "version", "action"]
+      },
+      "SignerInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "role": { "type": "string" },
+          "roleAr": { "type": "string" }
+        },
+        "required": ["name", "role"]
+      },
+      "RequirementInput": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string" },
+          "label": { "type": "string" },
+          "required": { "type": "boolean" }
+        },
+        "required": ["kind", "label", "required"]
+      },
+      "ContractInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "titleAr": { "type": "string" },
+          "valueMinor": { "type": "string" },
+          "keyDate": { "type": "string" },
+          "signers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SignerInput" }
+          },
+          "type": { "type": "string" },
+          "leadId": { "type": "string" },
+          "unitId": { "type": "string" },
+          "reservationId": { "type": "string" },
+          "reservationVersion": { "type": "number" },
+          "unitVersion": { "type": "number" },
+          "ownerId": { "type": "string" },
+          "requirements": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RequirementInput" }
+          }
+        },
+        "required": [
+          "requestId",
+          "title",
+          "valueMinor",
+          "keyDate",
+          "signers",
+          "type",
+          "leadId"
+        ]
+      },
+      "ContractUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "titleAr": { "type": "string" },
+          "valueMinor": { "type": "string" },
+          "keyDate": { "type": "string" },
+          "signers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SignerInput" }
+          },
+          "version": { "type": "number" }
+        },
+        "required": [
+          "requestId",
+          "title",
+          "valueMinor",
+          "keyDate",
+          "signers",
+          "version"
+        ]
+      },
+      "ContractAction": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "action": { "type": "string" },
+          "reason": { "type": "string" },
+          "reference": { "type": "string" },
+          "signedDate": { "type": "string" },
+          "documentId": { "type": "string" }
+        },
+        "required": ["requestId", "version", "action", "reason"]
+      },
+      "RequirementAttach": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "documentId": { "type": "string" }
+        },
+        "required": ["requestId", "version", "documentId"]
+      },
+      "DocumentArchive": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "action": { "type": "string" }
         },
         "required": ["requestId", "version", "action"]
       },

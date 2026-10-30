@@ -297,7 +297,9 @@ export class FeaturesService {
     const companies = (
       await c.query(COMPANY_POLICY + " ORDER BY c.created_at,c.id")
     ).rows;
-    const usage = (await c.query("SELECT * FROM platform.resource_usage")).rows;
+    const storage = (
+      await c.query("SELECT * FROM platform.company_storage_counts")
+    ).rows;
     const listings = (
       await c.query("SELECT * FROM platform.company_listing_counts")
     ).rows;
@@ -312,10 +314,15 @@ export class FeaturesService {
         !!company.plan_version_id;
       const resources: Record<string, any> = {};
       for (const resource of ["users", "listings", "storage"]) {
-        const measured = resource === "users" || resource === "listings";
-        const observation = usage.find(
-          (u) => u.company_id === company.id && u.resource === resource,
-        );
+        const used =
+          resource === "users"
+            ? company.user_count
+            : resource === "listings"
+              ? (listings.find((x) => x.company_id === company.id)?.listings ??
+                0)
+              : Number(
+                  storage.find((x) => x.company_id === company.id)?.bytes ?? 0,
+                ) / 1073741824;
         const base =
           company.limits?.[resource === "storage" ? "storageGb" : resource] ??
           null;
@@ -328,27 +335,12 @@ export class FeaturesService {
             : base
           : 0;
         resources[resource] = {
-          ...resourceState(
-            measured
-              ? resource === "users"
-                ? company.user_count
-                : (listings.find((x) => x.company_id === company.id)
-                    ?.listings ?? 0)
-              : observation
-                ? Number(observation.used) /
-                  (resource === "storage" ? 1073741824 : 1)
-                : null,
-            limit,
-            measured || !!observation,
-          ),
+          ...resourceState(used, limit, true),
           baseLimit: company.plan_version_id ? base : 0,
           overrideExpires: override
             ? new Date(override.expires_at).toISOString()
             : null,
-          measuredAt:
-            resource === "users" || resource === "listings"
-              ? new Date().toISOString()
-              : (observation?.measured_at ?? null),
+          measuredAt: new Date().toISOString(),
         };
       }
       return {

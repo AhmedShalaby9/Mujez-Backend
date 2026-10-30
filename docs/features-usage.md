@@ -79,3 +79,5 @@ until configured. Repeated seeds are serialized and duplicate-free. Both screens
 read this stored configuration; all existing admin pages and designs are preserved.
 
 Migration 015 supplies real active listing counts from company inventory, replacing unknown/observed listing usage. Current listing limits and active overrides are enforced on unit creation/restoration; project limits are enforced on project creation/restoration. Storage remains unmeasured.
+
+Migration 017 supplies actual retained document bytes, including archived files, and enforces storage limits/overrides during upload.
