@@ -20,6 +20,9 @@ before(async () => {
       ),
     );
 
+  await db.exec(`INSERT INTO platform.subscription_plans(key) VALUES('starter'),('pro'),('business'),('enterprise');
+    INSERT INTO platform.plan_versions(plan_key,revision,name,description,monthly_minor,annual_minor,limits,features)
+    SELECT key,1,'{"en":"Test plan","ar":"خطة اختبار"}','{}',10000,100000,'{"users":10,"listings":100,"projects":20,"storageGb":5}','{"en":[],"ar":[]}' FROM platform.subscription_plans;`);
   actor = (
     await db.query(
       "INSERT INTO platform.users(name,email,status,role_id) SELECT 'Test','test@mujez.com','active',id FROM platform.roles WHERE key='super_admin' RETURNING id",
@@ -66,6 +69,23 @@ test("create persists company with audit/outbox, real owner and queued welcome e
   assert.equal(company.status, "pending");
   assert.equal(company.users, 1);
   assert.equal(company.ownerProvisioned, true);
+  assert.equal(company.subscription.status, "trialing");
+  assert.equal(company.subscription.plan, input.plan);
+  const subscription = (
+    await db.query("SELECT * FROM platform.subscriptions WHERE company_id=$1", [
+      company.uuid,
+    ])
+  ).rows[0];
+  assert.equal(subscription.status, "trialing");
+  assert.equal(subscription.plan_key, input.plan);
+  assert.equal(
+    Math.round(
+      (new Date(subscription.period_end) -
+        new Date(subscription.period_start)) /
+        86400000,
+    ),
+    14,
+  );
   assert.equal(
     (
       await db.query(
@@ -163,4 +183,79 @@ test("audit failure rolls back company creation", async () => {
     ),
   );
   assert.equal((await service.list()).total, 1);
+});
+
+test("configured trial duration and selected published plan are persisted without revenue or payment records", async () => {
+  await db.query(
+    "INSERT INTO platform.settings(key,value) VALUES('platform',$1)",
+    [{ trialDays: 21 }],
+  );
+  const created = await service.create(
+    {
+      ...input,
+      slug: "configured-trial",
+      adminEmail: "trial@example.test",
+      plan: "pro",
+    },
+    actor,
+  );
+  const row = (
+    await db.query(
+      "SELECT s.*,p.revision FROM platform.subscriptions s JOIN platform.plan_versions p ON p.id=s.plan_version_id WHERE s.company_id=$1",
+      [created.uuid],
+    )
+  ).rows[0];
+  assert.equal(row.plan_key, "pro");
+  assert.equal(row.revision, 1);
+  assert.equal(row.status, "trialing");
+  assert.equal(
+    Math.round(
+      (new Date(row.period_end) - new Date(row.period_start)) / 86400000,
+    ),
+    21,
+  );
+  assert.equal(created.mrr, 0);
+  assert.equal(
+    (await db.query("SELECT count(*)::int AS n FROM platform.payments")).rows[0]
+      .n,
+    0,
+  );
+  assert.equal(
+    (await db.query("SELECT count(*)::int AS n FROM platform.invoices")).rows[0]
+      .n,
+    0,
+  );
+});
+test("unavailable plan rejects company, subscription, owner and email atomically", async () => {
+  await db.query(
+    "UPDATE platform.subscription_plans SET archived=true WHERE key='enterprise'",
+  );
+  await assert.rejects(
+    service.create(
+      {
+        ...input,
+        slug: "unavailable-plan",
+        adminEmail: "unavailable@example.test",
+        plan: "enterprise",
+      },
+      actor,
+    ),
+    (e) => e.getStatus() === 409,
+  );
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::int AS n FROM platform.companies WHERE slug='unavailable-plan'",
+      )
+    ).rows[0].n,
+    0,
+  );
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::int AS n FROM platform.company_owner_accounts WHERE email='unavailable@example.test'",
+      )
+    ).rows[0].n,
+    0,
+  );
 });

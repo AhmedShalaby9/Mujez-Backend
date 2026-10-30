@@ -1,3 +1,4 @@
+import { createInitialTrial } from "../subscriptions/initial-trial.js";
 import { OwnerWelcomeService } from "../../identity/welcome/welcome.service.js";
 import {
   ConflictException,
@@ -119,12 +120,14 @@ export class CompaniesService {
           )
         ).rows[0];
         await this.event(c, actor, "company.created", null, row);
+        const subscription = await createInitialTrial(c, row, actor);
         const emailDelivery = await this.welcome.provision(c, row, actor);
         const current = (await c.query(SELECT + " WHERE c.id=$1", [row.id]))
           .rows[0];
         return {
           ...companyDto(current),
           ownerProvisioned: true,
+          subscription,
           emailDelivery,
         };
       });

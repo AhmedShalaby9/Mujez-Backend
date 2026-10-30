@@ -1,6 +1,6 @@
 # Automatic Company Owner welcome
 
-Company creation provisions a single `company_owner` in the `company_admin` identity pool, using the company contact email. The existing cross-platform email uniqueness and tenant isolation apply. Migration 021 adds first-login credential state and a restricted mail queue. Company, owner, credential and welcome job commit together; no account is seeded with a shared password.
+Company creation provisions a single `company_owner` in the `company_admin` identity pool, using the company contact email. The existing cross-platform email uniqueness and tenant isolation apply. Migration 021 adds first-login credential state and a restricted mail queue. Company, selected-plan trial subscription, owner, credential and welcome job commit together; no account is seeded with a shared password.
 
 The owner receives a bilingual email from `info@mujez.net` containing the dashboard login link, their email, and a randomly generated 32-character password. The password expires after 24 hours and must be changed at first login (12–256 characters). Until then the API allows only session inspection and password change; the dashboard redirects to `/change-password`. Password change rotates all sessions, activates the tenant owner and records a password-free audit event. Temporary sessions last ten minutes. Existing owners retain their established login behavior.
 
@@ -19,3 +19,9 @@ Staging uses `/opt/mujez-staging/shared/welcome-mail.env` (root-only), separate 
 Staging deployments validate mail configuration, back up the database, apply migrations 021–022 and wait for the API, routing worker and mail worker health checks. Rollback stops the new worker before restoring old services; pending first-login tenant users remain invited so an older API cannot accidentally grant access without changing the temporary password.
 
 Tests cover restricted database roles, atomic failure, actual local SMTP STARTTLS, retry, encrypted payload cleanup, first-login access, expiry, administrative resend and password rotation. No live customer receives test mail.
+
+## Selected plan at company creation
+
+Creating a company now creates an actual `trialing` subscription on the selected plan's latest published version, for the configured platform `trialDays` (default 14). Archived or unpublished plans reject the whole transaction. The subscription, owner and mail job commit atomically; any audit failure rolls them all back. Company onboarding status remains pending independently of subscription access. After the initial password change, the owner can access CRM while the trial is current. Expiry, suspension and all existing plan limits still apply.
+
+The trial uses a monthly cycle and the existing bank payment-method metadata default; this does not collect a payment, create an invoice, or record MRR. Paid activation and later plan changes remain explicit subscription administration actions. Editing company details never silently switches an existing subscription.

@@ -25,6 +25,10 @@ string. Monthly normalized MRR is a display projection of active contract terms,
 not proof of collected revenue. Trials/canceled/expired subscriptions have zero MRR.
 Company records show the latest subscription plan and MRR when present.
 
+## Company creation
+
+The plan selected when creating a company provisions a real trial subscription in the same transaction as the company, owner and welcome email. It uses the current published version and configured trial duration, rejects archived/unpublished plans, and never creates a payment or invoice. Editing a company does not change its subscription; use the explicit subscription plan-change action.
+
 ## Rules
 
 New-only edits leave existing terms untouched. Renewal scope records a pending

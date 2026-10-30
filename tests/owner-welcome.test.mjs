@@ -168,6 +168,9 @@ before(async () => {
         "utf8",
       ),
     );
+  await db.exec(`INSERT INTO platform.subscription_plans(key) VALUES('starter'),('pro'),('business'),('enterprise');
+    INSERT INTO platform.plan_versions(plan_key,revision,name,description,monthly_minor,annual_minor,limits,features)
+    SELECT key,1,'{"en":"Test plan","ar":"خطة اختبار"}','{}',10000,100000,'{"users":10,"listings":100,"projects":20,"storageGb":5}','{"en":[],"ar":[]}' FROM platform.subscription_plans;`);
   root = (
     await db.query(
       "INSERT INTO platform.users(name,email,status,role_id) SELECT 'Root','root@welcome.test','active',id FROM platform.roles WHERE key='super_admin' RETURNING id",
@@ -316,6 +319,7 @@ test("first password change replaces credentials, activates the tenant owner and
     .set("Cookie", fresh)
     .expect(200);
   assert.equal(me.body.mustChangePassword, false);
+  await api().get("/api/v1/leads").set("Cookie", fresh).expect(200);
   await post("/api/v1/auth/login", {
     email: company.adminEmail,
     password: temp,
