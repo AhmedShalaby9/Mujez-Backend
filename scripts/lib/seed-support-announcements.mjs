@@ -81,7 +81,7 @@ export async function seedSupportAnnouncements(client) {
     [
       "initial-welcome",
       "[Sample] Welcome to Mujez",
-      "[تجريبي] مرحبًا بكم في مجاز",
+      "[تجريبي] مرحبًا بكم في موچز",
       "all",
       "update",
     ],
