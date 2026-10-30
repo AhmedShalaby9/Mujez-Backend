@@ -40,9 +40,14 @@ old_dc exec -T postgres pg_dump -U mujez_owner -d mujez -Fc > "$backup_dir/$rele
 test -s "$backup_dir/$release_id.dump"
 dc run --rm -T --interactive=false maintenance node scripts/migrate.mjs
 
-if ! dc up -d --no-build --wait --wait-timeout 120 api; then
-  echo 'New API failed readiness; restoring previous API image and environment.' >&2
-  old_dc up -d --no-build --force-recreate --wait --wait-timeout 120 api
+if ! dc up -d --no-build --wait --wait-timeout 120 api routing-worker; then
+  echo 'New API or routing worker failed readiness; restoring previous services.' >&2
+  if old_dc config --services | grep -qx 'routing-worker'; then
+    old_dc up -d --no-build --force-recreate --wait --wait-timeout 120 api routing-worker
+  else
+    dc stop routing-worker || true
+    old_dc up -d --no-build --force-recreate --wait --wait-timeout 120 api
+  fi
   echo 'Database migrations are not automatically reversed. Use backward-compatible migrations.' >&2
   exit 1
 fi

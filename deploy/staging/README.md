@@ -101,3 +101,5 @@ active code symlink. Database rollback/restoration is a separate reviewed operat
 Nginx config: `/etc/nginx/sites-available/mujez-staging`. The checked-in
 `nginx.conf` is initial HTTP bootstrap only; do not overwrite the active TLS file.
 `certbot.timer` renews TLS; test with `certbot renew --dry-run`.
+
+The routing-worker service runs first-contact SLA reassignment with the normal restricted runtime credentials and a real heartbeat. Deployments wait for both API and worker health; no additional STAGING_ENV fields or secrets are needed.

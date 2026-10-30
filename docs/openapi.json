@@ -394,6 +394,12 @@
         "operationId": "LeadsController_list",
         "parameters": [
           {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -572,6 +578,29 @@
         "tags": ["Leads"]
       }
     },
+    "/api/v1/leads/{id}/contact": {
+      "post": {
+        "operationId": "LeadsController_contact",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LeadContact" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leads"]
+      }
+    },
     "/api/v1/leads/{id}/notes": {
       "post": {
         "operationId": "LeadsController_note",
@@ -599,6 +628,12 @@
       "get": {
         "operationId": "PipelineController_list",
         "parameters": [
+          {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "page",
             "required": false,
@@ -663,6 +698,12 @@
       "get": {
         "operationId": "PipelineController_options",
         "parameters": [
+          {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "page",
             "required": false,
@@ -845,6 +886,12 @@
         "operationId": "TasksController_leads",
         "parameters": [
           {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -982,6 +1029,12 @@
       "get": {
         "operationId": "ProjectsController_list",
         "parameters": [
+          {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "page",
             "required": false,
@@ -1212,6 +1265,12 @@
         "operationId": "UnitsController_list",
         "parameters": [
           {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -1367,6 +1426,12 @@
         "operationId": "ReservationsController_list",
         "parameters": [
           {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -1486,6 +1551,12 @@
       "get": {
         "operationId": "ContractsController_list",
         "parameters": [
+          {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "page",
             "required": false,
@@ -1659,6 +1730,12 @@
         "operationId": "CommissionsController_list",
         "parameters": [
           {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -1797,6 +1874,12 @@
       "get": {
         "operationId": "DocumentsController_list",
         "parameters": [
+          {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "page",
             "required": false,
@@ -1938,6 +2021,235 @@
         },
         "responses": { "201": { "description": "" } },
         "tags": ["Documents"]
+      }
+    },
+    "/api/v1/marketing": {
+      "get": {
+        "operationId": "MarketingController_list",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 1, "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 50, "type": "number" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "stage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "qualified",
+                "viewing",
+                "offer",
+                "contract",
+                "won",
+                "lost"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Marketing"]
+      },
+      "post": {
+        "operationId": "MarketingController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CampaignInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Marketing"]
+      }
+    },
+    "/api/v1/marketing/{id}": {
+      "get": {
+        "operationId": "MarketingController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Marketing"]
+      }
+    },
+    "/api/v1/marketing/{id}/update": {
+      "post": {
+        "operationId": "MarketingController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CampaignUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Marketing"]
+      }
+    },
+    "/api/v1/marketing/{id}/archive": {
+      "post": {
+        "operationId": "MarketingController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CampaignArchive" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Marketing"]
+      }
+    },
+    "/api/v1/routing": {
+      "get": {
+        "operationId": "RoutingController_list",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Routing"]
+      },
+      "post": {
+        "operationId": "RoutingController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RoutingInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Routing"]
+      }
+    },
+    "/api/v1/routing/options": {
+      "get": {
+        "operationId": "RoutingController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Routing"]
+      }
+    },
+    "/api/v1/routing/simulate": {
+      "post": {
+        "operationId": "RoutingController_simulate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RoutingSimulation" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Routing"]
+      }
+    },
+    "/api/v1/routing/{id}/update": {
+      "post": {
+        "operationId": "RoutingController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RoutingUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Routing"]
+      }
+    },
+    "/api/v1/routing/{id}/action": {
+      "post": {
+        "operationId": "RoutingController_action",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RoutingAction" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Routing"]
       }
     },
     "/admin/api/v1/companies": {
@@ -3209,6 +3521,7 @@
         "type": "object",
         "properties": {
           "requestId": { "type": "string", "format": "uuid" },
+          "campaignId": { "type": ["string", "null"] },
           "name": { "type": "string" },
           "nameAr": { "type": "string" },
           "phone": { "type": "string" },
@@ -3232,6 +3545,7 @@
         "type": "object",
         "properties": {
           "requestId": { "type": "string", "format": "uuid" },
+          "campaignId": { "type": ["string", "null"] },
           "name": { "type": "string" },
           "nameAr": { "type": "string" },
           "phone": { "type": "string" },
@@ -3291,6 +3605,16 @@
           "reason": { "type": "string" }
         },
         "required": ["requestId", "version", "action", "reason"]
+      },
+      "LeadContact": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "channel": { "type": "string" },
+          "note": { "type": "string" }
+        },
+        "required": ["requestId", "version", "channel", "note"]
       },
       "LeadNote": {
         "type": "object",
@@ -3744,6 +4068,134 @@
         "required": ["requestId", "version", "action", "reason"]
       },
       "DocumentArchive": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "action": { "type": "string" }
+        },
+        "required": ["requestId", "version", "action"]
+      },
+      "CampaignInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "source": { "type": "string" },
+          "projectId": { "type": ["string", "null"] },
+          "status": { "type": "string" },
+          "spendMinor": { "type": "string" }
+        },
+        "required": ["requestId", "name", "source", "status", "spendMinor"]
+      },
+      "CampaignUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "source": { "type": "string" },
+          "projectId": { "type": ["string", "null"] },
+          "status": { "type": "string" },
+          "spendMinor": { "type": "string" },
+          "version": { "type": "number" }
+        },
+        "required": [
+          "requestId",
+          "name",
+          "source",
+          "status",
+          "spendMinor",
+          "version"
+        ]
+      },
+      "CampaignArchive": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "action": { "type": "string" }
+        },
+        "required": ["requestId", "version", "action"]
+      },
+      "RoutingSimulation": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string" },
+          "source": { "type": "string" },
+          "segment": { "type": "string" },
+          "budgetMinor": { "type": "object" }
+        },
+        "required": ["source", "segment"]
+      },
+      "RoutingTarget": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" },
+          "weight": { "type": "object" }
+        },
+        "required": ["userId", "weight"]
+      },
+      "RoutingInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "source": { "type": "object" },
+          "segment": { "type": "object" },
+          "minBudgetMinor": { "type": "object" },
+          "strategy": { "type": "string" },
+          "teamName": { "type": "string" },
+          "teamNameAr": { "type": "string" },
+          "slaMinutes": { "type": "number" },
+          "active": { "type": "boolean" },
+          "targets": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RoutingTarget" }
+          }
+        },
+        "required": [
+          "requestId",
+          "name",
+          "strategy",
+          "slaMinutes",
+          "active",
+          "targets"
+        ]
+      },
+      "RoutingUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "source": { "type": "object" },
+          "segment": { "type": "object" },
+          "minBudgetMinor": { "type": "object" },
+          "strategy": { "type": "string" },
+          "teamName": { "type": "string" },
+          "teamNameAr": { "type": "string" },
+          "slaMinutes": { "type": "number" },
+          "active": { "type": "boolean" },
+          "targets": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RoutingTarget" }
+          },
+          "version": { "type": "number" }
+        },
+        "required": [
+          "requestId",
+          "name",
+          "strategy",
+          "slaMinutes",
+          "active",
+          "targets",
+          "version"
+        ]
+      },
+      "RoutingAction": {
         "type": "object",
         "properties": {
           "requestId": { "type": "string", "format": "uuid" },

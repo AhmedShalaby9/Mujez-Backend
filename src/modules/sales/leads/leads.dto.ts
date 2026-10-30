@@ -24,6 +24,7 @@ export const STAGES = [
   "lost",
 ] as const;
 export class SalesQuery {
+  @IsOptional() @IsUUID() @ApiPropertyOptional() campaignId?: string;
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -59,6 +60,10 @@ export class SalesRequest {
   declare requestId: string;
 }
 export class LeadInput extends SalesRequest {
+  @IsOptional()
+  @IsUUID()
+  @ApiPropertyOptional({ type: String, nullable: true })
+  campaignId?: string | null;
   @IsString()
   @Transform(trim)
   @MinLength(2)
@@ -234,4 +239,17 @@ export class DealUpdate extends SalesRequest {
     description: "Integer EGP minor units as a string",
   })
   declare valueMinor: string;
+}
+
+export class LeadContact extends SalesRequest {
+  @IsInt() @Min(0) @ApiProperty() declare version: number;
+  @IsIn(["phone", "email", "meeting", "other"])
+  @ApiProperty()
+  declare channel: string;
+  @IsString()
+  @Transform(trim)
+  @MinLength(10)
+  @MaxLength(1000)
+  @ApiProperty()
+  declare note: string;
 }

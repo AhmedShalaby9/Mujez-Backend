@@ -270,6 +270,10 @@ test("reissuing invalidates old links and activation is single use with a real t
     "documents.manage",
     "commissions.read",
     "commissions.manage",
+    "marketing.read",
+    "marketing.manage",
+    "routing.read",
+    "routing.manage",
   ]);
   assert.equal(
     (

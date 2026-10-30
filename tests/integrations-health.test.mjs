@@ -150,6 +150,7 @@ test("health uses actual probe results and sanitizes dependency failures", async
   const m = new OperationalMetrics();
   const database = {
     ready: async () => {},
+    platform: async () => ({ seen_at: new Date(), healthy: true }),
     poolStats: () => ({ total: 2, max: 20, idle: 1, waiting: 0 }),
   };
   let h = await new SystemHealthService(
@@ -181,4 +182,26 @@ test("health uses actual probe results and sanitizes dependency failures", async
   assert.equal(h.redis.status, "down");
   assert.equal(h.alerts.length, 2);
   assert.ok(!JSON.stringify(h).includes("secret"));
+});
+
+test("routing worker health requires a fresh observed heartbeat", async () => {
+  const h = await new SystemHealthService(
+    {
+      ready: async () => {},
+      platform: async () => ({
+        seen_at: new Date("2020-01-01"),
+        healthy: false,
+      }),
+      poolStats: () => ({ total: 0, max: 20 }),
+    },
+    { ready: async () => {} },
+    new OperationalMetrics(),
+  ).snapshot();
+  assert.equal(h.routingWorker.status, "down");
+  assert.equal(
+    h.alerts.some(
+      (a) => a.service === "lead-routing" && a.severity === "warning",
+    ),
+    true,
+  );
 });

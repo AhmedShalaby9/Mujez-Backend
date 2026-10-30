@@ -89,9 +89,22 @@ export class SystemHealthService {
         clearTimeout(timer);
       }
     };
-    const [database, redis] = await Promise.all([
+    let workerSeenAt: string | null = null;
+    const [database, redis, routingWorker] = await Promise.all([
       probe(() => this.db.ready()),
       probe(() => this.cache.ready()),
+      probe(async () => {
+        const r = await this.db.platform(
+          async (c) =>
+            (
+              await c.query(
+                "SELECT seen_at,seen_at>now()-interval '2 minutes' AS healthy FROM platform.worker_heartbeats WHERE key='lead-routing'",
+              )
+            ).rows[0],
+        );
+        workerSeenAt = r?.seen_at ? new Date(r.seen_at).toISOString() : null;
+        if (!r?.healthy) throw Error("Worker heartbeat stale");
+      }),
     ]);
     const observedAt = new Date().toISOString();
     const alerts = [
@@ -107,11 +120,21 @@ export class SystemHealthService {
         messageAr: "فشل فحص جاهزية " + service,
         time: observedAt,
       }));
+    if (routingWorker.status === "down")
+      alerts.push({
+        id: "probe-lead-routing",
+        severity: "warning",
+        service: "lead-routing",
+        messageEn: "Lead routing worker heartbeat is missing or stale",
+        messageAr: "إشارة عامل توزيع العملاء مفقودة أو قديمة",
+        time: observedAt,
+      });
     return {
       observedAt,
       status: alerts.length ? "degraded" : "healthy",
       database,
       redis,
+      routingWorker: { ...routingWorker, lastSeenAt: workerSeenAt },
       uptimeSeconds: Math.floor(process.uptime()),
       memoryMb: Math.round(process.memoryUsage().rss / 1048576),
       connections: this.db.poolStats(),

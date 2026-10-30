@@ -1,3 +1,4 @@
+import { pickRoute } from "../../administration/routing/routing-picker.js";
 import {
   Injectable,
   BadRequestException,
@@ -19,6 +20,7 @@ import {
   type StageChange,
   type LeadArchive,
   type LeadNote,
+  type LeadContact,
   type ActivityQuery,
   type DealInput,
   type DealUpdate,
@@ -35,7 +37,7 @@ export function normalizePhone(value: string) {
     );
   return s;
 }
-const LEAD = `SELECT l.*,l.budget_minor::text AS budget_minor,u.name AS owner_name,o.id AS opportunity_id,o.public_id AS deal_ref,o.title AS deal_title,o.value_minor::text AS deal_value,o.deal_type,o.version AS deal_version FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id`;
+const LEAD = `SELECT l.*,l.budget_minor::text AS budget_minor,u.name AS owner_name,o.id AS opportunity_id,o.public_id AS deal_ref,o.title AS deal_title,o.value_minor::text AS deal_value,o.deal_type,o.version AS deal_version,mc.name AS campaign_name,rr.name AS routing_rule_name,CASE WHEN l.first_contact_at IS NULL AND rr.active AND rr.archived_at IS NULL AND rr.sla_minutes>0 THEN l.assigned_at+make_interval(mins=>rr.sla_minutes) ELSE NULL END AS sla_due_at FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id LEFT JOIN tenant.marketing_campaigns mc ON mc.company_id=l.company_id AND mc.id=l.campaign_id LEFT JOIN tenant.routing_rules rr ON rr.company_id=l.company_id AND rr.id=l.routing_rule_id`;
 const ref = (prefix: string) =>
   prefix + "-" + randomBytes(6).toString("hex").toUpperCase();
 const iso = (value: any) => (value ? new Date(value).toISOString() : null);
@@ -50,6 +52,16 @@ export function leadDto(l: any) {
     budgetMinor: l.budget_minor === null ? null : String(l.budget_minor),
     currency: "EGP",
     source: l.source,
+    campaign: l.campaign_id
+      ? { id: l.campaign_id, name: l.campaign_name }
+      : null,
+    assignedAt: iso(l.assigned_at),
+    firstContactAt: iso(l.first_contact_at),
+    routingRule: l.routing_rule_id
+      ? { id: l.routing_rule_id, name: l.routing_rule_name }
+      : null,
+    slaDueAt: iso(l.sla_due_at),
+    routingAttempts: l.routing_attempts ?? 0,
     owner: l.owner_user_id ? { id: l.owner_user_id, name: l.owner_name } : null,
     stage: l.stage,
     score: l.score,
@@ -79,6 +91,10 @@ function filters(p: Principal, q: SalesQuery, board = false) {
         ? "l.archived_at IS NULL"
         : "l.archived_at IS NOT NULL",
     );
+  if (q.campaignId) {
+    args.push(q.campaignId);
+    where.push("l.campaign_id=$" + args.length);
+  }
   if (q.stage) {
     args.push(q.stage);
     where.push("l.stage=$" + args.length);
@@ -342,18 +358,73 @@ export class SalesService {
       );
     return target.id;
   }
+  async campaign(
+    c: PoolClient,
+    p: Principal,
+    id: string | null | undefined,
+    source: string,
+    oldId?: string | null,
+  ) {
+    if (!id) return null;
+    if (id !== oldId && !p.permissions.includes("marketing.read"))
+      throw new ForbiddenException();
+    const campaign = (
+      await c.query(
+        "SELECT * FROM tenant.marketing_campaigns WHERE company_id=$1 AND id=$2",
+        [p.companyId, id],
+      )
+    ).rows[0];
+    if (
+      !campaign ||
+      campaign.source !== source ||
+      (id !== oldId && (campaign.archived_at || campaign.status !== "active"))
+    )
+      throw new BadRequestException(
+        "Choose an active company campaign with the same lead source",
+      );
+    return id;
+  }
+  async contact(p: Principal, id: string, b: LeadContact) {
+    return this.write(p, "leads.manage", "lead.contact:" + id, b, async (c) => {
+      const old = await this.row(c, p, id, true);
+      this.check(old, b.version);
+      if (old.archived_at || old.first_contact_at)
+        throw new ConflictException(
+          "Lead is archived or first contact is already recorded",
+        );
+      await c.query(
+        "UPDATE tenant.leads SET first_contact_at=now(),version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
+        [p.companyId, id],
+      );
+      await this.event(c, p, id, "lead.contact_recorded", {
+        channel: b.channel,
+        note: b.note,
+      });
+      return leadDto(await this.row(c, p, id));
+    });
+  }
   async create(p: Principal, input: LeadInput) {
     return this.write(p, "leads.manage", "lead.create", input, async (c) => {
       const phone = normalizePhone(input.phone),
-        duplicate = await this.duplicate(c, p, phone, input),
-        owner = await this.owner(
-          c,
-          p,
-          input.ownerId === undefined ? p.id : input.ownerId,
-        );
+        duplicate = await this.duplicate(c, p, phone, input);
+      const routed =
+        input.ownerId === undefined
+          ? await pickRoute(c, p.companyId!, input, true)
+          : null;
+      const owner = await this.owner(
+        c,
+        p,
+        input.ownerId === undefined ? (routed?.userId ?? p.id) : input.ownerId,
+      );
+      const campaign = await this.campaign(
+        c,
+        p,
+        input.campaignId ?? null,
+        input.source,
+      );
       const l = (
         await c.query(
-          `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,score) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+          `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,score,campaign_id,routing_rule_id,assigned_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END) RETURNING id`,
           [
             p.companyId,
             ref("L"),
@@ -365,9 +436,19 @@ export class SalesService {
             input.source,
             owner,
             input.score ?? null,
+            campaign,
+            routed?.ruleId ?? null,
           ],
         )
       ).rows[0];
+      if (routed)
+        await this.event(c, p, l.id, "lead.routed", {
+          ruleId: routed.ruleId,
+          ruleName: routed.ruleName,
+          ownerId: routed.userId,
+          ownerName: routed.userName,
+          strategy: routed.strategy,
+        });
       if (duplicate && input.duplicateMode === "link")
         await c.query(
           "INSERT INTO tenant.lead_links(company_id,lead_id,related_id,reason) VALUES($1,$2,$3,$4)",
@@ -401,12 +482,19 @@ export class SalesService {
             p,
             input.ownerId === undefined ? old.owner_user_id : input.ownerId,
           );
+        const campaign = await this.campaign(
+          c,
+          p,
+          input.campaignId === undefined ? old.campaign_id : input.campaignId,
+          input.source,
+          old.campaign_id,
+        );
         const duplicate =
           phone !== old.phone
             ? await this.duplicate(c, p, phone, input, id)
             : null;
         await c.query(
-          `UPDATE tenant.leads SET name=$3,phone=$4,segment=$5,want=$6,budget_minor=$7,source=$8,owner_user_id=$9,score=$10,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2`,
+          `UPDATE tenant.leads SET name=$3,phone=$4,segment=$5,want=$6,budget_minor=$7,source=$8,owner_user_id=$9,score=$10,campaign_id=$11,assigned_at=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END ELSE assigned_at END,routing_rule_id=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN NULL ELSE routing_rule_id END,routing_attempts=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN 0 ELSE routing_attempts END,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2`,
           [
             p.companyId,
             id,
@@ -418,6 +506,7 @@ export class SalesService {
             input.source,
             owner,
             input.score ?? null,
+            campaign,
           ],
         );
         if (duplicate && input.duplicateMode === "link")
@@ -426,6 +515,8 @@ export class SalesService {
             [p.companyId, id, duplicate, input.reason],
           );
         await this.event(c, p, id, "lead.updated", {
+          campaignBefore: old.campaign_id,
+          campaignAfter: campaign,
           ownerBefore: old.owner_user_id,
           ownerAfter: owner,
           duplicateOf: duplicate,
