@@ -1,3 +1,4 @@
+import { expireUnitReservations } from "../reservations/reservation-expiry.js";
 import {
   Injectable,
   NotFoundException,
@@ -25,7 +26,7 @@ import type {
 } from "./inventory.dto.js";
 const iso = (v: any) => (v ? new Date(v).toISOString() : null);
 const text = (en: string, ar?: string) => ({ en, ar: ar ?? en });
-const UNIT = `SELECT u.*,u.price_minor::text AS price_minor,u.area::text AS area,b.code AS building_code,b.name AS building_name,ph.id AS phase_id,ph.name AS phase_name,p.id AS project_id,p.name AS project_name,p.archived_at AS project_archived_at FROM tenant.units u LEFT JOIN tenant.project_buildings b ON b.company_id=u.company_id AND b.id=u.building_id LEFT JOIN tenant.project_phases ph ON ph.company_id=b.company_id AND ph.id=b.phase_id LEFT JOIN tenant.projects p ON p.company_id=ph.company_id AND p.id=ph.project_id`;
+const UNIT = `SELECT u.*,u.price_minor::text AS price_minor,u.area::text AS area,b.code AS building_code,b.name AS building_name,ph.id AS phase_id,ph.name AS phase_name,p.id AS project_id,p.name AS project_name,p.archived_at AS project_archived_at FROM tenant.inventory_units u LEFT JOIN tenant.project_buildings b ON b.company_id=u.company_id AND b.id=u.building_id LEFT JOIN tenant.project_phases ph ON ph.company_id=b.company_id AND ph.id=b.phase_id LEFT JOIN tenant.projects p ON p.company_id=ph.company_id AND p.id=ph.project_id`;
 export function unitDto(u: any) {
   return {
     id: u.id,
@@ -72,7 +73,7 @@ function projectDto(p: any) {
     currency: "EGP",
   };
 }
-const COUNTS = `SELECT p.*,count(u.id)::int AS total,count(u.id) FILTER(WHERE u.status='available')::int AS available,count(u.id) FILTER(WHERE u.status IN ('hold','reserved'))::int AS held,count(u.id) FILTER(WHERE u.status='sold')::int AS sold,count(u.id) FILTER(WHERE u.status='under_contract')::int AS under_contract,min(u.price_minor) FILTER(WHERE u.status='available')::text AS from_price FROM tenant.projects p LEFT JOIN tenant.project_phases ph ON ph.company_id=p.company_id AND ph.project_id=p.id LEFT JOIN tenant.project_buildings b ON b.company_id=ph.company_id AND b.phase_id=ph.id LEFT JOIN tenant.units u ON u.company_id=b.company_id AND u.building_id=b.id AND u.archived_at IS NULL`;
+const COUNTS = `SELECT p.*,count(u.id)::int AS total,count(u.id) FILTER(WHERE u.status='available')::int AS available,count(u.id) FILTER(WHERE u.status IN ('hold','reserved'))::int AS held,count(u.id) FILTER(WHERE u.status='sold')::int AS sold,count(u.id) FILTER(WHERE u.status='under_contract')::int AS under_contract,min(u.price_minor) FILTER(WHERE u.status='available')::text AS from_price FROM tenant.projects p LEFT JOIN tenant.project_phases ph ON ph.company_id=p.company_id AND ph.project_id=p.id LEFT JOIN tenant.project_buildings b ON b.company_id=ph.company_id AND b.phase_id=ph.id LEFT JOIN tenant.inventory_units u ON u.company_id=b.company_id AND u.building_id=b.id AND u.archived_at IS NULL`;
 @Injectable()
 export class InventoryService {
   constructor(
@@ -80,6 +81,7 @@ export class InventoryService {
     private readonly sales: SalesService,
   ) {}
   async row(c: PoolClient, p: Principal, table: string, id: string) {
+    if (table === "units") await expireUnitReservations(c, p.companyId!, id);
     const row = (
       await c.query(
         `SELECT * FROM tenant.${table} WHERE company_id=$1 AND id=$2 FOR UPDATE`,

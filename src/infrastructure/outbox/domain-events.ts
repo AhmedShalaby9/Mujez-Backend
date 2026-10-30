@@ -3,7 +3,7 @@ import { sanitizeAudit, severityFor } from "./audit-sanitize.js";
 import type { PoolClient } from "pg";
 export interface DomainEvent {
   companyId: string;
-  actorId: string;
+  actorId: string | null;
   action: string;
   resourceType: string;
   resourceId: string;

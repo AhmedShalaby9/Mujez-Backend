@@ -1362,6 +1362,126 @@
         "tags": ["Units"]
       }
     },
+    "/api/v1/reservations": {
+      "get": {
+        "operationId": "ReservationsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 1, "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 50, "type": "number" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "stage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "qualified",
+                "viewing",
+                "offer",
+                "contract",
+                "won",
+                "lost"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "unitId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "leadId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Reservations"]
+      },
+      "post": {
+        "operationId": "ReservationsController_hold",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/HoldInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Reservations"]
+      }
+    },
+    "/api/v1/reservations/{id}": {
+      "get": {
+        "operationId": "ReservationsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Reservations"]
+      }
+    },
+    "/api/v1/reservations/{id}/action": {
+      "post": {
+        "operationId": "ReservationsController_action",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReservationAction" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Reservations"]
+      }
+    },
     "/admin/api/v1/companies": {
       "get": {
         "operationId": "CompaniesController_list",
@@ -2976,6 +3096,33 @@
           "priceMinor",
           "version"
         ]
+      },
+      "HoldInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "unitId": { "type": "string" },
+          "leadId": { "type": "string" },
+          "assigneeId": { "type": ["string", "null"] },
+          "unitVersion": { "type": "number" },
+          "hours": { "type": "number", "enum": [24, 48, 72] }
+        },
+        "required": ["requestId", "unitId", "leadId", "unitVersion", "hours"]
+      },
+      "ReservationAction": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "action": { "type": "string" },
+          "hours": { "type": "number" },
+          "depositMinor": {
+            "type": "string",
+            "description": "Manually recorded deposit; no external collection"
+          },
+          "reason": { "type": "string" }
+        },
+        "required": ["requestId", "version", "action"]
       },
       "CompanyInput": {
         "type": "object",
