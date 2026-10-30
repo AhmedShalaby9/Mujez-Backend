@@ -95,6 +95,11 @@ test("confirmation records exact manual deposit and changes inventory atomically
     req({ version: res.version, action: "confirm" }),
     400,
   );
+  await h.post(
+    "reservations/" + res.id + "/action",
+    req({ version: res.version, action: "confirm", depositMinor: null }),
+    400,
+  );
   res = (await action("confirm", { depositMinor: "900719925474099300" })).body;
   assert.equal(res.status, "reserved");
   assert.equal(res.depositMinor, "900719925474099300");

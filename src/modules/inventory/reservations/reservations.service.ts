@@ -256,7 +256,7 @@ export class ReservationsService {
         if (b.action === "confirm") {
           if (old.status !== "hold")
             throw new ConflictException("Only holds can be confirmed");
-          if (b.depositMinor === undefined)
+          if (typeof b.depositMinor !== "string")
             throw new BadRequestException(
               "Enter the manually recorded deposit amount",
             );
