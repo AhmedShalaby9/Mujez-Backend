@@ -13,9 +13,9 @@ const { AppModule } = await import("../dist/app.module.js");
 const app = await NestFactory.create(AppModule, { logger: false });
 try {
   const options = new DocumentBuilder()
-    .setTitle("Mujez CRM Foundation API")
+    .setTitle("Mujez CRM API")
     .setDescription(
-      "Foundation endpoints only. Business modules and controlled support access are not implemented yet.",
+      "Platform administration and company CRM endpoints with session authentication, company isolation and audited mutations.",
     )
     .setVersion("0.1.0")
     .addCookieAuth(

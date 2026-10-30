@@ -335,6 +335,18 @@ export class DocumentsService {
           throw new ConflictException(
             "Evidence for a signed contract must be retained",
           );
+        if (
+          archive &&
+          (
+            await c.query(
+              "SELECT 1 FROM tenant.commissions WHERE company_id=$1 AND status IN ('payable','paid') AND (payable_document_id=$2 OR paid_document_id=$2) LIMIT 1",
+              [p.companyId, id],
+            )
+          ).rowCount
+        )
+          throw new ConflictException(
+            "Commission receipt evidence must be retained",
+          );
         await c.query(
           "UPDATE tenant.documents SET archived_at=CASE WHEN $3 THEN now() ELSE NULL END,version=version+1 WHERE company_id=$1 AND id=$2",
           [p.companyId, id, archive],

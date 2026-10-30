@@ -33,7 +33,8 @@
     "db:seed:tasks": "npm run build && node --env-file-if-exists=.env scripts/seed-tasks.mjs",
     "db:seed:inventory": "npm run build && node --env-file-if-exists=.env scripts/seed-inventory.mjs",
     "db:seed:reservations": "npm run build && node --env-file-if-exists=.env scripts/seed-reservations.mjs",
-    "db:seed:contracts": "npm run build && node --env-file-if-exists=.env scripts/seed-contracts-documents.mjs"
+    "db:seed:contracts": "npm run build && node --env-file-if-exists=.env scripts/seed-contracts-documents.mjs",
+    "db:seed:commissions": "npm run build && node --env-file-if-exists=.env scripts/seed-commissions.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.2.0",

@@ -40,6 +40,8 @@ export async function tenantHarness() {
     "contracts.manage",
     "documents.read",
     "documents.manage",
+    "commissions.read",
+    "commissions.manage",
   ];
   await db.exec(
     "INSERT INTO platform.subscription_plans(key) VALUES('test-plan');INSERT INTO platform.plan_versions(plan_key,revision,name,description,monthly_minor,annual_minor,limits,features) VALUES('test-plan',1,'{\"en\":\"Test\",\"ar\":\"اختبار\"}','{}',10000,100000,'{\"users\":10}','{}');",

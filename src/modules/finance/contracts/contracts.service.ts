@@ -503,6 +503,37 @@ export class ContractsService {
               [p.companyId, old.unit_id],
             );
         } else {
+          const commissions = (
+            await c.query(
+              "SELECT id,status FROM tenant.commissions WHERE company_id=$1 AND contract_id=$2 FOR UPDATE",
+              [p.companyId, id],
+            )
+          ).rows;
+          if (
+            commissions.some((m) =>
+              ["approved", "payable", "paid"].includes(m.status),
+            )
+          )
+            throw new ConflictException(
+              "Cancel approved/payable commissions before voiding. Paid commissions require financial reversal.",
+            );
+          for (const m of commissions.filter(
+            (m) => m.status === "calculated",
+          )) {
+            await c.query(
+              "UPDATE tenant.commissions SET status='canceled',reason=$3,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
+              [p.companyId, m.id, b.reason],
+            );
+            await recordTenantEvent(c, {
+              companyId: p.companyId!,
+              actorId: p.id,
+              action: "commission.canceled",
+              resourceType: "commission",
+              resourceId: m.id,
+              after: { status: "canceled", reason: b.reason },
+              payload: { contractId: id, reason: b.reason },
+            });
+          }
           await c.query(
             "UPDATE tenant.contracts SET status='void',void_reason=$3,void_at=now(),version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
             [p.companyId, id, b.reason],

@@ -1654,6 +1654,145 @@
         "tags": ["Contracts"]
       }
     },
+    "/api/v1/commissions": {
+      "get": {
+        "operationId": "CommissionsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 1, "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 50, "type": "number" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "stage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "qualified",
+                "viewing",
+                "offer",
+                "contract",
+                "won",
+                "lost"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Commissions"]
+      },
+      "post": {
+        "operationId": "CommissionsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CommissionInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Commissions"]
+      }
+    },
+    "/api/v1/commissions/options": {
+      "get": {
+        "operationId": "CommissionsController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Commissions"]
+      }
+    },
+    "/api/v1/commissions/{id}": {
+      "get": {
+        "operationId": "CommissionsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Commissions"]
+      }
+    },
+    "/api/v1/commissions/{id}/recalculate": {
+      "post": {
+        "operationId": "CommissionsController_recalculate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CommissionUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Commissions"]
+      }
+    },
+    "/api/v1/commissions/{id}/action": {
+      "post": {
+        "operationId": "CommissionsController_action",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CommissionAction" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Commissions"]
+      }
+    },
     "/api/v1/documents": {
       "get": {
         "operationId": "DocumentsController_list",
@@ -2989,8 +3128,8 @@
     }
   },
   "info": {
-    "title": "Mujez CRM Foundation API",
-    "description": "Foundation endpoints only. Business modules and controlled support access are not implemented yet.",
+    "title": "Mujez CRM API",
+    "description": "Platform administration and company CRM endpoints with session authentication, company isolation and audited mutations.",
     "version": "0.1.0",
     "contact": {}
   },
@@ -3540,6 +3679,69 @@
           "documentId": { "type": "string" }
         },
         "required": ["requestId", "version", "documentId"]
+      },
+      "CommissionSplit": {
+        "type": "object",
+        "properties": {
+          "payeeId": { "type": ["string", "null"] },
+          "shareBps": { "type": "number" }
+        },
+        "required": ["shareBps"]
+      },
+      "CommissionInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "contractId": { "type": "string" },
+          "contractVersion": { "type": "number" },
+          "rateBps": { "type": "number" },
+          "splits": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CommissionSplit" }
+          }
+        },
+        "required": [
+          "requestId",
+          "contractId",
+          "contractVersion",
+          "rateBps",
+          "splits"
+        ]
+      },
+      "CommissionUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "contractId": { "type": "string" },
+          "contractVersion": { "type": "number" },
+          "rateBps": { "type": "number" },
+          "splits": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CommissionSplit" }
+          },
+          "version": { "type": "number" }
+        },
+        "required": [
+          "requestId",
+          "contractId",
+          "contractVersion",
+          "rateBps",
+          "splits",
+          "version"
+        ]
+      },
+      "CommissionAction": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "action": { "type": "string" },
+          "reason": { "type": "string" },
+          "documentId": { "type": "string" },
+          "reference": { "type": "string" },
+          "paidDate": { "type": "string" }
+        },
+        "required": ["requestId", "version", "action", "reason"]
       },
       "DocumentArchive": {
         "type": "object",
