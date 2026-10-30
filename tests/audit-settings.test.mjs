@@ -199,26 +199,30 @@ test("saved session duration and login attempt policy are consumed; shortening c
   await sessions.login("admin@settings.test", password, false);
   assert.equal(calls.at(-1)[1], 5);
 });
-test("trial and billing defaults affect only new records and preserve explicit invoice choices", async () => {
+test("legacy trial settings cannot issue free trials; billing defaults preserve explicit invoice choices", async () => {
   const subscriptions = new SubscriptionsService(
     { platform: (w) => tx(w) },
     settings,
   );
-  await subscriptions.create(
-    {
-      companyId: "MJ-SETTINGS",
-      plan: "starter",
-      planVersionId: planVersion,
-      cycle: "monthly",
-      status: "trialing",
-      payment: "bank",
-    },
-    root,
+  const terms = {
+    companyId: "MJ-SETTINGS",
+    plan: "starter",
+    planVersionId: planVersion,
+    cycle: "monthly",
+    payment: "bank",
+  };
+  await assert.rejects(
+    subscriptions.create({ ...terms, status: "trialing" }, root),
+    (e) => e.getStatus() === 400,
   );
-  const sub = (await db.query("SELECT * FROM platform.subscriptions")).rows[0];
+  await subscriptions.create({ ...terms, status: "active" }, root);
   assert.equal(
-    new Date(sub.period_end) - new Date(sub.period_start),
-    7 * 86400000,
+    (
+      await db.query(
+        "SELECT status='active' AND period_end=period_start+interval '1 month' AS valid FROM platform.subscriptions",
+      )
+    ).rows[0].valid,
+    true,
   );
   const billing = new BillingService(
     { platform: (w) => tx(w) },

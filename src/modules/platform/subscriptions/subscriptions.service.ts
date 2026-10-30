@@ -1,6 +1,5 @@
 import { Optional } from "@nestjs/common";
 import { SettingsService } from "../settings/settings.service.js";
-import { DEFAULT_SETTINGS } from "../settings/settings.model.js";
 import {
   Injectable,
   ConflictException,
@@ -277,6 +276,10 @@ export class SubscriptionsService {
     return row;
   }
   async create(input: SubscriptionCreate, actor: string) {
+    if (input.status !== "active")
+      throw new BadRequestException(
+        "New subscriptions must be active. Free trials are not offered.",
+      );
     try {
       return await this.db.platform(async (c) => {
         const company = (
@@ -306,15 +309,7 @@ export class SubscriptionsService {
             company.id,
           );
         const id = randomUUID();
-        const period =
-          input.status === "trialing"
-            ? (this.settings
-                ? await this.settings.forClient(c)
-                : DEFAULT_SETTINGS
-              ).trialDays + " days"
-            : input.cycle === "annual"
-              ? "1 year"
-              : "1 month";
+        const period = input.cycle === "annual" ? "1 year" : "1 month";
         const row = (
           await c.query(
             `INSERT INTO platform.subscriptions(id,public_id,company_id,plan_key,plan_version_id,cycle,status,payment_method,period_end) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now()+$9::interval) RETURNING *`,

@@ -82,7 +82,7 @@ try {
           planVersionId: option.planVersionId,
           cycle: "monthly",
           payment: "bank",
-          status: "trialing",
+          status: "active",
         },
         actor.id,
       );

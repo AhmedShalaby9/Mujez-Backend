@@ -13,7 +13,7 @@ exposes catalog choices to subscription managers without allowing catalog edits.
 - POST `/admin/api/v1/plans/:key/archive`: current `version`, boolean `archived`.
 - GET `/admin/api/v1/subscriptions?page=1&limit=100`: paginated persisted records.
 - POST `/admin/api/v1/subscriptions`: companyId (public ID), plan, planVersionId,
-  cycle (monthly/annual), status (active/trialing), payment (card/bank/instapay).
+  cycle (monthly/annual), status (active), payment (card/bank/instapay).
 - POST `/admin/api/v1/subscriptions/:id/change`: version, plan, planVersionId.
 - POST `/admin/api/v1/subscriptions/:id/cancel` or `/renew`: current version.
 
@@ -27,7 +27,9 @@ Company records show the latest subscription plan and MRR when present.
 
 ## Company creation
 
-The plan selected when creating a company provisions a real trial subscription in the same transaction as the company, owner and welcome email. It uses the current published version and configured trial duration, rejects archived/unpublished plans, and never creates a payment or invoice. Editing a company does not change its subscription; use the explicit subscription plan-change action.
+The plan selected when creating a company provisions a real active monthly subscription in the same transaction as the company, owner and welcome email. It uses the current published version and one monthly subscription period, rejects archived/unpublished plans, and never creates a payment or invoice. Editing a company does not change its subscription; use the explicit subscription plan-change action.
+
+New subscriptions must be active. Free trials are not offered, and legacy trial settings do not affect new contracts. Historic trial records remain readable.
 
 ## Rules
 

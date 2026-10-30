@@ -63,7 +63,7 @@ export class CompanyUpdate extends CompanyInput {
   @IsInt() @Min(0) @ApiProperty() declare version: number;
 }
 export class StatusInput {
-  @IsIn(["suspend", "reactivate", "archive", "start_trial", "activate"])
+  @IsIn(["suspend", "reactivate", "archive", "activate"])
   @ApiProperty()
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   declare action: string;

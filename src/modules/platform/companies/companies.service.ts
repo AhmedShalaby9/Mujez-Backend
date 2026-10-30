@@ -1,4 +1,4 @@
-import { createInitialTrial } from "../subscriptions/initial-trial.js";
+import { createInitialSubscription } from "../subscriptions/initial-subscription.js";
 import { OwnerWelcomeService } from "../../identity/welcome/welcome.service.js";
 import {
   ConflictException,
@@ -104,7 +104,7 @@ export class CompaniesService {
         const id = randomUUID();
         const row = (
           await c.query(
-            `INSERT INTO platform.companies(id,public_id,slug,name,company_type,city,admin_email,phone,website,selected_plan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+            `INSERT INTO platform.companies(id,public_id,slug,name,company_type,city,admin_email,phone,website,selected_plan,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active') RETURNING *`,
             [
               id,
               "MJ-" + id.toUpperCase(),
@@ -120,7 +120,7 @@ export class CompaniesService {
           )
         ).rows[0];
         await this.event(c, actor, "company.created", null, row);
-        const subscription = await createInitialTrial(c, row, actor);
+        const subscription = await createInitialSubscription(c, row, actor);
         const emailDelivery = await this.welcome.provision(c, row, actor);
         const current = (await c.query(SELECT + " WHERE c.id=$1", [row.id]))
           .rows[0];
@@ -206,7 +206,6 @@ export class CompaniesService {
       async (c, b) => {
         const transitions: Record<string, Record<string, string>> = {
           pending: {
-            start_trial: "trial",
             activate: "active",
             suspend: "suspended",
             archive: "archived",

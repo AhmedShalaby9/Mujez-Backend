@@ -66,25 +66,26 @@ const input = {
 };
 test("create persists company with audit/outbox, real owner and queued welcome email", async () => {
   company = await service.create(input, actor);
-  assert.equal(company.status, "pending");
+  assert.equal(company.status, "active");
   assert.equal(company.users, 1);
   assert.equal(company.ownerProvisioned, true);
-  assert.equal(company.subscription.status, "trialing");
+  assert.equal(company.subscription.status, "active");
   assert.equal(company.subscription.plan, input.plan);
   const subscription = (
     await db.query("SELECT * FROM platform.subscriptions WHERE company_id=$1", [
       company.uuid,
     ])
   ).rows[0];
-  assert.equal(subscription.status, "trialing");
+  assert.equal(subscription.status, "active");
   assert.equal(subscription.plan_key, input.plan);
   assert.equal(
-    Math.round(
-      (new Date(subscription.period_end) -
-        new Date(subscription.period_start)) /
-        86400000,
-    ),
-    14,
+    (
+      await db.query(
+        "SELECT period_end=period_start+interval '1 month' AS monthly FROM platform.subscriptions WHERE company_id=$1",
+        [company.uuid],
+      )
+    ).rows[0].monthly,
+    true,
   );
   assert.equal(
     (
@@ -94,7 +95,7 @@ test("create persists company with audit/outbox, real owner and queued welcome e
     ).rows[0].n,
     1,
   );
-  assert.equal(company.mrr, 0);
+  assert.equal(company.mrr, 100);
   assert.equal((await service.list()).total, 1);
   assert.equal(
     (
@@ -121,6 +122,10 @@ test("editing, progress, conflicts and status transitions persist", async () => 
     service.update(company.id, { ...input, version: 0 }, actor),
     (e) => e.getStatus() === 409,
   );
+  // Existing pending companies retain the administrative onboarding workflow.
+  await db.query("UPDATE platform.companies SET status='pending' WHERE id=$1", [
+    company.uuid,
+  ]);
   company = await service.step(
     company.id,
     { step: "team", completed: true, version: company.version },
@@ -133,21 +138,23 @@ test("editing, progress, conflicts and status transitions persist", async () => 
     actor,
   );
   assert.equal(company.completedSteps, 1);
-  company = await service.status(
-    company.id,
-    {
-      action: "start_trial",
-      reason: "Verified onboarding status",
-      version: company.version,
-    },
-    actor,
+  await assert.rejects(
+    service.status(
+      company.id,
+      {
+        action: "start_trial",
+        reason: "No free trials are offered",
+        version: company.version,
+      },
+      actor,
+    ),
+    (e) => e.getStatus() === 409,
   );
-  assert.equal(company.status, "trial");
   company = await service.status(
     company.id,
     {
       action: "activate",
-      reason: "Verified onboarding status",
+      reason: "Verified onboarding activation",
       version: company.version,
     },
     actor,
@@ -185,7 +192,7 @@ test("audit failure rolls back company creation", async () => {
   assert.equal((await service.list()).total, 1);
 });
 
-test("configured trial duration and selected published plan are persisted without revenue or payment records", async () => {
+test("selected plan creates an active monthly subscription regardless of legacy trial settings", async () => {
   await db.query(
     "INSERT INTO platform.settings(key,value) VALUES('platform',$1)",
     [{ trialDays: 21 }],
@@ -207,14 +214,17 @@ test("configured trial duration and selected published plan are persisted withou
   ).rows[0];
   assert.equal(row.plan_key, "pro");
   assert.equal(row.revision, 1);
-  assert.equal(row.status, "trialing");
+  assert.equal(row.status, "active");
   assert.equal(
-    Math.round(
-      (new Date(row.period_end) - new Date(row.period_start)) / 86400000,
-    ),
-    21,
+    (
+      await db.query(
+        "SELECT period_end=period_start+interval '1 month' AS monthly FROM platform.subscriptions WHERE company_id=$1",
+        [created.uuid],
+      )
+    ).rows[0].monthly,
+    true,
   );
-  assert.equal(created.mrr, 0);
+  assert.equal(created.mrr, 100);
   assert.equal(
     (await db.query("SELECT count(*)::int AS n FROM platform.payments")).rows[0]
       .n,

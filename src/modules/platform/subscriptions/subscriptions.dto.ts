@@ -93,7 +93,7 @@ export class SubscriptionCreate {
   declare plan: string;
   @ApiProperty() @IsIn(["monthly", "annual"]) declare cycle: string;
   @ApiProperty() @IsIn(["card", "bank", "instapay"]) declare payment: string;
-  @ApiProperty() @IsIn(["trialing", "active"]) declare status: string;
+  @ApiProperty() @IsIn(["active"]) declare status: string;
   @ApiProperty() @IsUUID() declare planVersionId: string;
 }
 export class SubscriptionChange extends Revision {
