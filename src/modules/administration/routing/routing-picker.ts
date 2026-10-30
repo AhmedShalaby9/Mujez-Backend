@@ -1,3 +1,4 @@
+import { tenantFeature } from "../../../common/auth/tenant-features.js";
 import type { PoolClient } from "pg";
 export interface RoutingSample {
   source: string;
@@ -29,7 +30,17 @@ export async function pickRoute(
       args,
     )
   ).rows;
+  const advanced = rules.some(
+    (r) => ["weighted", "team"].includes(r.strategy) || r.sla_minutes > 0,
+  )
+    ? await tenantFeature(c, companyId, "routing_adv")
+    : false;
   for (const r of rules) {
+    if (
+      !advanced &&
+      (["weighted", "team"].includes(r.strategy) || r.sla_minutes > 0)
+    )
+      continue;
     const targets = (
       await c.query(
         "SELECT t.*,u.name FROM tenant.routing_targets t JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.user_id WHERE t.company_id=$1 AND t.rule_id=$2 AND u.status='active' AND u.deleted_at IS NULL AND ($3::uuid IS NULL OR t.user_id<>$3::uuid) ORDER BY t.position,t.user_id",

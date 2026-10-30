@@ -299,3 +299,39 @@ test("growth seed adds draft campaigns and a disabled real-user rule once withou
     3,
   );
 });
+test("advanced routing kill switch stops advanced assignment and SLA work while basic explicit routing remains available", async () => {
+  await h.db.exec(
+    "UPDATE platform.features SET platform_on=false WHERE key='routing_adv'",
+  );
+  assert.equal((await h.get("routing")).body.advancedAvailable, false);
+  const current = (await h.get("routing")).body.items.find(
+    (r) => r.id === rule.id,
+  );
+  await h.post(
+    "routing/" + rule.id + "/action",
+    req({ version: current.version, action: "enable" }),
+    403,
+  );
+  const basic = (
+    await h.post(
+      "routing",
+      ruleInput({
+        name: "Basic routing without premium SLA",
+        strategy: "specific_user",
+        slaMinutes: 0,
+        targets: [{ userId: second, weight: 1 }],
+      }),
+    )
+  ).body;
+  const sim = (
+    await h.post("routing/simulate", { source: "website", segment: "res" })
+  ).body;
+  assert.equal(sim.assignment.ruleId, basic.id);
+  assert.equal((await runSlaSweep(h.database)).reassigned, 0);
+  const l = (await h.post("leads", leadInput(130))).body;
+  assert.equal(l.owner.id, second);
+  assert.equal(l.slaDueAt, null);
+  await h.db.exec(
+    "UPDATE platform.features SET platform_on=true WHERE key='routing_adv'",
+  );
+});

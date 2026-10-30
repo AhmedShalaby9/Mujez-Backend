@@ -2160,6 +2160,61 @@
         "tags": ["Marketing"]
       }
     },
+    "/api/v1/reports": {
+      "get": {
+        "operationId": "CompanyReportsController_report",
+        "parameters": [
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "quarter",
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CompanyReports"]
+      }
+    },
+    "/api/v1/reports/export": {
+      "post": {
+        "operationId": "CompanyReportsController_export",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReportExport" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["CompanyReports"]
+      }
+    },
+    "/api/v1/company-overview": {
+      "get": {
+        "operationId": "CompanyOverviewController_overview",
+        "parameters": [
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CompanyOverview"]
+      }
+    },
     "/api/v1/routing": {
       "get": {
         "operationId": "RoutingController_list",
@@ -2250,6 +2305,83 @@
         },
         "responses": { "201": { "description": "" } },
         "tags": ["Routing"]
+      }
+    },
+    "/api/v1/company-audit": {
+      "get": {
+        "operationId": "CompanyAuditController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "actor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CompanyAudit"]
+      }
+    },
+    "/api/v1/company-audit/options": {
+      "get": {
+        "operationId": "CompanyAuditController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CompanyAudit"]
+      }
+    },
+    "/api/v1/company-audit/{id}": {
+      "get": {
+        "operationId": "CompanyAuditController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CompanyAudit"]
       }
     },
     "/admin/api/v1/companies": {
@@ -4118,6 +4250,16 @@
           "action": { "type": "string" }
         },
         "required": ["requestId", "version", "action"]
+      },
+      "ReportExport": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "period": { "type": "string" },
+          "segment": { "type": "string" },
+          "lang": { "type": "object" }
+        },
+        "required": ["requestId", "period"]
       },
       "RoutingSimulation": {
         "type": "object",

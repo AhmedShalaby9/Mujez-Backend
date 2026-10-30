@@ -1,3 +1,4 @@
+import { tenantFeature } from "../../../common/auth/tenant-features.js";
 import { pickRoute } from "../../administration/routing/routing-picker.js";
 import {
   Injectable,
@@ -170,8 +171,13 @@ export class SalesService {
             args,
           )
         ).rows[0].n;
+        const advanced = rows.rows.some((l) => l.routing_rule_id)
+          ? await tenantFeature(c, p.companyId!, "routing_adv")
+          : false;
         return {
-          items: rows.rows.map(leadDto),
+          items: rows.rows.map((l) =>
+            leadDto({ ...l, sla_due_at: advanced ? l.sla_due_at : null }),
+          ),
           total,
           page: q.page,
           limit: q.limit,
@@ -190,6 +196,11 @@ export class SalesService {
       )
     ).rows[0];
     if (!l) throw new NotFoundException("Lead not found");
+    if (
+      l.routing_rule_id &&
+      !(await tenantFeature(c, p.companyId!, "routing_adv"))
+    )
+      l.sla_due_at = null;
     return l;
   }
   async detail(p: Principal, id: string) {

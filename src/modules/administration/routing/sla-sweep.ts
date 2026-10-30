@@ -1,3 +1,4 @@
+import { tenantFeature } from "../../../common/auth/tenant-features.js";
 import type { DatabaseService } from "../../../infrastructure/database/database.service.js";
 import { pickRoute } from "./routing-picker.js";
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
@@ -30,6 +31,8 @@ export async function runSlaSweep(
           )
         ).rowCount
       )
+        return 0;
+      if (!(await tenantFeature(c, company.company_id, "routing_adv")))
         return 0;
       const leads = (
         await c.query(

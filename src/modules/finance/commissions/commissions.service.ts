@@ -1,3 +1,4 @@
+import { requireTenantFeature } from "../../../common/auth/tenant-features.js";
 import {
   Injectable,
   BadRequestException,
@@ -99,20 +100,24 @@ export class CommissionsService {
   }
   async options(p: Principal) {
     await this.sales.access(p, "commissions.read");
-    return this.db.tenant(p.companyId!, async (c) => ({
-      payees: (
-        await c.query(
-          "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL ORDER BY name,id LIMIT 1000",
-          [p.companyId],
-        )
-      ).rows,
-    }));
+    return this.db.tenant(p.companyId!, async (c) => {
+      await requireTenantFeature(c, p.companyId!, "commissions");
+      return {
+        payees: (
+          await c.query(
+            "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL ORDER BY name,id LIMIT 1000",
+            [p.companyId],
+          )
+        ).rows,
+      };
+    });
   }
   async list(p: Principal, q: CommissionQuery) {
     await this.sales.access(p, "commissions.read");
     return this.db.tenant(
       p.companyId!,
       async (c) => {
+        await requireTenantFeature(c, p.companyId!, "commissions");
         const args: any[] = [p.companyId],
           w = ["m.company_id=$1"];
         if (q.status) {
@@ -162,9 +167,10 @@ export class CommissionsService {
   }
   async detail(p: Principal, id: string) {
     await this.sales.access(p, "commissions.read");
-    return this.db.tenant(p.companyId!, async (c) =>
-      commissionDto(await this.row(c, p, id)),
-    );
+    return this.db.tenant(p.companyId!, async (c) => {
+      await requireTenantFeature(c, p.companyId!, "commissions");
+      return commissionDto(await this.row(c, p, id));
+    });
   }
   async event(
     c: PoolClient,
@@ -210,6 +216,7 @@ export class CommissionsService {
       "commission.calculate:" + (id ?? "new"),
       b,
       async (c) => {
+        await requireTenantFeature(c, p.companyId!, "commissions");
         let old: any;
         if (id) {
           old = await this.row(c, p, id, true);
@@ -324,6 +331,7 @@ export class CommissionsService {
       "commission.action:" + id,
       b,
       async (c) => {
+        await requireTenantFeature(c, p.companyId!, "commissions");
         const m = await this.row(c, p, id, true);
         if (m.version !== b.version)
           throw new ConflictException("Commission changed. Refresh first");

@@ -46,15 +46,21 @@ export async function tenantHarness() {
     "marketing.manage",
     "routing.read",
     "routing.manage",
+    "reports.read",
+    "reports.export",
+    "audit.read",
   ];
   await db.exec(
     "INSERT INTO platform.subscription_plans(key) VALUES('test-plan');INSERT INTO platform.plan_versions(plan_key,revision,name,description,monthly_minor,annual_minor,limits,features) VALUES('test-plan',1,'{\"en\":\"Test\",\"ar\":\"اختبار\"}','{}',10000,100000,'{\"users\":10}','{}');",
+  );
+  await db.exec(
+    "INSERT INTO platform.features(key,name,platform_on,rollout) VALUES('commissions','{}',true,100),('routing_adv','{}',true,100);INSERT INTO platform.feature_plans(feature_key,plan_key,enabled) VALUES('commissions','test-plan',true),('routing_adv','test-plan',true)",
   );
   const principals = [];
   for (const slug of ["test-alpha", "test-beta"]) {
     const companyId = (
       await db.query(
-        "INSERT INTO platform.companies(public_id,slug,name,status) VALUES($1,$2,$3,'pending') RETURNING id",
+        "INSERT INTO platform.companies(public_id,slug,name,status) VALUES($1,$2,$3,'trial') RETURNING id",
         ["MJ-" + slug, slug, { en: slug, ar: slug }],
       )
     ).rows[0].id;

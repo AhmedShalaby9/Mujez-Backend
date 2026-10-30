@@ -392,3 +392,50 @@ test("commission seed creates one labeled calculated forecast and preserves it o
     "canceled",
   );
 });
+test("effective commission feature gates enforce the global switch, plan matrix, expiring overrides and company availability", async () => {
+  await h.db.exec(
+    "UPDATE platform.features SET platform_on=false WHERE key='commissions'",
+  );
+  await h.get("commissions", 403);
+  await h.db.exec(
+    "UPDATE platform.features SET platform_on=true WHERE key='commissions';UPDATE platform.feature_plans SET enabled=false WHERE feature_key='commissions'",
+  );
+  await h.get("commissions", 403);
+  await h.db.query(
+    "INSERT INTO platform.feature_overrides(company_id,feature_key,enabled,expires_at,reason) VALUES($1,'commissions',true,now()+interval '1 day','Feature override verification')",
+    [p.companyId],
+  );
+  await h.get("commissions");
+  await h.db.exec(
+    "UPDATE platform.features SET platform_on=false WHERE key='commissions'",
+  );
+  await h.get("commissions", 403);
+  await h.db.exec(
+    "UPDATE platform.features SET platform_on=true WHERE key='commissions';UPDATE platform.feature_plans SET enabled=true WHERE feature_key='commissions'",
+  );
+  await h.db.query(
+    "UPDATE platform.feature_overrides SET enabled=false WHERE company_id=$1 AND feature_key='commissions'",
+    [p.companyId],
+  );
+  await h.get("commissions", 403);
+  await h.db.query(
+    "UPDATE platform.feature_overrides SET expires_at=now()-interval '1 day' WHERE company_id=$1 AND feature_key='commissions'",
+    [p.companyId],
+  );
+  await h.get("commissions");
+  await h.db.query(
+    "UPDATE platform.companies SET status='pending' WHERE id=$1",
+    [p.companyId],
+  );
+  await h.get("commissions", 403);
+  await h.db.query("UPDATE platform.companies SET status='trial' WHERE id=$1", [
+    p.companyId,
+  ]);
+  const view = await h.database.tenant(p.companyId, (c) =>
+    c.query("SELECT DISTINCT company_id FROM platform.company_feature_access"),
+  );
+  assert.deepEqual(
+    view.rows.map((r) => r.company_id),
+    [p.companyId],
+  );
+});

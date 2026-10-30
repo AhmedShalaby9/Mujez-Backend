@@ -1,4 +1,8 @@
 import {
+  tenantFeature,
+  requireTenantFeature,
+} from "../../../common/auth/tenant-features.js";
+import {
   Injectable,
   BadRequestException,
   ConflictException,
@@ -88,6 +92,11 @@ export class RoutingService {
             )
           ).rows;
         return {
+          advancedAvailable: await tenantFeature(
+            c,
+            p.companyId!,
+            "routing_adv",
+          ),
           items: rows.map((r) => ruleDto(r, targets)),
           worker: {
             lastSeenAt: worker?.seen_at
@@ -113,6 +122,11 @@ export class RoutingService {
     }));
   }
   async validate(c: PoolClient, p: Principal, b: RoutingInput) {
+    if (
+      b.active &&
+      (["weighted", "team"].includes(b.strategy) || b.slaMinutes > 0)
+    )
+      await requireTenantFeature(c, p.companyId!, "routing_adv");
     if (b.active && !b.targets.length)
       throw new BadRequestException(
         "Choose an active user roster before enabling",
@@ -275,6 +289,11 @@ export class RoutingService {
           );
         } else if (b.action === "enable" || b.action === "disable") {
           const active = b.action === "enable";
+          if (
+            active &&
+            (["weighted", "team"].includes(old.strategy) || old.sla_minutes > 0)
+          )
+            await requireTenantFeature(c, p.companyId!, "routing_adv");
           if (
             active &&
             !(
