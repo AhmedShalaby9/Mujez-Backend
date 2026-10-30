@@ -755,6 +755,229 @@
         "tags": ["Pipeline"]
       }
     },
+    "/api/v1/tasks": {
+      "get": {
+        "operationId": "TasksController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["open", "done", "cancelled", "all"]
+            }
+          },
+          {
+            "name": "group",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["overdue", "today", "tomorrow", "week", "later"]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "leadId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "assigneeId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Tasks"]
+      },
+      "post": {
+        "operationId": "TasksController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Tasks"]
+      }
+    },
+    "/api/v1/tasks/options": {
+      "get": {
+        "operationId": "TasksController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Tasks"]
+      }
+    },
+    "/api/v1/tasks/lead-options": {
+      "get": {
+        "operationId": "TasksController_leads",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 1, "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 50, "type": "number" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "stage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "qualified",
+                "viewing",
+                "offer",
+                "contract",
+                "won",
+                "lost"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Tasks"]
+      }
+    },
+    "/api/v1/tasks/{id}": {
+      "get": {
+        "operationId": "TasksController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Tasks"]
+      }
+    },
+    "/api/v1/tasks/{id}/activities": {
+      "get": {
+        "operationId": "TasksController_activities",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 1, "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 50, "type": "number" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Tasks"]
+      }
+    },
+    "/api/v1/tasks/{id}/update": {
+      "post": {
+        "operationId": "TasksController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Tasks"]
+      }
+    },
+    "/api/v1/tasks/{id}/status": {
+      "post": {
+        "operationId": "TasksController_status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskStatus" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Tasks"]
+      }
+    },
     "/admin/api/v1/companies": {
       "get": {
         "operationId": "CompaniesController_list",
@@ -2153,6 +2376,57 @@
           }
         },
         "required": ["requestId", "version", "title", "type", "valueMinor"]
+      },
+      "Object": { "type": "object", "properties": {} },
+      "TaskInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "titleAr": { "type": "string" },
+          "description": { "type": "string" },
+          "leadId": { "type": ["string", "null"], "format": "uuid" },
+          "assigneeId": { "type": ["string", "null"], "format": "uuid" },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Africa/Cairo calendar date; defaults to server today on creation"
+          },
+          "priority": { "type": "string", "enum": ["high", "med", "low"] }
+        },
+        "required": ["requestId", "title", "priority"]
+      },
+      "TaskUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "titleAr": { "type": "string" },
+          "description": { "type": "string" },
+          "leadId": { "type": ["string", "null"], "format": "uuid" },
+          "assigneeId": { "type": ["string", "null"], "format": "uuid" },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Africa/Cairo calendar date; defaults to server today on creation"
+          },
+          "priority": { "type": "string", "enum": ["high", "med", "low"] },
+          "version": { "type": "number" }
+        },
+        "required": ["requestId", "title", "priority", "version"]
+      },
+      "TaskStatus": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "action": {
+            "type": "string",
+            "enum": ["complete", "reopen", "cancel"]
+          },
+          "reason": { "type": "string" }
+        },
+        "required": ["requestId", "version", "action"]
       },
       "CompanyInput": {
         "type": "object",

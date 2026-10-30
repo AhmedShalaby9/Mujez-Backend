@@ -1,0 +1,15 @@
+# Company tasks
+
+Tasks are persisted company records. Company owners need `tasks.read`/`tasks.manage` and a current trialing or active subscription. Migration 014 adds these permissions to existing owners and the owner provisioning function. RLS and composite company foreign keys protect tasks, assignees, leads and audit actors. Platform staff cannot access company tasks.
+
+`GET /api/v1/tasks` supports page/limit, status (open by default), date group, assignee, lead and text search. Counts cover all matching records before the date-group filter, independently of pagination. The response includes the database timestamp and Africa/Cairo calendar day. Due dates are date-only; overdue/today/tomorrow/next seven days/later are disjoint groups computed against that day. No browser-clock dependency or fictitious reminders.
+
+`GET /options` returns actual active company assignees. `/lead-options` also requires leads.read and returns searchable, paginated unarchived company leads. `GET /:id` and `/:id/activities` return task details and actual audit history. The dashboard lead drawer shows linked tasks and opens the filtered Tasks screen.
+
+`POST /tasks` creates a task with title, priority, optional description, assignee, lead and due date. Quick creation defaults to the current owner and the server calendar day. Explicit null assignee means unassigned. `/tasks/:id/update` edits an open task. `/tasks/:id/status` accepts complete, reopen or cancel; cancellation requires a reason of at least ten characters. Completion records the authenticated actor and database timestamp. Reopening clears the current completion fields while retaining history. Closed tasks must be reopened before editing. There is no hard delete.
+
+Mutations require a UUID requestId; updates also require the current integer version. Retries return the prior response, different payloads with reused request IDs conflict, and stale versions fail. State, audit, outbox, linked lead activity and replay records commit or roll back together. New lead links require a visible unarchived company lead; existing links survive lead archival. Changing links records both unlink and link activities. Assignments use real active company users, never preview identities.
+
+Run `npm run db:seed:tasks` with the isolated migration database configuration, or `node scripts/seed-tasks.mjs --company-slug=your-slug` in the maintenance container. Default targets are the three explicitly labeled sample companies with current subscriptions. The seeder ensures sample leads then adds four clearly labeled open tasks per eligible company (overdue, today, tomorrow, seven days ahead), including a general task without a lead. Reruns preserve existing edits/completions and create no identities, passwords, messages or fictional completion events. Seeded dates are initial dates, not rolling reminders.
+
+No new deployment secrets or environment variables are needed. The staging migration runs automatically; sample seeding is an explicit maintenance action.
