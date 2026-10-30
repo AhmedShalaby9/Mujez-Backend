@@ -217,7 +217,17 @@ export class FeaturesService {
         ).rowCount
       )
         throw new NotFoundException("Feature not found");
-      if((await c.query('SELECT 1 FROM platform.feature_overrides WHERE company_id=$1 AND feature_key=$2 AND revoked_at IS NULL AND expires_at>now()',[company.id,input.featureKey])).rowCount)throw new ConflictException('Remove the active override before replacing it');
+      if (
+        (
+          await c.query(
+            "SELECT 1 FROM platform.feature_overrides WHERE company_id=$1 AND feature_key=$2 AND revoked_at IS NULL AND expires_at>now()",
+            [company.id, input.featureKey],
+          )
+        ).rowCount
+      )
+        throw new ConflictException(
+          "Remove the active override before replacing it",
+        );
       const expires = new Date(input.expiresAt).getTime();
       if (expires <= Date.now() || expires > Date.now() + 366 * 86400000)
         throw new BadRequestException("Expiry must be within the next year");
@@ -288,6 +298,9 @@ export class FeaturesService {
       await c.query(COMPANY_POLICY + " ORDER BY c.created_at,c.id")
     ).rows;
     const usage = (await c.query("SELECT * FROM platform.resource_usage")).rows;
+    const listings = (
+      await c.query("SELECT * FROM platform.company_listing_counts")
+    ).rows;
     const overrides = (
       await c.query(
         "SELECT * FROM platform.limit_overrides WHERE revoked_at IS NULL AND expires_at>now()",
@@ -299,7 +312,7 @@ export class FeaturesService {
         !!company.plan_version_id;
       const resources: Record<string, any> = {};
       for (const resource of ["users", "listings", "storage"]) {
-        const measured = resource === "users";
+        const measured = resource === "users" || resource === "listings";
         const observation = usage.find(
           (u) => u.company_id === company.id && u.resource === resource,
         );
@@ -317,7 +330,10 @@ export class FeaturesService {
         resources[resource] = {
           ...resourceState(
             measured
-              ? company.user_count
+              ? resource === "users"
+                ? company.user_count
+                : (listings.find((x) => x.company_id === company.id)
+                    ?.listings ?? 0)
               : observation
                 ? Number(observation.used) /
                   (resource === "storage" ? 1073741824 : 1)
@@ -330,7 +346,7 @@ export class FeaturesService {
             ? new Date(override.expires_at).toISOString()
             : null,
           measuredAt:
-            resource === "users"
+            resource === "users" || resource === "listings"
               ? new Date().toISOString()
               : (observation?.measured_at ?? null),
         };

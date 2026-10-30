@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import {
   FeaturesService,
@@ -12,14 +12,9 @@ const db = new PGlite();
 let service, actor, company;
 const future = () => new Date(Date.now() + 86400000).toISOString();
 before(async () => {
-  for (const f of [
-    "001_foundation.sql",
-    "002_password_sessions.sql",
-    "003_companies_onboarding.sql",
-    "004_plans_subscriptions.sql",
-    "005_billing_payments.sql",
-    "006_features_usage.sql",
-  ])
+  for (const f of (
+    await readdir(new URL("../database/migrations/", import.meta.url))
+  ).sort())
     await db.exec(
       await readFile(
         new URL("../database/migrations/" + f, import.meta.url),
@@ -201,13 +196,13 @@ test("expired exceptions and unavailable company/subscription fail closed", asyn
     (e) => e.getStatus() === 400,
   );
 });
-test("usage reads real users, leaves missing measurements unknown, and expires quota overrides", async () => {
+test("usage reads real users/listings, leaves storage unknown, and expires quota overrides", async () => {
   let row = (await service.usage())[0];
   assert.equal(row.users.used, 0);
   assert.equal(row.users.limit, 5);
-  assert.equal(row.listings.used, null);
+  assert.equal(row.listings.used, 0);
   assert.equal(row.storage.used, null);
-  assert.equal(row.listings.measured, false);
+  assert.equal(row.listings.measured, true);
   await service.limit(
     "MJ-POLICY",
     {

@@ -978,6 +978,390 @@
         "tags": ["Tasks"]
       }
     },
+    "/api/v1/projects": {
+      "get": {
+        "operationId": "ProjectsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 1, "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 50, "type": "number" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "stage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "qualified",
+                "viewing",
+                "offer",
+                "contract",
+                "won",
+                "lost"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Projects"]
+      },
+      "post": {
+        "operationId": "ProjectsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProjectInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Projects"]
+      }
+    },
+    "/api/v1/projects/{id}": {
+      "get": {
+        "operationId": "ProjectsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Projects"]
+      }
+    },
+    "/api/v1/projects/{id}/update": {
+      "post": {
+        "operationId": "ProjectsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProjectUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Projects"]
+      }
+    },
+    "/api/v1/projects/{id}/archive": {
+      "post": {
+        "operationId": "ProjectsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InventoryArchive" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Projects"]
+      }
+    },
+    "/api/v1/projects/{id}/phases": {
+      "post": {
+        "operationId": "ProjectsController_phase",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PhaseInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Projects"]
+      }
+    },
+    "/api/v1/projects/{id}/phases/{phase}/update": {
+      "post": {
+        "operationId": "ProjectsController_phaseUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "phase",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PhaseUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Projects"]
+      }
+    },
+    "/api/v1/projects/phases/{phase}/buildings": {
+      "post": {
+        "operationId": "ProjectsController_building",
+        "parameters": [
+          {
+            "name": "phase",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BuildingInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Projects"]
+      }
+    },
+    "/api/v1/projects/phases/{phase}/buildings/{building}/update": {
+      "post": {
+        "operationId": "ProjectsController_buildingUpdate",
+        "parameters": [
+          {
+            "name": "phase",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "building",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BuildingUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Projects"]
+      }
+    },
+    "/api/v1/units": {
+      "get": {
+        "operationId": "UnitsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 1, "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 50, "type": "number" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "stage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "qualified",
+                "viewing",
+                "offer",
+                "contract",
+                "won",
+                "lost"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "listing",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "buildingId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Units"]
+      },
+      "post": {
+        "operationId": "UnitsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UnitInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Units"]
+      }
+    },
+    "/api/v1/units/{id}": {
+      "get": {
+        "operationId": "UnitsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Units"]
+      }
+    },
+    "/api/v1/units/{id}/update": {
+      "post": {
+        "operationId": "UnitsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UnitUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Units"]
+      }
+    },
+    "/api/v1/units/{id}/archive": {
+      "post": {
+        "operationId": "UnitsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InventoryArchive" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Units"]
+      }
+    },
     "/admin/api/v1/companies": {
       "get": {
         "operationId": "CompaniesController_list",
@@ -2427,6 +2811,171 @@
           "reason": { "type": "string" }
         },
         "required": ["requestId", "version", "action"]
+      },
+      "ProjectInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "developer": { "type": "string" },
+          "developerAr": { "type": "string" },
+          "location": { "type": "string" },
+          "locationAr": { "type": "string" },
+          "segment": { "type": "string" }
+        },
+        "required": [
+          "requestId",
+          "code",
+          "name",
+          "developer",
+          "location",
+          "segment"
+        ]
+      },
+      "ProjectUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "developer": { "type": "string" },
+          "developerAr": { "type": "string" },
+          "location": { "type": "string" },
+          "locationAr": { "type": "string" },
+          "segment": { "type": "string" },
+          "version": { "type": "number" }
+        },
+        "required": [
+          "requestId",
+          "code",
+          "name",
+          "developer",
+          "location",
+          "segment",
+          "version"
+        ]
+      },
+      "InventoryArchive": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "action": { "type": "string" }
+        },
+        "required": ["requestId", "version", "action"]
+      },
+      "PhaseInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "deliveryYear": { "type": "number" }
+        },
+        "required": ["requestId", "code", "name", "deliveryYear"]
+      },
+      "PhaseUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "deliveryYear": { "type": "number" },
+          "version": { "type": "number" }
+        },
+        "required": ["requestId", "code", "name", "deliveryYear", "version"]
+      },
+      "BuildingInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "floors": { "type": "number" }
+        },
+        "required": ["requestId", "code", "name", "floors"]
+      },
+      "BuildingUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "floors": { "type": "number" },
+          "version": { "type": "number" }
+        },
+        "required": ["requestId", "code", "name", "floors", "version"]
+      },
+      "UnitInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "buildingId": { "type": ["string", "null"] },
+          "listing": { "type": "string" },
+          "location": { "type": "string" },
+          "locationAr": { "type": "string" },
+          "type": { "type": "string" },
+          "bedrooms": { "type": ["number", "null"] },
+          "area": { "type": "number" },
+          "view": { "type": "string" },
+          "viewAr": { "type": "string" },
+          "floor": { "type": ["number", "null"] },
+          "priceMinor": {
+            "type": "string",
+            "description": "Exact EGP minor units"
+          }
+        },
+        "required": [
+          "requestId",
+          "code",
+          "listing",
+          "location",
+          "type",
+          "area",
+          "view",
+          "priceMinor"
+        ]
+      },
+      "UnitUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "buildingId": { "type": ["string", "null"] },
+          "listing": { "type": "string" },
+          "location": { "type": "string" },
+          "locationAr": { "type": "string" },
+          "type": { "type": "string" },
+          "bedrooms": { "type": ["number", "null"] },
+          "area": { "type": "number" },
+          "view": { "type": "string" },
+          "viewAr": { "type": "string" },
+          "floor": { "type": ["number", "null"] },
+          "priceMinor": {
+            "type": "string",
+            "description": "Exact EGP minor units"
+          },
+          "version": { "type": "number" }
+        },
+        "required": [
+          "requestId",
+          "code",
+          "listing",
+          "location",
+          "type",
+          "area",
+          "view",
+          "priceMinor",
+          "version"
+        ]
       },
       "CompanyInput": {
         "type": "object",

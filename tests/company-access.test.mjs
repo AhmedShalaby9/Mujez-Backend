@@ -258,6 +258,10 @@ test("reissuing invalidates old links and activation is single use with a real t
     "pipeline.manage",
     "tasks.read",
     "tasks.manage",
+    "projects.read",
+    "projects.manage",
+    "units.read",
+    "units.manage",
   ]);
   assert.equal(
     (

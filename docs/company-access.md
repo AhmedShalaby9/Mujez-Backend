@@ -26,7 +26,7 @@ Pending, trial and active companies can access their workspace so onboarding can
 
 ## Boundary and role
 
-The initial role is `company_owner`, identity pool `company_admin`, scope `company`, permission `workspace.view`. Migration 013 also grants `leads.read`, `leads.manage`, `pipeline.read`, `pipeline.manage`. These modules enforce company permissions and current subscription access; see [leads and pipeline](leads-pipeline.md). Migration 014 adds tasks.read/tasks.manage; see [tasks](tasks.md). Other CRM pages remain previews. No Mujez platform permissions are granted.
+The initial role is `company_owner`, identity pool `company_admin`, scope `company`, permission `workspace.view`. Migration 013 also grants `leads.read`, `leads.manage`, `pipeline.read`, `pipeline.manage`. These modules enforce company permissions and current subscription access; see [leads and pipeline](leads-pipeline.md). Migration 014 adds tasks.read/tasks.manage; see [tasks](tasks.md). Migration 015 adds projects.read/manage and units.read/manage; see [inventory](inventory.md). Other CRM pages remain previews. No Mujez platform permissions are granted.
 
 Company context comes only from the owner session's stored company/user relationship. Tenant profile queries use the existing restricted tenant pool and `DatabaseService.tenant` transaction-local context. Existing forced RLS and tenant-scoped foreign keys remain. The platform role receives no SELECT/UPDATE access to tenant user/role tables. Auth-only account/credential/session/invitation metadata lives in the platform schema, unavailable to the tenant role.
 
@@ -36,7 +36,7 @@ Invitation issuance/revocation is recorded in platform audit/outbox in the same 
 
 ## UI scope and deployment
 
-The company shell displays the authenticated owner and actual company, supports sign-out and bilingual navigation, removes fictional header counts/notifications and labels unimplemented CRM pages as design previews. Leads/Pipeline/Tasks now use real tenant APIs; other domain data/actions remain previews until implemented. Search is disabled rather than pretending to search real company records. The platform admin screens retain their backend connections and permissions.
+The company shell displays the authenticated owner and actual company, supports sign-out and bilingual navigation, removes fictional header counts/notifications and labels unimplemented CRM pages as design previews. Leads/Pipeline/Tasks/Projects/Units now use real tenant APIs; other domain data/actions remain previews until implemented. Search is disabled rather than pretending to search real company records. The platform admin screens retain their backend connections and permissions.
 
 Both route trees load components lazily to keep the initial production bundle under the existing budget. No budget increases, new environment variables or shared owner passwords are needed. Apply migration 012 through normal staging deployment. No owner is seeded with a public/default password; admins invite owners explicitly.
 
