@@ -277,6 +277,12 @@ test("reissuing invalidates old links and activation is single use with a real t
     "reports.read",
     "reports.export",
     "audit.read",
+    "contacts.read",
+    "contacts.manage",
+    "calendar.read",
+    "calendar.manage",
+    "team.read",
+    "team.manage",
   ]);
   assert.equal(
     (

@@ -44,15 +44,19 @@ before(async () => {
 after(async () => h.close());
 test("tasks require authenticated company scope and independent read/manage permissions", async () => {
   await h.api().get("/api/v1/tasks").expect(401);
-  h.state.principal = { ...p, pool: "platform" };
-  await h.get("tasks", 403);
-  h.state.principal = { ...p, scope: "own" };
-  await h.get("tasks", 403);
-  h.state.principal = { ...p, permissions: ["workspace.view", "tasks.read"] };
-  await h.get("tasks");
-  await h.post("tasks", body(), 403);
-  await h.get("tasks/lead-options", 403);
-  h.state.principal = p;
+  try {
+    h.state.principal = { ...p, pool: "platform" };
+    await h.get("tasks", 403);
+    h.state.principal = { ...p, scope: "own" };
+    const own = (await h.get("tasks")).body;
+    assert.equal(own.total, 0);
+    h.state.principal = { ...p, permissions: ["workspace.view", "tasks.read"] };
+    await h.get("tasks");
+    await h.post("tasks", body(), 403);
+    await h.get("tasks/lead-options", 403);
+  } finally {
+    h.state.principal = p;
+  }
   await h.get("tasks?companyId=" + other.companyId, 400);
   await h.get("tasks?page=0", 400);
   await h.get("tasks?limit=101", 400);
@@ -372,4 +376,27 @@ test("task seed reruns preserve edited/completed samples and never create identi
     (await h.db.query("SELECT count(*)::int AS n FROM tenant.users")).rows[0].n,
     count,
   );
+});
+
+test("own scope lists only assigned tasks and rejects a colleague's task or assignment", async () => {
+  const colleague = (
+    await h.db.query(
+      "INSERT INTO tenant.users(company_id,oidc_subject,identity_pool,name,email,role_id,status) SELECT company_id,'task-scope-colleague','company_user','Scope colleague','task-scope-colleague@example.test',role_id,'active' FROM tenant.users WHERE id=$1 RETURNING id",
+      [p.id],
+    )
+  ).rows[0].id;
+  const visible = (await h.post("tasks", body())).body;
+  const hidden = (await h.post("tasks", body({ assigneeId: colleague }))).body;
+  try {
+    h.state.principal = { ...p, scope: "own" };
+    const list = (await h.get("tasks?limit=100")).body;
+    assert.ok(list.items.some((t) => t.id === visible.id));
+    assert.ok(list.items.every((t) => t.assignee?.id === p.id));
+    assert.ok(!list.items.some((t) => t.id === hidden.id));
+    await h.get("tasks/" + hidden.id, 404);
+    await h.get("tasks/" + visible.id);
+    await h.post("tasks", body({ assigneeId: colleague }), 403);
+  } finally {
+    h.state.principal = p;
+  }
 });

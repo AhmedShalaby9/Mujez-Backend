@@ -186,15 +186,20 @@ after(async () => {
 test("CRM requires tenant scope, separate read/write permissions and a live subscription", async () => {
   await api().get("/api/v1/leads").expect(401);
   const original = p;
-  p = { ...p, pool: "platform" };
-  await get("leads", 403);
-  await get("pipeline", 403);
-  p = { ...original, permissions: ["workspace.view"] };
-  await get("leads", 403);
-  await post("leads", draft(), 403);
-  p = { ...original, scope: "own" };
-  await get("leads", 403);
-  p = original;
+  try {
+    p = { ...original, pool: "platform" };
+    await get("leads", 403);
+    await get("pipeline", 403);
+    p = { ...original, permissions: ["workspace.view"] };
+    await get("leads", 403);
+    await post("leads", draft(), 403);
+    p = { ...original, scope: "own" };
+    const own = (await get("leads")).body;
+    assert.equal(own.total, 0);
+    await get("pipeline");
+  } finally {
+    p = original;
+  }
   await get("leads?companyId=" + B, 400);
   await get("pipeline?limit=101", 400);
   await get("leads?page=0", 400);
@@ -615,4 +620,34 @@ test("sales seeding is explicit, idempotent and preserves edited sample records 
     (await db.query("SELECT count(*)::int AS n FROM tenant.users")).rows[0].n,
     users,
   );
+});
+
+test("own scope lists only owned leads and rejects direct access or reassignment to a colleague", async () => {
+  const original = p;
+  const colleague = (
+    await db.query(
+      "INSERT INTO tenant.users(company_id,oidc_subject,identity_pool,name,email,role_id,status) SELECT company_id,'sales-scope-colleague','company_user','Scope colleague','sales-scope-colleague@example.test',role_id,'active' FROM tenant.users WHERE id=$1 RETURNING id",
+      [U],
+    )
+  ).rows[0].id;
+  const visible = (await post("leads", draft({ phone: "+12025550990" }))).body;
+  const hidden = (
+    await post("leads", draft({ phone: "+12025550991", ownerId: colleague }))
+  ).body;
+  try {
+    p = { ...original, scope: "own" };
+    const list = (await get("leads?limit=100")).body;
+    assert.ok(list.items.some((l) => l.id === visible.id));
+    assert.ok(list.items.every((l) => l.owner?.id === U));
+    assert.ok(!list.items.some((l) => l.id === hidden.id));
+    await get("leads/" + hidden.id, 404);
+    await get("leads/" + visible.id);
+    await post(
+      "leads",
+      draft({ phone: "+12025550992", ownerId: colleague }),
+      403,
+    );
+  } finally {
+    p = original;
+  }
 });
