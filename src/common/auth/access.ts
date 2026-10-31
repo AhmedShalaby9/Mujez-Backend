@@ -18,4 +18,22 @@ export interface Principal {
   scope: "own" | "team" | "company" | "platform";
   teamId?: string;
   mustChangePassword?: boolean;
+  roleName?: { en: string; ar: string };
+  /** Present only when this principal is a platform admin inside a controlled workspace session. */
+  workspace?: {
+    sessionId: string;
+    mode: "read" | "manage";
+    reason: string | null;
+    startedAt: string;
+    manageExpiresAt: string | null;
+    platformUserName: string;
+    platformRoleName?: { en: string; ar: string };
+    company: {
+      id: string;
+      uuid: string;
+      slug: string;
+      name: { en: string; ar: string };
+      status: string;
+    };
+  };
 }

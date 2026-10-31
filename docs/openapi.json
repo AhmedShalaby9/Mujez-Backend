@@ -683,6 +683,194 @@
         "tags": ["Leads"]
       }
     },
+    "/api/v1/contacts": {
+      "get": {
+        "operationId": "ContactsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "buyer",
+                "seller",
+                "landlord",
+                "tenant",
+                "investor",
+                "developer"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Contacts"]
+      },
+      "post": {
+        "operationId": "ContactsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContactInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Contacts"]
+      }
+    },
+    "/api/v1/contacts/options": {
+      "get": {
+        "operationId": "ContactsController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Contacts"]
+      }
+    },
+    "/api/v1/contacts/{id}": {
+      "get": {
+        "operationId": "ContactsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Contacts"]
+      }
+    },
+    "/api/v1/contacts/{id}/activities": {
+      "get": {
+        "operationId": "ContactsController_activities",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 1, "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 50, "type": "number" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Contacts"]
+      }
+    },
+    "/api/v1/contacts/{id}/update": {
+      "post": {
+        "operationId": "ContactsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContactUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Contacts"]
+      }
+    },
+    "/api/v1/contacts/{id}/archive": {
+      "post": {
+        "operationId": "ContactsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContactArchive" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Contacts"]
+      }
+    },
+    "/api/v1/contacts/{id}/notes": {
+      "post": {
+        "operationId": "ContactsController_note",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContactNote" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Contacts"]
+      }
+    },
     "/api/v1/pipeline": {
       "get": {
         "operationId": "PipelineController_list",
@@ -1082,6 +1270,125 @@
         },
         "responses": { "201": { "description": "" } },
         "tags": ["Tasks"]
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "operationId": "CalendarController_list",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["viewing", "call", "meeting", "inspection", "signing"]
+            }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Calendar"]
+      },
+      "post": {
+        "operationId": "CalendarController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EventInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Calendar"]
+      }
+    },
+    "/api/v1/events/options": {
+      "get": {
+        "operationId": "CalendarController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Calendar"]
+      }
+    },
+    "/api/v1/events/{id}": {
+      "get": {
+        "operationId": "CalendarController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Calendar"]
+      }
+    },
+    "/api/v1/events/{id}/update": {
+      "post": {
+        "operationId": "CalendarController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EventUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Calendar"]
+      }
+    },
+    "/api/v1/events/{id}/status": {
+      "post": {
+        "operationId": "CalendarController_status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EventStatus" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Calendar"]
       }
     },
     "/api/v1/projects": {
@@ -2443,6 +2750,99 @@
         "tags": ["CompanyAudit"]
       }
     },
+    "/api/v1/team": {
+      "get": {
+        "operationId": "TeamController_list",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/invite": {
+      "post": {
+        "operationId": "TeamController_invite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TeamInvite" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/{id}/resend": {
+      "post": {
+        "operationId": "TeamController_resend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/{id}/revoke": {
+      "post": {
+        "operationId": "TeamController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/{id}/status": {
+      "post": {
+        "operationId": "TeamController_status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TeamStatus" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/activate": {
+      "post": {
+        "operationId": "TeamActivationController_activate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TeamActivate" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "" } },
+        "tags": ["TeamActivation"]
+      }
+    },
     "/admin/api/v1/companies": {
       "get": {
         "operationId": "CompaniesController_list",
@@ -3628,6 +4028,69 @@
         "responses": { "200": { "description": "" } },
         "tags": ["SystemHealth"]
       }
+    },
+    "/admin/api/v1/companies/{id}/workspace-session": {
+      "post": {
+        "operationId": "WorkspaceEntryController_enter",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EnterInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["WorkspaceEntry"]
+      }
+    },
+    "/api/v1/workspace-session/elevate": {
+      "post": {
+        "operationId": "WorkspaceSessionController_elevate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ElevateInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["WorkspaceSession"]
+      }
+    },
+    "/api/v1/workspace-session/drop": {
+      "post": {
+        "operationId": "WorkspaceSessionController_drop",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["WorkspaceSession"]
+      }
+    },
+    "/api/v1/workspace-session/exit": {
+      "post": {
+        "operationId": "WorkspaceSessionController_exit",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ExitInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["WorkspaceSession"]
+      }
     }
   },
   "info": {
@@ -3817,6 +4280,81 @@
         },
         "required": ["requestId", "version", "note"]
       },
+      "Object": { "type": "object", "properties": {} },
+      "ContactInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "buyer",
+              "seller",
+              "landlord",
+              "tenant",
+              "investor",
+              "developer"
+            ]
+          },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "companyName": { "type": "string" },
+          "phones": { "type": "array", "items": { "type": "string" } },
+          "emails": { "type": "array", "items": { "type": "string" } },
+          "area": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "ownerId": { "type": ["object", "null"] },
+          "notes": { "type": "string" }
+        },
+        "required": ["requestId", "type", "name"]
+      },
+      "ContactUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "buyer",
+              "seller",
+              "landlord",
+              "tenant",
+              "investor",
+              "developer"
+            ]
+          },
+          "name": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "companyName": { "type": "string" },
+          "phones": { "type": "array", "items": { "type": "string" } },
+          "emails": { "type": "array", "items": { "type": "string" } },
+          "area": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "ownerId": { "type": ["object", "null"] },
+          "notes": { "type": "string" },
+          "version": { "type": "number" }
+        },
+        "required": ["requestId", "type", "name", "version"]
+      },
+      "ContactArchive": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "action": { "type": "string" },
+          "reason": { "type": "string" }
+        },
+        "required": ["requestId", "version", "action", "reason"]
+      },
+      "ContactNote": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "note": { "type": "string" }
+        },
+        "required": ["requestId", "version", "note"]
+      },
       "DealInput": {
         "type": "object",
         "properties": {
@@ -3855,7 +4393,6 @@
         },
         "required": ["requestId", "version", "title", "type", "valueMinor"]
       },
-      "Object": { "type": "object", "properties": {} },
       "TaskInput": {
         "type": "object",
         "properties": {
@@ -3903,6 +4440,64 @@
             "enum": ["complete", "reopen", "cancel"]
           },
           "reason": { "type": "string" }
+        },
+        "required": ["requestId", "version", "action"]
+      },
+      "EventInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "type": {
+            "type": "string",
+            "enum": ["viewing", "call", "meeting", "inspection", "signing"]
+          },
+          "title": { "type": "string" },
+          "titleAr": { "type": "string" },
+          "startsAt": { "type": "string" },
+          "endsAt": { "type": "string" },
+          "place": { "type": "string" },
+          "contactId": { "type": ["object", "null"] },
+          "leadId": { "type": ["object", "null"] },
+          "ownerId": { "type": ["object", "null"] },
+          "notes": { "type": "string" }
+        },
+        "required": ["requestId", "type", "title", "startsAt", "endsAt"]
+      },
+      "EventUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "type": {
+            "type": "string",
+            "enum": ["viewing", "call", "meeting", "inspection", "signing"]
+          },
+          "title": { "type": "string" },
+          "titleAr": { "type": "string" },
+          "startsAt": { "type": "string" },
+          "endsAt": { "type": "string" },
+          "place": { "type": "string" },
+          "contactId": { "type": ["object", "null"] },
+          "leadId": { "type": ["object", "null"] },
+          "ownerId": { "type": ["object", "null"] },
+          "notes": { "type": "string" },
+          "version": { "type": "number" }
+        },
+        "required": [
+          "requestId",
+          "type",
+          "title",
+          "startsAt",
+          "endsAt",
+          "version"
+        ]
+      },
+      "EventStatus": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "action": { "type": "string" },
+          "outcome": { "type": "string" }
         },
         "required": ["requestId", "version", "action"]
       },
@@ -4406,6 +5001,19 @@
         },
         "required": ["requestId", "version", "action"]
       },
+      "TeamInvite": {
+        "type": "object",
+        "properties": { "role": { "type": "string", "enum": ["agent"] } },
+        "required": ["role"]
+      },
+      "TeamStatus": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "enum": ["disable", "enable"] }
+        },
+        "required": ["action"]
+      },
+      "TeamActivate": { "type": "object", "properties": {} },
       "CompanyInput": {
         "type": "object",
         "properties": {
@@ -4946,6 +5554,30 @@
           "value": { "$ref": "#/components/schemas/SettingsValue" }
         },
         "required": ["password", "reason", "version", "value"]
+      },
+      "EnterInput": {
+        "type": "object",
+        "properties": {
+          "mode": { "type": "string" },
+          "reason": { "type": "string" },
+          "durationMinutes": { "type": "number" },
+          "password": { "type": "string" }
+        },
+        "required": ["mode", "reason", "durationMinutes", "password"]
+      },
+      "ElevateInput": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string" },
+          "durationMinutes": { "type": "number" },
+          "password": { "type": "string" }
+        },
+        "required": ["reason", "durationMinutes", "password"]
+      },
+      "ExitInput": {
+        "type": "object",
+        "properties": { "reason": { "type": "string" } },
+        "required": ["reason"]
       }
     }
   }

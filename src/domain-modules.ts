@@ -17,17 +17,18 @@ import { GrowthReportsModule } from "./modules/growth/reports/reports.module.js"
 import { AdministrationRoutingModule } from "./modules/administration/routing/routing.module.js";
 import { AdministrationNotificationsModule } from "./modules/administration/notifications/notifications.module.js";
 import { AdministrationAuditModule } from "./modules/administration/audit/audit.module.js";
+import { AdministrationTeamModule } from "./modules/administration/team/team.module.js";
 import { PlatformCompaniesModule } from "./modules/platform/companies/companies.module.js";
 import { PlatformSubscriptionsModule } from "./modules/platform/subscriptions/subscriptions.module.js";
 import { PlatformBillingModule } from "./modules/platform/billing/billing.module.js";
 import { PlatformFeaturesModule } from "./modules/platform/features/features.module.js";
-import { PlatformUsageModule } from "./modules/platform/usage/usage.module.js";
 import { PlatformIntegrationsModule } from "./modules/platform/integrations/integrations.module.js";
 import { PlatformSupportModule } from "./modules/platform/support/support.module.js";
 import { PlatformAnnouncementsModule } from "./modules/platform/announcements/announcements.module.js";
 import { PlatformRolesModule } from "./modules/platform/roles/roles.module.js";
 import { PlatformSettingsModule } from "./modules/platform/settings/settings.module.js";
 import { PlatformHealthModule } from "./modules/platform/health/health.module.js";
+import { PlatformWorkspaceModule } from "./modules/platform/workspace/workspace.module.js";
 
 export const DOMAIN_MODULES = [
   PlatformOverviewModule,
@@ -49,15 +50,16 @@ export const DOMAIN_MODULES = [
   AdministrationRoutingModule,
   AdministrationNotificationsModule,
   AdministrationAuditModule,
+  AdministrationTeamModule,
   PlatformCompaniesModule,
   PlatformSubscriptionsModule,
   PlatformBillingModule,
   PlatformFeaturesModule,
-  PlatformUsageModule,
   PlatformIntegrationsModule,
   PlatformSupportModule,
   PlatformAnnouncementsModule,
   PlatformRolesModule,
   PlatformSettingsModule,
   PlatformHealthModule,
+  PlatformWorkspaceModule,
 ];

@@ -9,7 +9,7 @@ import {
 import type { PoolClient } from "pg";
 import type { Principal } from "../../../common/auth/access.js";
 import { DatabaseService } from "../../../infrastructure/database/database.service.js";
-import { SalesService } from "../../sales/leads/sales.service.js";
+import { SalesService, ownWhere } from "../../sales/leads/sales.service.js";
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
 import { taskDate } from "../../sales/tasks/tasks.service.js";
 import type {
@@ -52,7 +52,7 @@ export function commissionAmounts(
     amounts: rows.map((r) => String(r.amount)),
   };
 }
-const SELECT = `SELECT m.*,m.agreed_value_minor::text AS agreed_value_minor,m.gross_minor::text AS gross_minor,m.paid_date::text AS paid_date,c.public_id AS contract_ref,c.status AS contract_status,c.value_minor::text AS current_value,l.name AS lead_name,c.lead_id,u.code AS unit_code,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today FROM tenant.commissions m JOIN tenant.contracts c ON c.company_id=m.company_id AND c.id=m.contract_id JOIN tenant.leads l ON l.company_id=c.company_id AND l.id=c.lead_id LEFT JOIN tenant.units u ON u.company_id=c.company_id AND u.id=c.unit_id`;
+const SELECT = `SELECT m.*,m.agreed_value_minor::text AS agreed_value_minor,m.gross_minor::text AS gross_minor,m.paid_date::text AS paid_date,c.public_id AS contract_ref,c.status AS contract_status,c.value_minor::text AS current_value,c.owner_id AS contract_owner_id,l.name AS lead_name,c.lead_id,u.code AS unit_code,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today FROM tenant.commissions m JOIN tenant.contracts c ON c.company_id=m.company_id AND c.id=m.contract_id JOIN tenant.leads l ON l.company_id=c.company_id AND l.id=c.lead_id LEFT JOIN tenant.units u ON u.company_id=c.company_id AND u.id=c.unit_id`;
 export function commissionDto(m: any) {
   return {
     id: m.id,
@@ -95,7 +95,8 @@ export class CommissionsService {
         [p.companyId, id],
       )
     ).rows[0];
-    if (!m) throw new NotFoundException("Commission not found");
+    if (!m || (p.scope === "own" && m.contract_owner_id !== p.id))
+      throw new NotFoundException("Commission not found");
     return m;
   }
   async options(p: Principal) {
@@ -120,6 +121,8 @@ export class CommissionsService {
         await requireTenantFeature(c, p.companyId!, "commissions");
         const args: any[] = [p.companyId],
           w = ["m.company_id=$1"];
+        const own = ownWhere(p, args, "c.owner_id");
+        if (own) w.push(own);
         if (q.status) {
           args.push(q.status);
           w.push("m.status=$" + args.length);
@@ -150,8 +153,10 @@ export class CommissionsService {
         ).rows;
         const summary = (
           await c.query(
-            "SELECT status,sum(gross_minor)::text AS amount FROM tenant.commissions WHERE company_id=$1 GROUP BY status",
-            [p.companyId],
+            p.scope === "own"
+              ? "SELECT m.status,sum(m.gross_minor)::text AS amount FROM tenant.commissions m JOIN tenant.contracts c ON c.company_id=m.company_id AND c.id=m.contract_id WHERE m.company_id=$1 AND c.owner_id=$2 GROUP BY m.status"
+              : "SELECT status,sum(gross_minor)::text AS amount FROM tenant.commissions WHERE company_id=$1 GROUP BY status",
+            p.scope === "own" ? [p.companyId, p.id] : [p.companyId],
           )
         ).rows;
         return {

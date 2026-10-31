@@ -97,16 +97,20 @@ export class SessionService {
       async (c) =>
         (
           await c.query(
-            "SELECT EXISTS(SELECT 1 FROM platform.users WHERE email=$1) AS platform,EXISTS(SELECT 1 FROM platform.company_owner_accounts WHERE email=$1) AS company",
+            "SELECT EXISTS(SELECT 1 FROM platform.users WHERE email=$1) AS platform,EXISTS(SELECT 1 FROM platform.company_owner_accounts WHERE email=$1) AS company,EXISTS(SELECT 1 FROM platform.company_employee_accounts WHERE email=$1) AS employee",
             [email.trim().toLowerCase()],
           )
         ).rows[0],
     );
-    if (realm.platform && realm.company)
+    if (
+      [realm.platform, realm.company, realm.employee].filter(Boolean).length > 1
+    )
       throw new UnauthorizedException("Invalid email or password");
     const session = realm.company
       ? await this.loginOwner(email, password, remember, ip)
-      : await this.login(email, password, remember, previous, ip);
+      : realm.employee
+        ? await this.loginEmployee(email, password, remember, ip)
+        : await this.login(email, password, remember, previous, ip);
     if (previous) await this.logout(previous);
     return session;
   }
@@ -189,6 +193,162 @@ export class SessionService {
       );
     });
     return { token, seconds };
+  }
+  async loginEmployee(
+    email: string,
+    password: string,
+    remember: boolean,
+    ip: string,
+  ) {
+    const policy = this.settings
+      ? await this.settings.value()
+      : DEFAULT_SETTINGS;
+    if (
+      !(await this.cache.consume("login:ip:" + digest(ip), 100, 900)) ||
+      !(await this.cache.consume(
+        "login:email:" + digest(email.trim().toLowerCase()),
+        policy.lockoutAttempts,
+        900,
+      ))
+    )
+      throw new HttpException("Too many attempts. Try again later.", 429);
+    const a = await this.db.platform(
+      async (c) =>
+        (
+          await c.query(
+            `SELECT a.*,p.password_hash,co.status AS company_status FROM platform.company_employee_accounts a JOIN platform.company_employee_credentials p ON p.account_id=a.id JOIN platform.companies co ON co.id=a.company_id WHERE a.email=$1 AND a.status='active'`,
+            [email.trim().toLowerCase()],
+          )
+        ).rows[0],
+    );
+    const valid = await verifyPassword(
+      password,
+      a?.password_hash ?? (await this.dummy),
+    );
+    if (!a || !valid)
+      throw new UnauthorizedException("Invalid email or password");
+    if (!["pending", "trial", "active"].includes(a.company_status))
+      throw new ForbiddenException("Company access unavailable");
+    await this.employeeProfile(a);
+    const token = "e_" + randomBytes(32).toString("hex"),
+      seconds = remember ? 2592000 : policy.sessionLength * 60;
+    await this.db.platform(async (c) => {
+      const current = (
+        await c.query(
+          `SELECT a.status,p.password_hash,co.status AS company_status FROM platform.company_employee_accounts a JOIN platform.company_employee_credentials p ON p.account_id=a.id JOIN platform.companies co ON co.id=a.company_id WHERE a.id=$1 FOR SHARE OF co,a,p`,
+          [a.id],
+        )
+      ).rows[0];
+      if (
+        !current ||
+        current.status !== "active" ||
+        current.password_hash !== a.password_hash
+      )
+        throw new UnauthorizedException("Invalid email or password");
+      if (!["pending", "trial", "active"].includes(current.company_status))
+        throw new ForbiddenException("Company access unavailable");
+      await c.query(
+        "DELETE FROM platform.company_employee_sessions WHERE expires_at<now()",
+      );
+      await c.query(
+        `INSERT INTO platform.company_employee_sessions(digest,account_id,expires_at) VALUES($1,$2,now()+$3*interval '1 second')`,
+        [digest(token), a.id, seconds],
+      );
+    });
+    await this.db.tenant(a.company_id, async (c) => {
+      await c.query(
+        "UPDATE tenant.users SET last_login_at=now() WHERE company_id=$1 AND id=$2",
+        [a.company_id, a.user_id],
+      );
+    });
+    return { token, seconds };
+  }
+  async employeeProfile(a: any) {
+    const user = await this.db.tenant(
+      a.company_id,
+      async (c) =>
+        (
+          await c.query(
+            `SELECT u.id,u.name,u.email,u.team_id,r.key AS role,r.name AS role_name,r.permissions,r.scope FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=$2 AND u.status='active' AND u.deleted_at IS NULL AND u.identity_pool='company_user'`,
+            [a.company_id, a.user_id],
+          )
+        ).rows[0],
+    );
+    if (!user) throw new UnauthorizedException();
+    return {
+      id: user.id,
+      subject: user.id,
+      pool: "company_user" as const,
+      scope: user.scope as "own" | "team" | "company",
+      companyId: a.company_id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      roleName: user.role_name,
+      permissions: user.permissions,
+      teamId: user.team_id ?? undefined,
+    };
+  }
+  async resolveEmployee(token: string) {
+    if (!/^e_[a-f0-9]{64}$/.test(token)) throw new UnauthorizedException();
+    const a = await this.db.platform(
+      async (c) =>
+        (
+          await c.query(
+            `SELECT a.*,co.public_id,co.slug,co.name AS company_name,co.status AS company_status FROM platform.company_employee_sessions s JOIN platform.company_employee_accounts a ON a.id=s.account_id JOIN platform.companies co ON co.id=a.company_id WHERE s.digest=$1 AND s.expires_at>now() AND a.status='active'`,
+            [digest(token)],
+          )
+        ).rows[0],
+    );
+    if (!a) throw new UnauthorizedException();
+    if (!["pending", "trial", "active"].includes(a.company_status))
+      throw new ForbiddenException("Company access unavailable");
+    const profile = await this.employeeProfile(a);
+    return {
+      ...profile,
+      company: {
+        id: a.public_id,
+        slug: a.slug,
+        name: a.company_name,
+        status: a.company_status,
+      },
+    };
+  }
+  async changeEmployeePassword(
+    principal: { id: string; companyId?: string },
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    if (currentPassword === newPassword)
+      throw new ForbiddenException("Choose a different password.");
+    const hashed = await hashPassword(newPassword);
+    await this.db.platform(async (c) => {
+      if (
+        !(
+          await c.query(
+            "SELECT 1 FROM platform.companies WHERE id=$1 AND status IN ('pending','trial','active') FOR SHARE",
+            [principal.companyId],
+          )
+        ).rowCount
+      )
+        throw new ForbiddenException("Company access unavailable");
+      const a = (
+        await c.query(
+          "SELECT a.id,p.* FROM platform.company_employee_accounts a JOIN platform.company_employee_credentials p ON p.account_id=a.id WHERE a.company_id=$1 AND a.user_id=$2 AND a.status='active' FOR UPDATE OF a,p",
+          [principal.companyId, principal.id],
+        )
+      ).rows[0];
+      if (!a || !(await verifyPassword(currentPassword, a.password_hash)))
+        throw new UnauthorizedException("Current password is incorrect.");
+      await c.query(
+        "UPDATE platform.company_employee_credentials SET password_hash=$2 WHERE account_id=$1",
+        [a.id, hashed],
+      );
+      await c.query(
+        "DELETE FROM platform.company_employee_sessions WHERE account_id=$1",
+        [a.id],
+      );
+    });
   }
   async ownerProfile(a: any) {
     const user = await this.db.tenant(
@@ -297,6 +457,7 @@ export class SessionService {
   }
   async resolve(token: string) {
     if (token.startsWith("c_")) return this.resolveOwner(token);
+    if (token.startsWith("e_")) return this.resolveEmployee(token);
     if (!/^[a-f0-9]{64}$/.test(token)) throw new UnauthorizedException();
     const user = await this.db.platform(
       async (c) =>
@@ -323,6 +484,15 @@ export class SessionService {
         c.query("DELETE FROM platform.company_owner_sessions WHERE digest=$1", [
           digest(token),
         ]),
+      );
+      return;
+    }
+    if (token.startsWith("e_")) {
+      await this.db.platform((c) =>
+        c.query(
+          "DELETE FROM platform.company_employee_sessions WHERE digest=$1",
+          [digest(token)],
+        ),
       );
       return;
     }

@@ -36,7 +36,7 @@ resets the supplied accounts and revokes their sessions.
 
 super_admin includes every platform permission. platform_admin excludes billing,
 plans, platform user administration and settings. Permissions remain server-side.
-Company onboarding, plans/subscriptions, billing/payments, features/usage, integration settings, support tickets and announcements have persisted APIs. See the module documents in docs/ for scope and delivery limitations.
+Company onboarding, plans/subscriptions, billing/payments, features/usage, integration settings, support tickets, announcements, contacts, calendar (see [docs/contacts-calendar.md](docs/contacts-calendar.md)) and controlled workspace access (read-only; see [docs/workspace-access.md](docs/workspace-access.md)) have persisted APIs. See the module documents in docs/ for scope and delivery limitations.
 Password recovery delivery and MFA are not implemented. The UI directs users to
 the administrator for password reset; it does not claim to send email.
 

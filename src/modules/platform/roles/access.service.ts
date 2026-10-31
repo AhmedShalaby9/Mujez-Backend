@@ -166,7 +166,7 @@ export class PlatformAccessService {
       if (
         (
           await c.query(
-            "SELECT 1 FROM platform.users WHERE email=$1 UNION ALL SELECT 1 FROM platform.company_owner_accounts WHERE email=$1",
+            "SELECT 1 FROM platform.users WHERE email=$1 UNION ALL SELECT 1 FROM platform.company_owner_accounts WHERE email=$1 UNION ALL SELECT 1 FROM platform.company_employee_accounts WHERE email=$1",
             [input.email],
           )
         ).rowCount

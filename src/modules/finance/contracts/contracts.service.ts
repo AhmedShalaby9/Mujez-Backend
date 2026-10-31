@@ -9,7 +9,7 @@ import { randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { Principal } from "../../../common/auth/access.js";
 import { DatabaseService } from "../../../infrastructure/database/database.service.js";
-import { SalesService } from "../../sales/leads/sales.service.js";
+import { SalesService, ownWhere } from "../../sales/leads/sales.service.js";
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
 import { taskDate } from "../../sales/tasks/tasks.service.js";
 import { expireUnitReservations } from "../../inventory/reservations/reservation-expiry.js";
@@ -72,7 +72,8 @@ export class ContractsService {
         [p.companyId, id],
       )
     ).rows[0];
-    if (!row) throw new NotFoundException("Contract not found");
+    if (!row || (p.scope === "own" && row.owner_id !== p.id))
+      throw new NotFoundException("Contract not found");
     return row;
   }
   async requirements(c: PoolClient, p: Principal, id: string) {
@@ -90,6 +91,8 @@ export class ContractsService {
       async (c) => {
         const args: any[] = [p.companyId],
           w = ["c.company_id=$1"];
+        const own = ownWhere(p, args, "c.owner_id");
+        if (own) w.push(own);
         if (q.status) {
           args.push(q.status);
           w.push(
@@ -280,6 +283,7 @@ export class ContractsService {
           }
         }
         const owner = b.ownerId ?? p.id;
+        if (p.scope === "own" && owner !== p.id) throw new ForbiddenException();
         if (
           !(
             await c.query(

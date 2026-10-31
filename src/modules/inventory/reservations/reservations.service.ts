@@ -9,7 +9,7 @@ import type { PoolClient } from "pg";
 import type { Principal } from "../../../common/auth/access.js";
 import { DatabaseService } from "../../../infrastructure/database/database.service.js";
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
-import { SalesService } from "../../sales/leads/sales.service.js";
+import { SalesService, ownWhere } from "../../sales/leads/sales.service.js";
 import { randomBytes } from "node:crypto";
 import type {
   ReservationQuery,
@@ -57,6 +57,8 @@ export class ReservationsService {
       async (c) => {
         const args: any[] = [p.companyId],
           w = ["r.company_id=$1"];
+        const own = ownWhere(p, args, "r.assignee_id");
+        if (own) w.push(own);
         for (const [key, col] of [
           ["unitId", "r.unit_id"],
           ["leadId", "r.lead_id"],
@@ -120,7 +122,8 @@ export class ReservationsService {
         id,
       ])
     ).rows[0];
-    if (!row) throw new NotFoundException("Reservation not found");
+    if (!row || (p.scope === "own" && row.assignee_id !== p.id))
+      throw new NotFoundException("Reservation not found");
     return row;
   }
   async event(
@@ -200,6 +203,8 @@ export class ReservationsService {
         )
           throw new BadRequestException("Select an active company lead");
         const assignee = b.assigneeId === undefined ? p.id : b.assigneeId;
+        if (p.scope === "own" && assignee !== p.id)
+          throw new ForbiddenException();
         if (
           assignee &&
           !(

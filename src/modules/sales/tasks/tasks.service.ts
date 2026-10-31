@@ -10,7 +10,7 @@ import type { PoolClient } from "pg";
 import type { Principal } from "../../../common/auth/access.js";
 import { DatabaseService } from "../../../infrastructure/database/database.service.js";
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
-import { SalesService } from "../leads/sales.service.js";
+import { SalesService, ownWhere } from "../leads/sales.service.js";
 import { type ActivityQuery, type SalesQuery } from "../leads/leads.dto.js";
 import {
   TASK_GROUPS,
@@ -102,7 +102,8 @@ export class TasksService {
         [p.companyId, id],
       )
     ).rows[0];
-    if (!t) throw new NotFoundException("Task not found");
+    if (!t || (p.scope === "own" && t.assignee_id !== p.id))
+      throw new NotFoundException("Task not found");
     return t;
   }
   async options(p: Principal) {
@@ -161,6 +162,8 @@ export class TasksService {
         const now = await this.clock(c),
           args: any[] = [p.companyId, now.today],
           where = ["t.company_id=$1", "$2::date IS NOT NULL"];
+        const own = ownWhere(p, args, "t.assignee_id");
+        if (own) where.push(own);
         if (q.status !== "all") {
           args.push(q.status ?? "open");
           where.push("t.status=$" + args.length);
@@ -272,6 +275,8 @@ export class TasksService {
             ? old.assignee_id
             : p.id
           : input.assigneeId;
+    if (p.scope === "own" && assigneeId !== p.id)
+      throw new ForbiddenException();
     if (leadId !== old?.lead_id && leadId) {
       if (!p.permissions.includes("leads.read"))
         throw new ForbiddenException("Lead access is required to link a task");

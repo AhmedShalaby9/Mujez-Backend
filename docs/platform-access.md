@@ -15,7 +15,7 @@ Only an active **Super Admin** can mutate platform access. Every mutation requir
 
 ## Role workflows
 
-`POST /roles` creates a bilingual custom role with only `co.view`. `POST /roles/:key/permission` accepts `{version,permission,enabled,password,reason}` and validates the permission against the backend catalog. Permission changes apply to existing sessions on their next request. Clients cannot invent permissions. Super Admin's built-in complete permission set is locked in both service and database. Workspace eligibility permissions do not themselves grant a tenant session; that capability is still pending.
+`POST /roles` creates a bilingual custom role with only `co.view`. `POST /roles/:key/permission` accepts `{version,permission,enabled,password,reason}` and validates the permission against the backend catalog. Permission changes apply to existing sessions on their next request. Clients cannot invent permissions. Super Admin's built-in complete permission set is locked in both service and database. Workspace eligibility permissions (`ws.read`, `ws.manage`) now do grant a tenant session through the controlled workspace-access flow; see [workspace access](workspace-access.md) for the entry/resolution mechanics and its current limitations (notably: still read-only).
 
 `POST /roles/:key/archive` archives an unused custom role. Built-in roles cannot be archived, and all members (including invited/disabled) must be reassigned first. Archiving preserves history rather than physically deleting rows. The UI uses the live member counts and backend versions; no member counts or authorization outcomes are simulated.
 

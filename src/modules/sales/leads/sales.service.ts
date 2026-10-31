@@ -83,9 +83,19 @@ export function leadDto(l: any) {
       : null,
   };
 }
+/** Row-level "my own records only" clause for own-scope tenant principals
+ * (e.g. the Sales Agent role). RLS enforces company isolation; it cannot
+ * express per-user scope, so every scoped list/row query adds this itself. */
+export function ownWhere(p: Principal, args: any[], column: string) {
+  if (p.scope !== "own") return null;
+  args.push(p.id);
+  return column + "=$" + args.length;
+}
 function filters(p: Principal, q: SalesQuery, board = false) {
   const args: any[] = [p.companyId],
     where = ["l.company_id=$1"];
+  const own = ownWhere(p, args, "l.owner_user_id");
+  if (own) where.push(own);
   if (board || q.archived !== "all")
     where.push(
       board || q.archived !== "archived"
@@ -114,9 +124,7 @@ export class SalesService {
   constructor(private readonly db: DatabaseService) {}
   async access(p: Principal, permission: string) {
     if (
-      p.pool !== "company_admin" ||
-      p.role !== "company_owner" ||
-      p.scope !== "company" ||
+      (p.pool !== "company_admin" && p.pool !== "company_user") ||
       !p.companyId ||
       !p.permissions.includes(permission)
     )
@@ -195,7 +203,8 @@ export class SalesService {
         [p.companyId, id],
       )
     ).rows[0];
-    if (!l) throw new NotFoundException("Lead not found");
+    if (!l || (p.scope === "own" && l.owner_user_id !== p.id))
+      throw new NotFoundException("Lead not found");
     if (
       l.routing_rule_id &&
       !(await tenantFeature(c, p.companyId!, "routing_adv"))
@@ -319,6 +328,11 @@ export class SalesService {
       );
   }
   async owner(c: PoolClient, p: Principal, id: string | null) {
+    if (p.scope === "own") {
+      if (id !== null && id !== undefined && id !== p.id)
+        throw new ForbiddenException();
+      return p.id;
+    }
     if (
       id &&
       !(
@@ -419,7 +433,7 @@ export class SalesService {
       const phone = normalizePhone(input.phone),
         duplicate = await this.duplicate(c, p, phone, input);
       const routed =
-        input.ownerId === undefined
+        input.ownerId === undefined && p.scope !== "own"
           ? await pickRoute(c, p.companyId!, input, true)
           : null;
       const owner = await this.owner(

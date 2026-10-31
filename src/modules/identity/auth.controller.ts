@@ -22,9 +22,11 @@ import type { Response } from "express";
 import { Public, RequireAccess } from "../../common/auth/access.js";
 import {
   sessionCookie,
+  workspaceCookie,
   type AuthRequest,
 } from "../../common/auth/access.guard.js";
 import { SessionService } from "../../common/auth/session.service.js";
+import { WorkspaceService } from "../platform/workspace/workspace.service.js";
 import { ENV, type Environment } from "../../config/env.js";
 class ChangeOwnerPasswordDto {
   @IsString() @MinLength(1) @MaxLength(256) declare currentPassword: string;
@@ -39,12 +41,18 @@ class LoginDto {
 export class AuthController {
   constructor(
     private readonly sessions: SessionService,
+    private readonly workspace: WorkspaceService,
     @Inject(ENV) private readonly env: Environment,
   ) {}
   private get name() {
     return this.env.NODE_ENV === "production"
       ? "__Host-mujez_session"
       : "mujez_session";
+  }
+  private get workspaceName() {
+    return this.env.NODE_ENV === "production"
+      ? "__Host-mujez_workspace"
+      : "mujez_workspace";
   }
   @Public()
   @Post("login")
@@ -83,7 +91,7 @@ export class AuthController {
     const { subject, ...user } = req.principal;
     return user;
   }
-  @RequireAccess(["company_admin"])
+  @RequireAccess(["company_admin", "company_user"])
   @Post("change-password")
   @HttpCode(200)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
@@ -92,22 +100,18 @@ export class AuthController {
     @Req() req: AuthRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    if (
-      req.path.startsWith("/admin/") ||
-      req.principal.role !== "company_owner"
-    )
-      throw new ForbiddenException();
-    await this.sessions.changeOwnerPassword(
-      req.principal,
-      body.currentPassword,
-      body.newPassword,
-    );
-    const next = await this.sessions.loginOwner(
-      req.principal.email,
-      body.newPassword,
-      false,
-      req.ip ?? "unknown",
-    );
+    if (req.path.startsWith("/admin/")) throw new ForbiddenException();
+    const employee = req.principal.pool === "company_user";
+    await (
+      employee
+        ? this.sessions.changeEmployeePassword.bind(this.sessions)
+        : this.sessions.changeOwnerPassword.bind(this.sessions)
+    )(req.principal, body.currentPassword, body.newPassword);
+    const next = await (
+      employee
+        ? this.sessions.loginEmployee.bind(this.sessions)
+        : this.sessions.loginOwner.bind(this.sessions)
+    )(req.principal.email, body.newPassword, false, req.ip ?? "unknown");
     res.cookie(this.name, next.token, {
       httpOnly: true,
       secure: this.env.NODE_ENV === "production",
@@ -120,8 +124,22 @@ export class AuthController {
     @Req() req: AuthRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.sessions.logout(sessionCookie(req));
+    const token = sessionCookie(req);
+    if (token && !token.startsWith("c_")) {
+      try {
+        const principal = await this.sessions.resolve(token);
+        if (principal.pool === "platform")
+          await this.workspace.endAllFor(principal.id);
+      } catch {}
+    }
+    await this.sessions.logout(token);
     res.clearCookie(this.name, {
+      httpOnly: true,
+      secure: this.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+    res.clearCookie(this.workspaceName, {
       httpOnly: true,
       secure: this.env.NODE_ENV === "production",
       sameSite: "lax",

@@ -23,7 +23,18 @@ export interface UploadFile {
   size: number;
   mimetype: string;
 }
-const META = `SELECT d.id,d.company_id,d.kind,d.title,d.file_name,d.mime_type,d.sha256,d.size_bytes,d.lead_id,d.contract_id,d.uploaded_by,d.expires_date::text AS expires_date,d.archived_at,d.version,d.seed_key,d.created_at,l.name AS lead_name,c.public_id AS contract_ref,u.name AS uploader,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today FROM tenant.documents d LEFT JOIN tenant.leads l ON l.company_id=d.company_id AND l.id=d.lead_id LEFT JOIN tenant.contracts c ON c.company_id=d.company_id AND c.id=d.contract_id LEFT JOIN tenant.users u ON u.company_id=d.company_id AND u.id=d.uploaded_by`;
+const FROM = `FROM tenant.documents d LEFT JOIN tenant.leads l ON l.company_id=d.company_id AND l.id=d.lead_id LEFT JOIN tenant.contracts c ON c.company_id=d.company_id AND c.id=d.contract_id LEFT JOIN tenant.users u ON u.company_id=d.company_id AND u.id=d.uploaded_by`;
+const META = `SELECT d.id,d.company_id,d.kind,d.title,d.file_name,d.mime_type,d.sha256,d.size_bytes,d.lead_id,d.contract_id,d.uploaded_by,d.expires_date::text AS expires_date,d.archived_at,d.version,d.seed_key,d.created_at,l.name AS lead_name,l.owner_user_id AS lead_owner_id,c.public_id AS contract_ref,c.owner_id AS contract_owner_id,u.name AS uploader,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today ${FROM}`;
+/** A document is visible to an own-scope principal when they uploaded it, or
+ * own the lead or contract it is linked to -- following the subject's
+ * visibility, as the rest of the own-scope rules do. */
+function ownsDocument(p: Principal, d: any) {
+  return (
+    d.uploaded_by === p.id ||
+    d.lead_owner_id === p.id ||
+    d.contract_owner_id === p.id
+  );
+}
 export function documentDto(d: any) {
   return {
     id: d.id,
@@ -114,6 +125,12 @@ export class DocumentsService {
       async (c) => {
         const args: any[] = [p.companyId],
           w = ["d.company_id=$1"];
+        if (p.scope === "own") {
+          args.push(p.id);
+          w.push(
+            `(d.uploaded_by=$${args.length} OR l.owner_user_id=$${args.length} OR c.owner_id=$${args.length})`,
+          );
+        }
         if (q.archived !== "all")
           w.push(
             q.archived === "archived"
@@ -137,10 +154,7 @@ export class DocumentsService {
         }
         const where = " WHERE " + w.join(" AND ");
         const total = (
-          await c.query(
-            "SELECT count(*)::int AS n FROM tenant.documents d" + where,
-            args,
-          )
+          await c.query("SELECT count(*)::int AS n " + FROM + where, args)
         ).rows[0].n;
         const items = (
           await c.query(
@@ -177,7 +191,8 @@ export class DocumentsService {
         id,
       ])
     ).rows[0];
-    if (!d) throw new NotFoundException("Document not found");
+    if (!d || (p.scope === "own" && !ownsDocument(p, d)))
+      throw new NotFoundException("Document not found");
     return d;
   }
   async detail(p: Principal, id: string) {
