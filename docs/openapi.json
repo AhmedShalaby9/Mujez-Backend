@@ -543,6 +543,74 @@
         "tags": ["NotificationPreferences"]
       }
     },
+    "/api/v1/public/site": {
+      "get": {
+        "operationId": "PublicSiteController_site",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["PublicSite"]
+      }
+    },
+    "/api/v1/public/demo-requests": {
+      "post": {
+        "operationId": "PublicSiteController_request",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DemoRequestInput" }
+            }
+          }
+        },
+        "responses": { "202": { "description": "" } },
+        "tags": ["PublicSite"]
+      }
+    },
+    "/admin/api/v1/demo-requests": {
+      "get": {
+        "operationId": "DemoRequestsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["DemoRequests"]
+      }
+    },
+    "/admin/api/v1/demo-requests/{id}/status": {
+      "post": {
+        "operationId": "DemoRequestsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DemoRequestStatus" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["DemoRequests"]
+      }
+    },
     "/admin/api/v1/overview": {
       "get": {
         "operationId": "OverviewController_snapshot",
@@ -4919,6 +4987,27 @@
       "ViewVersion": { "type": "object", "properties": {} },
       "ReadNotifications": { "type": "object", "properties": {} },
       "NotificationPreferences": { "type": "object", "properties": {} },
+      "DemoRequestInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string" },
+          "fullName": { "type": "string" },
+          "companyName": { "type": "string" },
+          "email": { "type": "string" },
+          "phone": { "type": "string" },
+          "plan": { "type": "string" },
+          "cycle": { "type": "string" }
+        },
+        "required": ["requestId", "fullName", "companyName", "email", "phone"]
+      },
+      "DemoRequestStatus": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "status": { "type": "string" }
+        },
+        "required": ["version", "status"]
+      },
       "AuditQuery": {
         "type": "object",
         "properties": {

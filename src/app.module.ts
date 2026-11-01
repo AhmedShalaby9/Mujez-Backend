@@ -1,3 +1,4 @@
+import { PublicSiteModule } from "./modules/public-site/public-site.module.js";
 import { ApiQuotaService } from "./common/auth/api-quota.service.js";
 import { NotificationsModule } from "./modules/identity/notifications/notifications.module.js";
 import { OwnerWelcomeModule } from "./modules/identity/welcome/welcome.module.js";
@@ -34,6 +35,7 @@ class EnvironmentModule {}
 @Module({
   imports: [
     NotificationsModule,
+    PublicSiteModule,
     EnvironmentModule,
     OwnerWelcomeModule,
     DatabaseModule,
