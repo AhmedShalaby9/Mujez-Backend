@@ -384,3 +384,45 @@ test("stored bytes and requirement definitions are immutable to the runtime data
     /permission denied/,
   );
 });
+
+test("document review persists the real reviewer and safe preview retains tenant boundaries", async () => {
+  const uploaded = (
+    await upload(req({ title: "Review fixture", kind: "other" }))
+  ).body;
+  const reviewed = (
+    await h.post(
+      "documents/" + uploaded.id + "/review",
+      req({
+        version: uploaded.version,
+        status: "verified",
+        reason: "Verified against supplied evidence",
+      }),
+    )
+  ).body;
+  assert.equal(reviewed.reviewStatus, "verified");
+  assert.equal(reviewed.reviewedBy, p.id);
+  assert.ok(reviewed.reviewedAt);
+  const feed = (await h.get("documents?status=verified")).body;
+  assert.ok(feed.items.some((d) => d.id === uploaded.id));
+  assert.ok(feed.summary.byKind.other >= 1);
+  const preview = await h.get("documents/" + uploaded.id + "/preview");
+  assert.match(preview.headers["content-type"], /application\/pdf/);
+  assert.match(preview.headers["content-disposition"], /inline/);
+  assert.match(preview.headers["content-security-policy"], /sandbox/);
+  try {
+    h.state.principal = other;
+    await h.get("documents/" + uploaded.id + "/preview", 404);
+    h.state.principal = { ...p, scope: "own" };
+    await h.post(
+      "documents/" + uploaded.id + "/review",
+      req({
+        version: reviewed.version,
+        status: "rejected",
+        reason: "Agent cannot self-verify",
+      }),
+      403,
+    );
+  } finally {
+    h.state.principal = p;
+  }
+});

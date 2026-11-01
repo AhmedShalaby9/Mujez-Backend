@@ -651,3 +651,36 @@ test("own scope lists only owned leads and rejects direct access or reassignment
     p = original;
   }
 });
+
+test("lead email, segment, owner and typed activity are persisted and filtered across pages", async () => {
+  const input = draft({
+      phone: "+12025550881",
+      email: "actual-sales@example.test",
+      segment: "com",
+    }),
+    created = (await post("leads", input)).body;
+  assert.equal(created.email, input.email);
+  assert.ok(created.stageChangedAt);
+  assert.ok(created.lastActivityAt);
+  const list = (await get("leads?segment=com&ownerId=" + U + "&limit=1")).body;
+  assert.ok(list.items.every((l) => l.segment === "com" && l.owner?.id === U));
+  await post("leads/" + created.id + "/notes", {
+    requestId: randomUUID(),
+    version: created.version,
+    note: "Called the actual buyer",
+    kind: "call",
+    outcome: "call_back",
+  });
+  const activity = (await get("leads/" + created.id + "/activities")).body;
+  assert.ok(
+    activity.items.some(
+      (a) => a.kind === "lead.call_logged" && a.details.outcome === "call_back",
+    ),
+  );
+  await post(
+    "leads",
+    draft({ phone: "+12025550882", email: input.email }),
+    409,
+  );
+  await get("leads?segment=invalid", 400);
+});

@@ -375,3 +375,37 @@ test("expired invitations fail closed and activation audit failure leaves the in
   );
   await service.activate({ token: v.token, password }, "ip");
 });
+
+test("custom roles clone a real base grant set and return descriptions and safe user dates", async () => {
+  const r = await service.newRole(
+    input({
+      nameEn: "Copied support",
+      nameAr: "دعم منسوخ",
+      baseRole: "support_admin",
+      descriptionEn: "Handles support requests",
+      descriptionAr: "يعالج طلبات الدعم",
+    }),
+    actor,
+  );
+  const catalog = await service.roles(),
+    copy = catalog.roles.find((x) => x.key === r.key),
+    base = catalog.roles.find((x) => x.key === "support_admin");
+  assert.deepEqual(copy.permissions, base.permissions);
+  assert.equal(copy.descriptionEn, "Handles support requests");
+  assert.ok(
+    catalog.permissions.every((x) => x.group && Number.isInteger(x.order)),
+  );
+  assert.ok((await service.users()).items.every((x) => x.createdAt));
+  await assert.rejects(
+    () =>
+      service.newRole(
+        input({
+          nameEn: "Bad clone",
+          nameAr: "نسخة",
+          baseRole: "not-a-real-role",
+        }),
+        actor,
+      ),
+    /Role/,
+  );
+});

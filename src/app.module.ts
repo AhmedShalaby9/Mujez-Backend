@@ -1,3 +1,5 @@
+import { ApiQuotaService } from "./common/auth/api-quota.service.js";
+import { NotificationsModule } from "./modules/identity/notifications/notifications.module.js";
 import { OwnerWelcomeModule } from "./modules/identity/welcome/welcome.module.js";
 import {
   CompanyAccessController,
@@ -31,6 +33,7 @@ import { DOMAIN_MODULES } from "./domain-modules.js";
 class EnvironmentModule {}
 @Module({
   imports: [
+    NotificationsModule,
     EnvironmentModule,
     OwnerWelcomeModule,
     DatabaseModule,
@@ -48,6 +51,7 @@ class EnvironmentModule {}
   ],
   providers: [
     SessionService,
+    ApiQuotaService,
     CompanyAccessService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: TokenThrottlerGuard },

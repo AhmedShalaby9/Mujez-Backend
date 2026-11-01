@@ -48,7 +48,7 @@ jobs:
           trap 'rm -f "$RUNNER_TEMP/staging.env"; ssh staging-actions "rm -f $incoming/staging.env" || true' EXIT
           printf '%s\n' "$STAGING_ENV" > "$RUNNER_TEMP/staging.env"
           tar --exclude='*.env' --exclude='.env*' --exclude='__pycache__' -czf "$RUNNER_TEMP/source.tar.gz" \
-            Dockerfile .dockerignore package.json package-lock.json tsconfig.json src scripts database deploy
+            Dockerfile .dockerignore package.json package-lock.json tsconfig.json src assets scripts database deploy
           ssh staging-actions "install -d -m 700 $incoming"
           scp "$RUNNER_TEMP/source.tar.gz" "$RUNNER_TEMP/staging.env" deploy/staging/deploy.sh "staging-actions:$incoming/"
           ssh staging-actions "bash $incoming/deploy.sh $BACKEND_PATH $release_id"

@@ -274,3 +274,66 @@ test("audit failure rolls policy changes back", async () => {
   );
   assert.equal((await service.catalog()).features[0].version, before.version);
 });
+
+test("permanent feature overrides remain effective and expose their actual creator", async () => {
+  await db.query("UPDATE platform.companies SET status='active' WHERE id=$1", [
+    company.id,
+  ]);
+  await db.query(
+    "UPDATE platform.subscriptions SET status='active',period_end=now()+interval '1 month' WHERE company_id=$1",
+    [company.id],
+  );
+  await db.query(
+    "UPDATE platform.features SET platform_on=true,rollout=100 WHERE key='bulk_import'",
+  );
+  const prior = (await service.catalog()).overrides.find(
+    (o) => o.companyId === company.public_id && o.featureKey === "bulk_import",
+  );
+  if (prior)
+    await service.remove(
+      prior.id,
+      {
+        version: prior.version,
+        reason: "Replace with permanent override for verification",
+      },
+      actor,
+    );
+  const current = await service.effective(company.public_id);
+  await service.override(
+    {
+      companyId: company.public_id,
+      featureKey: "bulk_import",
+      enabled: true,
+      expiresAt: null,
+      reason: "Permanent approved exception",
+      version: current.version,
+    },
+    actor,
+  );
+  const row = (await service.catalog()).overrides.find(
+    (o) => o.companyId === company.public_id && o.featureKey === "bulk_import",
+  );
+  assert.equal(row.expires, null);
+  assert.equal(row.createdBy.id, actor);
+  assert.ok(row.createdAt);
+  const effective = await service.effective(company.public_id);
+  assert.equal(effective.features.bulk_import, true);
+  const feature = (await service.catalog()).features.find(
+    (f) => f.key === "bulk_import",
+  );
+  await service.change(
+    feature.key,
+    {
+      version: feature.version,
+      action: "deprecate",
+      deprecated: true,
+      reason: "Deprecated for future plan offers",
+    },
+    actor,
+  );
+  assert.equal(
+    (await service.catalog()).features.find((f) => f.key === feature.key)
+      .deprecated,
+    true,
+  );
+});

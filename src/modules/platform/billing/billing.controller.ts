@@ -1,5 +1,9 @@
+import type { Response } from "express";
+import { renderInvoice } from "./invoice-pdf.js";
 import {
   Controller,
+  Res,
+  StreamableFile,
   Get,
   Post,
   Body,
@@ -45,6 +49,22 @@ export class BillingController {
   }
   @Get("invoices/:number") invoiceDetails(@Param("number") number: string) {
     return this.service.invoiceDetails(number);
+  }
+  @Get("invoices/:number/pdf") async pdf(
+    @Param("number") number: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const invoice = await this.service.invoiceDetails(number);
+    const content = await renderInvoice(invoice);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="' +
+        invoice.number.replace(/[^A-Za-z0-9_-]/g, "") +
+        '.pdf"',
+    );
+    res.setHeader("Cache-Control", "no-store");
+    return new StreamableFile(content);
   }
   @Get("payments/:id") paymentDetails(@Param("id") id: string) {
     return this.service.paymentDetails(id);

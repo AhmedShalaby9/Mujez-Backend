@@ -421,3 +421,73 @@ test("runtime cannot rewrite support entries or expose platform support tables t
     await db.exec("RESET ROLE");
   }
 });
+
+test("announcement priority and real end/delete actions preserve publication and audience boundaries", async () => {
+  const high = await announcements.save(
+    null,
+    { ...ann({ published: true }), priority: "high" },
+    actor,
+  );
+  assert.equal(high.priority, "high");
+  let ended = await announcements.action(high.id, high.version, "end", actor);
+  assert.equal(ended.status, "expired");
+  assert.equal(ended.published, true);
+  assert.ok(
+    !(await announcements.visible(company.id, "en")).some(
+      (x) => x.id === high.id,
+    ),
+  );
+  const draft = await announcements.save(
+    null,
+    { ...ann({ published: false }), priority: "normal" },
+    actor,
+  );
+  await announcements.action(draft.id, draft.version, "delete", actor);
+  assert.ok(!(await announcements.list()).items.some((x) => x.id === draft.id));
+  await assert.rejects(
+    announcements.action(high.id, ended.version, "delete", actor),
+    (e) => e.getStatus() === 400,
+  );
+});
+
+test("first response metric measures the first public agent reply and ignores internal notes", async () => {
+  const t = await support.create(
+    {
+      companyId: company.public_id,
+      subjectEn: "Response metric check",
+      subjectAr: "قياس الرد",
+      requester: "metric@example.test",
+      category: "tech",
+      priority: "low",
+      message: "Customer request for response measurement",
+    },
+    actor,
+  );
+  let d = await support.detail(t.id);
+  await support.entry(
+    t.id,
+    {
+      version: d.version,
+      kind: "internal",
+      text: "Internal triage is not a customer reply",
+    },
+    actor,
+  );
+  d = await support.detail(t.id);
+  assert.equal(d.firstResponseAt, null);
+  await support.entry(
+    t.id,
+    { version: d.version, kind: "reply", text: "First public response" },
+    actor,
+  );
+  d = await support.detail(t.id);
+  assert.ok(d.firstResponseAt);
+  const first = d.firstResponseAt;
+  await support.entry(
+    t.id,
+    { version: d.version, kind: "reply", text: "Subsequent public response" },
+    actor,
+  );
+  assert.equal((await support.detail(t.id)).firstResponseAt, first);
+  assert.ok((await support.summary()).firstResponseMedianMinutes >= 0);
+});

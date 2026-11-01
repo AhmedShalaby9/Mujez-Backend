@@ -1,0 +1,6 @@
+ALTER TABLE platform.features ADD COLUMN deprecated boolean NOT NULL DEFAULT false;
+ALTER TABLE platform.features ADD COLUMN category text NOT NULL DEFAULT 'advanced' CHECK(category IN ('module','advanced'));
+ALTER TABLE platform.feature_overrides ALTER COLUMN expires_at DROP NOT NULL;
+ALTER TABLE platform.feature_overrides ADD COLUMN created_by uuid REFERENCES platform.users(id);
+ALTER TABLE platform.feature_overrides ADD COLUMN created_at timestamptz;
+CREATE OR REPLACE VIEW platform.company_feature_access WITH(security_barrier=true) AS SELECT c.id AS company_id,f.key,f.platform_on,f.rollout,coalesce(fp.enabled,false) AS plan_enabled,o.enabled AS override_enabled,(c.status IN ('trial','active') AND s.id IS NOT NULL) AS accessible FROM platform.companies c CROSS JOIN platform.features f LEFT JOIN LATERAL(SELECT * FROM platform.subscriptions WHERE company_id=c.id AND status IN ('active','trialing') AND period_end>now() ORDER BY created_at DESC,id LIMIT 1)s ON true LEFT JOIN platform.feature_plans fp ON fp.feature_key=f.key AND fp.plan_key=s.plan_key LEFT JOIN platform.feature_overrides o ON o.company_id=c.id AND o.feature_key=f.key AND o.revoked_at IS NULL AND (o.expires_at IS NULL OR o.expires_at>now()) WHERE c.id=nullif(current_setting('app.company_id',true),'')::uuid;

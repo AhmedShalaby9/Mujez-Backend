@@ -35,6 +35,9 @@ function map(t: any) {
     updated: new Date(t.updated_at).toISOString(),
     requester: t.requester,
     slaDue: new Date(t.sla_due).toISOString(),
+    firstResponseAt: t.first_response_at
+      ? new Date(t.first_response_at).toISOString()
+      : null,
     resolvedAt: t.resolved_at ? new Date(t.resolved_at).toISOString() : null,
     version: t.version,
   };
@@ -46,7 +49,7 @@ export class SupportService {
     if (!c) return this.db.platform((c) => this.summary(c));
     return (
       await c.query(
-        `SELECT count(*) FILTER(WHERE status='open')::int AS open,count(*) FILTER(WHERE status='waiting')::int AS waiting,count(*) FILTER(WHERE status IN ('open','progress','waiting') AND sla_due<now())::int AS overdue,count(*) FILTER(WHERE status IN ('resolved','closed') AND resolved_at>=now()-interval '7 days')::int AS resolved,count(*) FILTER(WHERE status IN ('open','progress','waiting'))::int AS active FROM platform.support_tickets`,
+        `SELECT count(*) FILTER(WHERE status='open')::int AS open,count(*) FILTER(WHERE status='waiting')::int AS waiting,count(*) FILTER(WHERE status IN ('open','progress','waiting') AND sla_due<now())::int AS overdue,count(*) FILTER(WHERE status IN ('resolved','closed') AND resolved_at>=now()-interval '7 days')::int AS resolved,count(*) FILTER(WHERE status IN ('open','progress','waiting'))::int AS active, percentile_cont(0.5) WITHIN GROUP(ORDER BY extract(epoch FROM first_response_at-created_at)/60) FILTER(WHERE created_at>=now()-interval '30 days' AND first_response_at IS NOT NULL) AS "firstResponseMedianMinutes",count(*) FILTER(WHERE created_at>=now()-interval '30 days' AND first_response_at IS NOT NULL)::int AS "firstResponseCount" FROM platform.support_tickets`,
       )
     ).rows[0];
   }
@@ -269,6 +272,11 @@ export class SupportService {
         "INSERT INTO platform.support_entries(ticket_id,kind,body,actor_id) VALUES ($1,$2,$3,$4)",
         [t.id, input.kind, input.text, actor],
       );
+      if (input.kind === "reply")
+        await c.query(
+          "UPDATE platform.support_tickets SET first_response_at=coalesce(first_response_at,now()) WHERE id=$1",
+          [t.id],
+        );
       await this.touch(c, t);
       await this.event(c, t, actor, "support." + input.kind + "_added", {
         kind: input.kind,

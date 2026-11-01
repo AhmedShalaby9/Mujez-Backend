@@ -20,7 +20,7 @@ import type {
   ContractAction,
   RequirementAttach,
 } from "./contracts.dto.js";
-const SELECT = `SELECT c.*,c.value_minor::text AS value_minor,c.key_date::text AS key_date,c.signed_date::text AS signed_date,l.name AS lead_name,l.archived_at AS lead_archived_at,u.code AS unit_code,o.name AS owner_name,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today FROM tenant.contracts c JOIN tenant.leads l ON l.company_id=c.company_id AND l.id=c.lead_id LEFT JOIN tenant.units u ON u.company_id=c.company_id AND u.id=c.unit_id LEFT JOIN tenant.users o ON o.company_id=c.company_id AND o.id=c.owner_id`;
+const SELECT = `SELECT c.*,c.value_minor::text AS value_minor,c.key_date::text AS key_date,c.signed_date::text AS signed_date,l.segment AS segment,(SELECT count(*)::int FROM tenant.contract_requirements r WHERE r.company_id=c.company_id AND r.contract_id=c.id) AS requirements_total,(SELECT count(*)::int FROM tenant.contract_requirements r JOIN tenant.documents d ON d.company_id=r.company_id AND d.id=r.document_id WHERE r.company_id=c.company_id AND r.contract_id=c.id AND d.archived_at IS NULL AND (d.expires_date IS NULL OR d.expires_date>=(now() AT TIME ZONE 'Africa/Cairo')::date)) AS requirements_satisfied,l.name AS lead_name,l.archived_at AS lead_archived_at,u.code AS unit_code,o.name AS owner_name,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today FROM tenant.contracts c JOIN tenant.leads l ON l.company_id=c.company_id AND l.id=c.lead_id LEFT JOIN tenant.units u ON u.company_id=c.company_id AND u.id=c.unit_id LEFT JOIN tenant.users o ON o.company_id=c.company_id AND o.id=c.owner_id`;
 export function contractDto(c: any) {
   const expiring =
     c.status === "signed" &&
@@ -32,6 +32,9 @@ export function contractDto(c: any) {
     type: c.type,
     status: expiring ? "expiring" : c.status,
     storedStatus: c.status,
+    segment: c.segment,
+    requirementsTotal: c.requirements_total,
+    requirementsSatisfied: c.requirements_satisfied,
     leadId: c.lead_id,
     contact: c.lead_name,
     leadArchived: !!c.lead_archived_at,
@@ -93,6 +96,10 @@ export class ContractsService {
           w = ["c.company_id=$1"];
         const own = ownWhere(p, args, "c.owner_id");
         if (own) w.push(own);
+        if (q.segment) {
+          args.push(q.segment);
+          w.push("l.segment=$" + args.length);
+        }
         if (q.status) {
           args.push(q.status);
           w.push(
@@ -132,8 +139,18 @@ export class ContractsService {
             [...args, q.limit, (q.page - 1) * q.limit],
           )
         ).rows;
+        const summaryRows = (
+          await c.query(
+            "SELECT CASE WHEN c.status='signed' AND c.key_date<=(now() AT TIME ZONE 'Africa/Cairo')::date+30 THEN 'expiring' ELSE c.status END AS status,count(*)::int AS n" +
+              SELECT.slice(SELECT.lastIndexOf(" FROM tenant.contracts c")) +
+              where +
+              " GROUP BY 1",
+            args,
+          )
+        ).rows;
         return {
           items: rows.map(contractDto),
+          summary: Object.fromEntries(summaryRows.map((r) => [r.status, r.n])),
           total,
           page: q.page,
           limit: q.limit,

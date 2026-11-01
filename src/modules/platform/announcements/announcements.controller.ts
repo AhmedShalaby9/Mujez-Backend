@@ -13,6 +13,7 @@ import {
 import { RequireAccess } from "../../../common/auth/access.js";
 import type { AuthRequest } from "../../../common/auth/access.guard.js";
 import { AnnouncementsService } from "./announcements.service.js";
+import { Version } from "../support/support.dto.js";
 import { AnnouncementInput } from "./announcements.dto.js";
 @RequireAccess(["platform"], "ann")
 @Controller("admin/api/v1/announcements")
@@ -28,6 +29,20 @@ export class AnnouncementsController {
   }
   @Post() create(@Body() input: AnnouncementInput, @Req() req: AuthRequest) {
     return this.service.save(null, input, req.principal.id);
+  }
+  @Post(":id/end") end(
+    @Param("id") id: string,
+    @Body() b: Version,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.action(id, b.version, "end", req.principal.id);
+  }
+  @Post(":id/delete") remove(
+    @Param("id") id: string,
+    @Body() b: Version,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.action(id, b.version, "delete", req.principal.id);
   }
   @Post(":id/update") update(
     @Param("id") id: string,

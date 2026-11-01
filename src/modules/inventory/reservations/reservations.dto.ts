@@ -13,8 +13,9 @@ import { Transform } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { SalesQuery, SalesRequest } from "../../sales/leads/leads.dto.js";
 export class ReservationQuery extends SalesQuery {
+  @IsOptional() @IsIn(["24h"]) @ApiPropertyOptional() expiringWithin?: string;
   @IsOptional()
-  @IsIn(["hold", "reserved", "converted", "expired", "canceled"])
+  @IsIn(["open", "hold", "reserved", "converted", "expired", "canceled"])
   @ApiPropertyOptional()
   status?: string;
   @IsOptional() @IsUUID() @ApiPropertyOptional() unitId?: string;

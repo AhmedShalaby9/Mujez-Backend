@@ -16,6 +16,8 @@ import type {
   PlanInput,
   SubscriptionCreate,
   SubscriptionChange,
+  SubscriptionCancel,
+  CycleChange,
 } from "./subscriptions.dto.js";
 export const SUB_SELECT = `SELECT s.*,c.public_id AS company_ref,c.name AS company_name,v.name AS plan_name,v.revision,v.monthly_minor,v.annual_minor,v.limits,v.features FROM platform.subscriptions s JOIN platform.companies c ON c.id=s.company_id JOIN platform.plan_versions v ON v.id=s.plan_version_id`;
 export function subDto(s: any) {
@@ -38,6 +40,11 @@ export function subDto(s: any) {
     planVersionId: s.plan_version_id,
     planRevision: s.revision,
     pendingVersionId: s.pending_version_id,
+    pendingPlan: s.pending_plan_key ?? null,
+    pendingCycle: s.pending_cycle ?? null,
+    cancellationReason: s.cancellation_reason ?? null,
+    cancellationNote: s.cancellation_note ?? null,
+    canceledAt: s.canceled_at ? new Date(s.canceled_at).toISOString() : null,
     cycle: s.cycle,
     status,
     payment: s.payment_method,
@@ -101,6 +108,9 @@ export class SubscriptionsService {
             listings: input.listings ?? null,
             projects: input.projects ?? null,
             storageGb: input.storageGb ?? null,
+            leads: input.leads ?? null,
+            contacts: input.contacts ?? null,
+            apiPerDay: input.apiPerDay ?? null,
           },
           { en: input.featsEn, ar: input.featsAr },
         ],
@@ -110,7 +120,7 @@ export class SubscriptionsService {
   async plans() {
     return this.db.platform(async (c) => {
       const result = await c.query(
-        `SELECT p.key,p.archived,p.version,v.*, (SELECT count(*)::integer FROM platform.subscriptions s WHERE s.plan_key=p.key AND s.status IN ('trialing','active','past_due','suspended') AND s.period_end>now()) AS companies FROM platform.subscription_plans p JOIN LATERAL (SELECT * FROM platform.plan_versions WHERE plan_key=p.key ORDER BY revision DESC LIMIT 1) v ON true ORDER BY CASE p.key WHEN 'starter' THEN 1 WHEN 'pro' THEN 2 WHEN 'business' THEN 3 ELSE 4 END`,
+        `SELECT p.key,p.archived,p.version,v.*, (SELECT round(coalesce(sum(CASE WHEN s.cycle='annual' THEN pv.annual_minor::numeric/12 ELSE pv.monthly_minor END),0))::text FROM platform.subscriptions s JOIN platform.plan_versions pv ON pv.id=s.plan_version_id WHERE s.plan_key=p.key AND s.status='active' AND s.period_end>now()) AS mrr_minor, (SELECT count(*)::integer FROM platform.subscriptions s WHERE s.plan_key=p.key AND s.status IN ('trialing','active','past_due','suspended') AND s.period_end>now()) AS companies FROM platform.subscription_plans p JOIN LATERAL (SELECT * FROM platform.plan_versions WHERE plan_key=p.key ORDER BY revision DESC LIMIT 1) v ON true ORDER BY CASE p.key WHEN 'starter' THEN 1 WHEN 'pro' THEN 2 WHEN 'business' THEN 3 ELSE 4 END`,
       );
       return result.rows.map((v) => ({
         key: v.key,
@@ -129,6 +139,7 @@ export class SubscriptionsService {
         featsEn: v.features.en,
         featsAr: v.features.ar,
         companies: v.companies,
+        mrrMinor: v.mrr_minor,
       }));
     });
   }
@@ -182,7 +193,7 @@ export class SubscriptionsService {
         for (const sub of subs) {
           const after = (
             await c.query(
-              `UPDATE platform.subscriptions SET ${input.scope === "renewal" ? "pending_version_id=$2" : "plan_version_id=$2,pending_version_id=NULL"},version=version+1,updated_at=now() WHERE id=$1 RETURNING *`,
+              `UPDATE platform.subscriptions SET ${input.scope === "renewal" ? "pending_version_id=$2,pending_plan_key=plan_key" : "plan_version_id=$2,pending_version_id=NULL,pending_plan_key=NULL"},version=version+1,updated_at=now() WHERE id=$1 RETURNING *`,
               [sub.id, row.id],
             )
           ).rows[0];
@@ -205,7 +216,13 @@ export class SubscriptionsService {
       return { key, planVersionId: row.id };
     });
   }
-  archivePlan(key: string, version: number, archived: boolean, actor: string) {
+  archivePlan(
+    key: string,
+    version: number,
+    archived: boolean,
+    actor: string,
+    reason?: string,
+  ) {
     return this.db.platform(async (c) => {
       const before = (
         await c.query(
@@ -234,7 +251,7 @@ export class SubscriptionsService {
         archived ? "plan.archived" : "plan.restored",
         v.id,
         before,
-        after,
+        { ...after, reason: reason ?? null },
       );
       return after;
     });
@@ -345,18 +362,80 @@ export class SubscriptionsService {
       throw error;
     }
   }
+  async history(id: string) {
+    return this.db.platform(async (c) => {
+      const sub = (
+        await c.query(
+          "SELECT id FROM platform.subscriptions WHERE public_id=$1",
+          [id],
+        )
+      ).rows[0];
+      if (!sub) throw new NotFoundException();
+      return {
+        items: (
+          await c.query(
+            "SELECT a.id,a.action,a.before,a.after,a.at,u.name AS actor FROM platform.audit_logs a LEFT JOIN platform.users u ON u.id=a.actor_platform_user_id WHERE a.resource='subscription' AND a.resource_id=$1 ORDER BY a.at,a.id LIMIT 1000",
+            [sub.id],
+          )
+        ).rows,
+      };
+    });
+  }
+  async cycle(id: string, input: CycleChange, actor: string) {
+    return this.db.platform(async (c) => {
+      const before = (
+        await c.query(
+          "SELECT * FROM platform.subscriptions WHERE public_id=$1 FOR UPDATE",
+          [id],
+        )
+      ).rows[0];
+      if (!before) throw new NotFoundException();
+      if (
+        before.version !== input.version ||
+        before.cancel_at_period_end ||
+        new Date(before.period_end).getTime() <= Date.now() ||
+        ["canceled", "expired", "suspended"].includes(before.status)
+      )
+        throw new ConflictException(
+          "Subscription changed or cannot schedule renewal terms",
+        );
+      const after = (
+        await c.query(
+          "UPDATE platform.subscriptions SET pending_cycle=$2,version=version+1,updated_at=now() WHERE id=$1 RETURNING *",
+          [before.id, input.cycle],
+        )
+      ).rows[0];
+      await this.event(
+        c,
+        actor,
+        "subscription.cycle_scheduled",
+        before.id,
+        before,
+        after,
+        before.company_id,
+      );
+      return subDto(
+        (await c.query(SUB_SELECT + " WHERE s.id=$1", [before.id])).rows[0],
+      );
+    });
+  }
   async action(
     id: string,
     version: number,
     action: string,
     actor: string,
-    input?: SubscriptionChange,
+    input?: SubscriptionChange | SubscriptionCancel,
   ) {
     return this.db.platform(async (c) => {
       // Read/lock plan before subscription to keep lock order consistent with bulk plan edits.
-      const target = input
-        ? await this.currentPlan(c, input.plan, input.planVersionId)
-        : null;
+      const target =
+        action === "change" && input
+          ? await this.currentPlan(
+              c,
+              (input as SubscriptionChange).plan,
+              (input as SubscriptionChange).planVersionId,
+            )
+          : null;
       const before = (
         await c.query(
           "SELECT * FROM platform.subscriptions WHERE public_id=$1 FOR UPDATE",
@@ -379,7 +458,7 @@ export class SubscriptionsService {
       let after;
       if (action === "cancel") {
         if (
-          before.cancel_at_period_end ||
+          (before.cancel_at_period_end && input?.when !== "now") ||
           ["canceled", "expired"].includes(before.status) ||
           new Date(before.period_end).getTime() <= Date.now()
         )
@@ -388,8 +467,13 @@ export class SubscriptionsService {
           );
         after = (
           await c.query(
-            "UPDATE platform.subscriptions SET cancel_at_period_end=true,version=version+1,updated_at=now() WHERE id=$1 RETURNING *",
-            [before.id],
+            "UPDATE platform.subscriptions SET cancel_at_period_end=$2,status=CASE WHEN $2 THEN status ELSE 'canceled' END,period_end=CASE WHEN $2 THEN period_end ELSE greatest(now(),period_start+interval '1 microsecond') END,cancellation_reason=$3,cancellation_note=$4,cancellation_requested_at=now(),canceled_at=CASE WHEN $2 THEN NULL ELSE now() END,version=version+1,updated_at=now() WHERE id=$1 RETURNING *",
+            [
+              before.id,
+              input?.when !== "now",
+              (input as SubscriptionCancel | undefined)?.reason ?? "other",
+              (input as SubscriptionCancel | undefined)?.note ?? "",
+            ],
           )
         ).rows[0];
       } else if (action === "change") {
@@ -403,8 +487,17 @@ export class SubscriptionsService {
           );
         after = (
           await c.query(
-            "UPDATE platform.subscriptions SET plan_key=$2,plan_version_id=$3,pending_version_id=NULL,version=version+1,updated_at=now() WHERE id=$1 RETURNING *",
-            [before.id, input!.plan, target.id],
+            input?.when === "renewal"
+              ? "UPDATE platform.subscriptions SET pending_plan_key=$2,pending_version_id=$3,pending_cycle=coalesce($4,pending_cycle),version=version+1,updated_at=now() WHERE id=$1 RETURNING *"
+              : "UPDATE platform.subscriptions SET plan_key=$2,plan_version_id=$3,pending_version_id=NULL,pending_plan_key=NULL,version=version+1,updated_at=now() WHERE id=$1 RETURNING *",
+            input?.when === "renewal"
+              ? [
+                  before.id,
+                  (input as SubscriptionChange).plan,
+                  target.id,
+                  (input as SubscriptionChange).cycle ?? null,
+                ]
+              : [before.id, (input as SubscriptionChange).plan, target.id],
           )
         ).rows[0];
       } else {
@@ -413,12 +506,13 @@ export class SubscriptionsService {
             "Suspended subscriptions require review before renewal",
           );
         const planVersion = before.pending_version_id ?? before.plan_version_id;
-        const interval = before.cycle === "annual" ? "1 year" : "1 month";
+        const cycle = before.pending_cycle ?? before.cycle;
+        const interval = cycle === "annual" ? "1 year" : "1 month";
         try {
           after = (
             await c.query(
-              `UPDATE platform.subscriptions SET plan_version_id=$2,pending_version_id=NULL,status='active',cancel_at_period_end=false,period_start=greatest(now(),period_end),period_end=greatest(now(),period_end)+$3::interval,version=version+1,updated_at=now() WHERE id=$1 RETURNING *`,
-              [before.id, planVersion, interval],
+              `UPDATE platform.subscriptions SET plan_key=coalesce(pending_plan_key,plan_key),plan_version_id=$2,pending_version_id=NULL,pending_plan_key=NULL,cycle=$4,pending_cycle=NULL,status='active',cancel_at_period_end=false,period_start=greatest(now(),period_end),period_end=greatest(now(),period_end)+$3::interval,version=version+1,updated_at=now() WHERE id=$1 RETURNING *`,
+              [before.id, planVersion, interval, cycle],
             )
           ).rows[0];
         } catch (error: any) {

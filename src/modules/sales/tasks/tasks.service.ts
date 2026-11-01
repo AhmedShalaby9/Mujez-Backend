@@ -19,7 +19,7 @@ import {
   type TaskUpdate,
   type TaskStatus,
 } from "./tasks.dto.js";
-const SELECT = `SELECT t.*,t.due_date::text AS due_date,l.public_id AS lead_ref,l.name AS lead_name,l.archived_at AS lead_archived_at,u.name AS assignee_name,creator.name AS creator_name,finisher.name AS finisher_name FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id LEFT JOIN tenant.users creator ON creator.company_id=t.company_id AND creator.id=t.created_by LEFT JOIN tenant.users finisher ON finisher.company_id=t.company_id AND finisher.id=t.completed_by`;
+const SELECT = `SELECT t.*,t.due_date::text AS due_date,l.public_id AS lead_ref,l.name AS lead_name,l.segment AS lead_segment,l.archived_at AS lead_archived_at,u.name AS assignee_name,creator.name AS creator_name,finisher.name AS finisher_name FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id LEFT JOIN tenant.users creator ON creator.company_id=t.company_id AND creator.id=t.created_by LEFT JOIN tenant.users finisher ON finisher.company_id=t.company_id AND finisher.id=t.completed_by`;
 const iso = (v: any) => (v ? new Date(v).toISOString() : null);
 export function taskGroup(due: string, today: string) {
   const delta =
@@ -57,6 +57,7 @@ export function taskDto(t: any, today: string) {
           id: t.lead_id,
           reference: t.lead_ref,
           name: t.lead_name,
+          segment: t.lead_segment,
           archivedAt: iso(t.lead_archived_at),
         }
       : null,
@@ -129,6 +130,8 @@ export class TasksService {
         `(name->>'en' ILIKE $2 OR name->>'ar' ILIKE $2 OR public_id ILIKE $2)`,
       );
     }
+    const own = ownWhere(p, args, "owner_user_id");
+    if (own) where.push(own);
     return this.db.tenant(
       p.companyId!,
       async (c) => ({
@@ -200,6 +203,14 @@ export class TasksService {
             args,
           )
         ).rows;
+        const byAssignee = (
+          await c.query(
+            "SELECT t.assignee_id AS id,u.name,count(*)::int AS open FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id WHERE " +
+              where.join(" AND ") +
+              " AND t.status='open' GROUP BY t.assignee_id,u.name ORDER BY count(*) DESC,t.assignee_id",
+            args,
+          )
+        ).rows;
         const summary = Object.fromEntries(
           TASK_GROUPS.map((g) => [
             g,
@@ -226,7 +237,7 @@ export class TasksService {
         return {
           items: rows.map((t) => taskDto(t, now.today)),
           total: q.group ? summary[q.group] : all,
-          summary: { ...summary, all },
+          summary: { ...summary, all, byAssignee },
           today: now.today,
           asOf: iso(now.at),
           page: q.page,
@@ -283,8 +294,11 @@ export class TasksService {
       if (
         !(
           await c.query(
-            "SELECT id FROM tenant.leads WHERE company_id=$1 AND id=$2 AND archived_at IS NULL",
-            [p.companyId, leadId],
+            "SELECT id FROM tenant.leads WHERE company_id=$1 AND id=$2 AND archived_at IS NULL" +
+              (p.scope === "own" ? " AND owner_user_id=$3" : ""),
+            p.scope === "own"
+              ? [p.companyId, leadId, p.id]
+              : [p.companyId, leadId],
           )
         ).rowCount
       )

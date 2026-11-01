@@ -26,7 +26,7 @@ import type {
 } from "./inventory.dto.js";
 const iso = (v: any) => (v ? new Date(v).toISOString() : null);
 const text = (en: string, ar?: string) => ({ en, ar: ar ?? en });
-const UNIT = `SELECT u.*,u.price_minor::text AS price_minor,u.area::text AS area,b.code AS building_code,b.name AS building_name,ph.id AS phase_id,ph.name AS phase_name,p.id AS project_id,p.name AS project_name,p.archived_at AS project_archived_at FROM tenant.inventory_units u LEFT JOIN tenant.project_buildings b ON b.company_id=u.company_id AND b.id=u.building_id LEFT JOIN tenant.project_phases ph ON ph.company_id=b.company_id AND ph.id=b.phase_id LEFT JOIN tenant.projects p ON p.company_id=ph.company_id AND p.id=ph.project_id`;
+const UNIT = `SELECT u.*,u.price_minor::text AS price_minor,u.area::text AS area,b.code AS building_code,b.name AS building_name,ph.id AS phase_id,ph.name AS phase_name,ph.delivery_year,coalesce(p.segment,CASE WHEN u.type IN ('office','retail') THEN 'com' ELSE 'res' END) AS segment,p.id AS project_id,p.name AS project_name,p.archived_at AS project_archived_at FROM tenant.inventory_units u LEFT JOIN tenant.project_buildings b ON b.company_id=u.company_id AND b.id=u.building_id LEFT JOIN tenant.project_phases ph ON ph.company_id=b.company_id AND ph.id=b.phase_id LEFT JOIN tenant.projects p ON p.company_id=ph.company_id AND p.id=ph.project_id`;
 export function unitDto(u: any) {
   return {
     id: u.id,
@@ -39,6 +39,8 @@ export function unitDto(u: any) {
     project: u.project_name ?? u.location,
     projectArchived: !!u.project_archived_at,
     listing: u.listing,
+    segment: u.segment,
+    deliveryYear: u.delivery_year ?? null,
     location: u.location,
     type: u.type,
     bedrooms: u.bedrooms,
@@ -67,13 +69,15 @@ function projectDto(p: any) {
     total: Number(p.total ?? 0),
     available: Number(p.available ?? 0),
     heldOrReserved: Number(p.held ?? 0),
+    held: Number(p.hold_count ?? 0),
+    reserved: Number(p.reserved_count ?? 0),
     sold: Number(p.sold ?? 0),
     underContract: Number(p.under_contract ?? 0),
     fromPriceMinor: p.from_price ?? null,
     currency: "EGP",
   };
 }
-const COUNTS = `SELECT p.*,count(u.id)::int AS total,count(u.id) FILTER(WHERE u.status='available')::int AS available,count(u.id) FILTER(WHERE u.status IN ('hold','reserved'))::int AS held,count(u.id) FILTER(WHERE u.status='sold')::int AS sold,count(u.id) FILTER(WHERE u.status='under_contract')::int AS under_contract,min(u.price_minor) FILTER(WHERE u.status='available')::text AS from_price FROM tenant.projects p LEFT JOIN tenant.project_phases ph ON ph.company_id=p.company_id AND ph.project_id=p.id LEFT JOIN tenant.project_buildings b ON b.company_id=ph.company_id AND b.phase_id=ph.id LEFT JOIN tenant.inventory_units u ON u.company_id=b.company_id AND u.building_id=b.id AND u.archived_at IS NULL`;
+const COUNTS = `SELECT p.*,count(u.id)::int AS total,count(u.id) FILTER(WHERE u.status='available')::int AS available,count(u.id) FILTER(WHERE u.status IN ('hold','reserved'))::int AS held,count(u.id) FILTER(WHERE u.status='hold')::int AS hold_count,count(u.id) FILTER(WHERE u.status='reserved')::int AS reserved_count,count(u.id) FILTER(WHERE u.status='sold')::int AS sold,count(u.id) FILTER(WHERE u.status='under_contract')::int AS under_contract,min(u.price_minor) FILTER(WHERE u.status='available')::text AS from_price FROM tenant.projects p LEFT JOIN tenant.project_phases ph ON ph.company_id=p.company_id AND ph.project_id=p.id LEFT JOIN tenant.project_buildings b ON b.company_id=ph.company_id AND b.phase_id=ph.id LEFT JOIN tenant.inventory_units u ON u.company_id=b.company_id AND u.building_id=b.id AND u.archived_at IS NULL`;
 @Injectable()
 export class InventoryService {
   constructor(
@@ -223,6 +227,27 @@ export class InventoryService {
             [p.companyId, id],
           )
         ).rows;
+        const aggregate = (
+          await c.query(
+            "SELECT b.id AS building_id,ph.id AS phase_id,count(u.id)::int AS total,count(u.id) FILTER(WHERE u.status='available')::int AS available,count(u.id) FILTER(WHERE u.status='hold')::int AS held,count(u.id) FILTER(WHERE u.status='reserved')::int AS reserved,count(u.id) FILTER(WHERE u.status='sold')::int AS sold,min(u.price_minor) FILTER(WHERE u.status='available')::text AS from_price FROM tenant.project_buildings b JOIN tenant.project_phases ph ON ph.company_id=b.company_id AND ph.id=b.phase_id LEFT JOIN tenant.inventory_units u ON u.company_id=b.company_id AND u.building_id=b.id AND u.archived_at IS NULL WHERE b.company_id=$1 AND ph.project_id=$2 GROUP BY b.id,ph.id",
+            [p.companyId, id],
+          )
+        ).rows;
+        const counts = (rows: any[]) => ({
+          total: rows.reduce((s, r) => s + r.total, 0),
+          available: rows.reduce((s, r) => s + r.available, 0),
+          held: rows.reduce((s, r) => s + r.held, 0),
+          reserved: rows.reduce((s, r) => s + r.reserved, 0),
+          sold: rows.reduce((s, r) => s + r.sold, 0),
+          fromPriceMinor: rows.reduce(
+            (n: string | null, r) =>
+              r.from_price !== null &&
+              (n === null || BigInt(r.from_price) < BigInt(n))
+                ? r.from_price
+                : n,
+            null,
+          ),
+        });
         return {
           ...projectDto(row),
           phases: phases.map((ph) => ({
@@ -230,6 +255,7 @@ export class InventoryService {
             code: ph.code,
             name: ph.name,
             deliveryYear: ph.delivery_year,
+            ...counts(aggregate.filter((r) => r.phase_id === ph.id)),
             version: ph.version,
             buildings: buildings
               .filter((b) => b.phase_id === ph.id)
@@ -238,6 +264,7 @@ export class InventoryService {
                 code: b.code,
                 name: b.name,
                 floors: b.floors,
+                ...counts(aggregate.filter((r) => r.building_id === b.id)),
                 version: b.version,
               })),
           })),
@@ -444,6 +471,13 @@ export class InventoryService {
             `(u.code ILIKE $${args.length} OR u.location->>'en' ILIKE $${args.length} OR u.location->>'ar' ILIKE $${args.length} OR p.name->>'en' ILIKE $${args.length} OR p.name->>'ar' ILIKE $${args.length})`,
           );
         }
+        if (q.segment) {
+          args.push(q.segment);
+          w.push(
+            "coalesce(p.segment,CASE WHEN u.type IN ('office','retail') THEN 'com' ELSE 'res' END)=$" +
+              args.length,
+          );
+        }
         const where = " WHERE " + w.join(" AND ");
         const total = (
           await c.query(
@@ -462,8 +496,20 @@ export class InventoryService {
             [...args, q.limit, (q.page - 1) * q.limit],
           )
         ).rows;
+        const summaryRows = (
+          await c.query(
+            "SELECT status,count(*)::int AS n FROM (" +
+              UNIT +
+              where +
+              ") units GROUP BY status",
+            args,
+          )
+        ).rows;
         return {
           items: rows.map(unitDto),
+          summary: Object.fromEntries(
+            summaryRows.map((row) => [row.status, row.n]),
+          ),
           total,
           page: q.page,
           limit: q.limit,

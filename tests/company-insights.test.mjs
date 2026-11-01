@@ -448,3 +448,44 @@ test("insights seed composes real source records idempotently without signed sal
     0,
   );
 });
+
+test("audit category filters apply before pagination and CSV exports are private, redacted and audited once", async () => {
+  const all = (await h.get("company-audit?category=docs&limit=1")).body;
+  assert.ok(all.items.every((r) => r.resourceType === "document"));
+  const body = req({ category: "leads" }),
+    r = (await h.post("company-audit/export", body)).body;
+  assert.ok(r.csv.startsWith("\uFEFF"));
+  assert.ok(!r.csv.includes("never-log-value"));
+  assert.ok(r.csv.includes("'=HYPERLINK"));
+  assert.equal((await h.post("company-audit/export", body)).body.csv, r.csv);
+  assert.equal(
+    (
+      await h.db.query(
+        "SELECT count(*)::int n FROM tenant.audit_logs WHERE company_id=$1 AND action='company_audit.exported'",
+        [p.companyId],
+      )
+    ).rows[0].n,
+    1,
+  );
+  try {
+    h.state.principal = {
+      ...p,
+      permissions: p.permissions.filter((x) => x !== "reports.export"),
+    };
+    await h.post("company-audit/export", req({}), 403);
+    h.state.principal = other;
+    const d = (await h.post("company-audit/export", req({}))).body;
+    assert.equal(
+      d.rows,
+      (
+        await h.db.query(
+          "SELECT count(*)::int n FROM tenant.audit_logs WHERE company_id=$1 AND action<>'company_audit.exported'",
+          [other.companyId],
+        )
+      ).rows[0].n,
+    );
+    assert.ok(!d.csv.includes("redaction.verify"));
+  } finally {
+    h.state.principal = p;
+  }
+});

@@ -1,3 +1,4 @@
+import { requireCrmSlot } from "../../../common/auth/crm-quota.js";
 import { tenantFeature } from "../../../common/auth/tenant-features.js";
 import { pickRoute } from "../../administration/routing/routing-picker.js";
 import {
@@ -38,7 +39,7 @@ export function normalizePhone(value: string) {
     );
   return s;
 }
-const LEAD = `SELECT l.*,l.budget_minor::text AS budget_minor,u.name AS owner_name,o.id AS opportunity_id,o.public_id AS deal_ref,o.title AS deal_title,o.value_minor::text AS deal_value,o.deal_type,o.version AS deal_version,mc.name AS campaign_name,rr.name AS routing_rule_name,CASE WHEN l.first_contact_at IS NULL AND rr.active AND rr.archived_at IS NULL AND rr.sla_minutes>0 THEN l.assigned_at+make_interval(mins=>rr.sla_minutes) ELSE NULL END AS sla_due_at FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id LEFT JOIN tenant.marketing_campaigns mc ON mc.company_id=l.company_id AND mc.id=l.campaign_id LEFT JOIN tenant.routing_rules rr ON rr.company_id=l.company_id AND rr.id=l.routing_rule_id`;
+const LEAD = `SELECT l.*,(SELECT max(a.created_at) FROM tenant.lead_activities a WHERE a.company_id=l.company_id AND a.lead_id=l.id) AS last_activity_at,l.budget_minor::text AS budget_minor,u.name AS owner_name,o.id AS opportunity_id,o.public_id AS deal_ref,o.title AS deal_title,o.value_minor::text AS deal_value,o.deal_type,o.version AS deal_version,mc.name AS campaign_name,rr.name AS routing_rule_name,CASE WHEN l.first_contact_at IS NULL AND rr.active AND rr.archived_at IS NULL AND rr.sla_minutes>0 THEN l.assigned_at+make_interval(mins=>rr.sla_minutes) ELSE NULL END AS sla_due_at FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id LEFT JOIN tenant.marketing_campaigns mc ON mc.company_id=l.company_id AND mc.id=l.campaign_id LEFT JOIN tenant.routing_rules rr ON rr.company_id=l.company_id AND rr.id=l.routing_rule_id`;
 const ref = (prefix: string) =>
   prefix + "-" + randomBytes(6).toString("hex").toUpperCase();
 const iso = (value: any) => (value ? new Date(value).toISOString() : null);
@@ -48,6 +49,9 @@ export function leadDto(l: any) {
     reference: l.public_id,
     name: l.name,
     phone: l.phone,
+    email: l.email ?? null,
+    lastActivityAt: iso(l.last_activity_at ?? l.created_at),
+    stageChangedAt: iso(l.stage_changed_at),
     segment: l.segment,
     want: l.want,
     budgetMinor: l.budget_minor === null ? null : String(l.budget_minor),
@@ -102,6 +106,22 @@ function filters(p: Principal, q: SalesQuery, board = false) {
         ? "l.archived_at IS NULL"
         : "l.archived_at IS NOT NULL",
     );
+  if (q.budgetMinMinor) {
+    args.push(q.budgetMinMinor);
+    where.push("l.budget_minor>=$" + args.length);
+  }
+  if (q.budgetMaxMinor) {
+    args.push(q.budgetMaxMinor);
+    where.push("l.budget_minor<=$" + args.length);
+  }
+  if (q.segment) {
+    args.push(q.segment);
+    where.push("l.segment=$" + args.length);
+  }
+  if (q.ownerId) {
+    args.push(q.ownerId);
+    where.push("l.owner_user_id=$" + args.length);
+  }
   if (q.campaignId) {
     args.push(q.campaignId);
     where.push("l.campaign_id=$" + args.length);
@@ -218,8 +238,8 @@ export class SalesService {
       const l = await this.row(c, p, id);
       const related = (
         await c.query(
-          `SELECT x.id,x.public_id AS reference,x.name,x.archived_at FROM tenant.lead_links r JOIN tenant.leads x ON x.company_id=r.company_id AND x.id=CASE WHEN r.lead_id=$2 THEN r.related_id ELSE r.lead_id END WHERE r.company_id=$1 AND (r.lead_id=$2 OR r.related_id=$2) ORDER BY r.created_at DESC,x.id`,
-          [p.companyId, id],
+          `SELECT x.id,x.public_id AS reference,x.name,x.archived_at FROM tenant.lead_links r JOIN tenant.leads x ON x.company_id=r.company_id AND x.id=CASE WHEN r.lead_id=$2 THEN r.related_id ELSE r.lead_id END WHERE r.company_id=$1 AND (r.lead_id=$2 OR r.related_id=$2) AND ($3::uuid IS NULL OR x.owner_user_id=$3) ORDER BY r.created_at DESC,x.id`,
+          [p.companyId, id, p.scope === "own" ? p.id : null],
         )
       ).rows;
       return {
@@ -354,10 +374,14 @@ export class SalesService {
   ) {
     const matches = (
       await c.query(
-        "SELECT id,public_id AS reference,name,phone,version FROM tenant.leads WHERE company_id=$1 AND phone=$2 AND archived_at IS NULL AND ($3::uuid IS NULL OR id<>$3) ORDER BY created_at,id LIMIT 5",
-        [p.companyId, phone, exclude ?? null],
+        "SELECT id,public_id AS reference,name,phone,version,owner_user_id FROM tenant.leads WHERE company_id=$1 AND (phone=$2 OR ($4::text IS NOT NULL AND lower(email)=lower($4))) AND archived_at IS NULL AND ($3::uuid IS NULL OR id<>$3) ORDER BY created_at,id LIMIT 5",
+        [p.companyId, phone, exclude ?? null, input.email ?? null],
       )
     ).rows;
+    if (p.scope === "own" && matches.some((m) => m.owner_user_id !== p.id))
+      throw new ConflictException(
+        "An active lead already exists. Contact your company administrator.",
+      );
     if (!matches.length) {
       if (input.duplicateMode || input.duplicateOf)
         throw new ConflictException(
@@ -373,8 +397,14 @@ export class SalesService {
       });
     const target = (
       await c.query(
-        "SELECT id FROM tenant.leads WHERE company_id=$1 AND id=$2 AND phone=$3 AND archived_at IS NULL AND id<>coalesce($4::uuid,gen_random_uuid())",
-        [p.companyId, input.duplicateOf, phone, exclude ?? null],
+        "SELECT id FROM tenant.leads WHERE company_id=$1 AND id=$2 AND (phone=$3 OR ($5::text IS NOT NULL AND lower(email)=lower($5))) AND archived_at IS NULL AND id<>coalesce($4::uuid,gen_random_uuid())",
+        [
+          p.companyId,
+          input.duplicateOf,
+          phone,
+          exclude ?? null,
+          input.email ?? null,
+        ],
       )
     ).rows[0];
     if (!target)
@@ -447,9 +477,10 @@ export class SalesService {
         input.campaignId ?? null,
         input.source,
       );
+      await requireCrmSlot(c, p.companyId!, "leads");
       const l = (
         await c.query(
-          `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,score,campaign_id,routing_rule_id,assigned_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END) RETURNING id`,
+          `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,score,campaign_id,routing_rule_id,assigned_at,email) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END,$13) RETURNING id`,
           [
             p.companyId,
             ref("L"),
@@ -463,6 +494,7 @@ export class SalesService {
             input.score ?? null,
             campaign,
             routed?.ruleId ?? null,
+            input.email?.toLowerCase() ?? null,
           ],
         )
       ).rows[0];
@@ -515,11 +547,12 @@ export class SalesService {
           old.campaign_id,
         );
         const duplicate =
-          phone !== old.phone
+          phone !== old.phone ||
+          (input.email !== undefined && input.email !== old.email)
             ? await this.duplicate(c, p, phone, input, id)
             : null;
         await c.query(
-          `UPDATE tenant.leads SET name=$3,phone=$4,segment=$5,want=$6,budget_minor=$7,source=$8,owner_user_id=$9,score=$10,campaign_id=$11,assigned_at=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END ELSE assigned_at END,routing_rule_id=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN NULL ELSE routing_rule_id END,routing_attempts=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN 0 ELSE routing_attempts END,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2`,
+          `UPDATE tenant.leads SET name=$3,phone=$4,segment=$5,want=$6,budget_minor=$7,source=$8,owner_user_id=$9,score=$10,campaign_id=$11,email=CASE WHEN $13::boolean THEN $12 ELSE email END,assigned_at=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END ELSE assigned_at END,routing_rule_id=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN NULL ELSE routing_rule_id END,routing_attempts=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN 0 ELSE routing_attempts END,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2`,
           [
             p.companyId,
             id,
@@ -532,6 +565,8 @@ export class SalesService {
             owner,
             input.score ?? null,
             campaign,
+            input.email?.toLowerCase() ?? null,
+            input.email !== undefined,
           ],
         );
         if (duplicate && input.duplicateMode === "link")
@@ -593,7 +628,7 @@ export class SalesService {
             "Move to the next stage, mark lost, or explicitly reopen a closed lead",
           );
         await c.query(
-          "UPDATE tenant.leads SET stage=$3,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
+          "UPDATE tenant.leads SET stage=$3,stage_changed_at=now(),version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
           [p.companyId, leadId, next],
         );
         await this.event(c, p, leadId, "lead.stage_changed", {
@@ -616,6 +651,8 @@ export class SalesService {
         this.check(l, input.version, true);
         if ((input.action === "archive") === !!l.archived_at)
           throw new ConflictException("Lead already has that archive state");
+        if (input.action === "restore")
+          await requireCrmSlot(c, p.companyId!, "leads");
         await c.query(
           "UPDATE tenant.leads SET archived_at=CASE WHEN $3 THEN now() ELSE NULL END,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
           [p.companyId, id, input.action === "archive"],
@@ -644,7 +681,23 @@ export class SalesService {
           "UPDATE tenant.leads SET version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
           [p.companyId, id],
         );
-        await this.event(c, p, id, "lead.note_added", { note: input.note });
+        if (input.outcome && input.kind !== "call")
+          throw new BadRequestException(
+            "Call outcome requires a call activity",
+          );
+        await this.event(
+          c,
+          p,
+          id,
+          input.kind && input.kind !== "note"
+            ? "lead." + input.kind + "_logged"
+            : "lead.note_added",
+          {
+            note: input.note,
+            kind: input.kind ?? "note",
+            outcome: input.outcome ?? null,
+          },
+        );
         return leadDto(await this.row(c, p, id));
       },
     );
@@ -657,7 +710,7 @@ export class SalesService {
       async (c) => {
         const rows = (
           await c.query(
-            `SELECT o.*,o.value_minor::text AS value_minor,l.public_id AS lead_ref,l.name AS contact,l.owner_user_id,u.name AS owner_name,l.stage,l.version AS lead_version,l.seed_key AS lead_seed_key FROM tenant.opportunities o JOIN tenant.leads l ON l.company_id=o.company_id AND l.id=o.lead_id LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id WHERE ${where} ORDER BY o.created_at DESC,o.id LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
+            `SELECT o.*,o.value_minor::text AS value_minor,l.public_id AS lead_ref,l.name AS contact,l.owner_user_id,u.name AS owner_name,l.stage,l.segment,l.stage_changed_at,l.version AS lead_version,l.seed_key AS lead_seed_key FROM tenant.opportunities o JOIN tenant.leads l ON l.company_id=o.company_id AND l.id=o.lead_id LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id WHERE ${where} ORDER BY o.created_at DESC,o.id LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
             [...args, q.limit, (q.page - 1) * q.limit],
           )
         ).rows;
@@ -681,6 +734,8 @@ export class SalesService {
               ? { id: r.owner_user_id, name: r.owner_name }
               : null,
             stage: r.stage,
+            segment: r.segment,
+            stageChangedAt: iso(r.stage_changed_at),
             version: r.version,
             leadVersion: r.lead_version,
             sample: !!(r.seed_key || r.lead_seed_key),

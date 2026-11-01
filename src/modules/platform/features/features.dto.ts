@@ -15,7 +15,13 @@ export class PolicyVersion {
   @ApiProperty() @IsInt() @Min(0) declare version: number;
 }
 export class FeatureChange extends PolicyVersion {
-  @ApiProperty() @IsIn(["flag", "rollout", "plan"]) declare action: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  deprecated?: boolean;
+  @ApiProperty()
+  @IsIn(["flag", "rollout", "plan", "deprecate"])
+  declare action: string;
   @ApiProperty() @IsOptional() @IsBoolean() declare enabled?: boolean;
   @ApiProperty()
   @IsOptional()
@@ -34,7 +40,10 @@ export class FeatureOverride extends PolicyVersion {
   @ApiProperty() @IsString() @Length(3, 80) declare companyId: string;
   @ApiProperty() @IsString() @Length(2, 80) declare featureKey: string;
   @ApiProperty() @IsBoolean() declare enabled: boolean;
-  @ApiProperty() @IsDateString({ strict: true }) declare expiresAt: string;
+  @ApiProperty({ nullable: true })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  declare expiresAt: string | null;
   @ApiProperty()
   @IsString()
   @Length(5, 500)
@@ -49,7 +58,27 @@ export class ReasonVersion extends PolicyVersion {
   declare reason: string;
 }
 export class LimitOverride extends ReasonVersion {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000000000)
+  limit?: number;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  days?: number;
   @ApiProperty()
-  @IsIn(["users", "listings", "storage"])
+  @IsIn([
+    "users",
+    "listings",
+    "storage",
+    "leads",
+    "contacts",
+    "projects",
+    "apiPerDay",
+  ])
   declare resource: string;
 }

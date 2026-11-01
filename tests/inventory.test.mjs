@@ -271,3 +271,15 @@ test("sample seed is opt-in, quota aware and preserves edits on rerun", async ()
     2,
   );
 });
+
+test("inventory segment filters and status summaries are calculated before paging", async () => {
+  const r = (await h.get("units?segment=res&limit=1")).body;
+  assert.ok(r.items.every((u) => u.segment === "res"));
+  assert.ok(Object.values(r.summary).reduce((s, n) => s + n, 0) === r.total);
+  const commercial = (await h.get("units?segment=com&limit=1")).body;
+  assert.ok(commercial.items.every((u) => u.segment === "com"));
+  assert.ok(
+    Object.values(commercial.summary).reduce((s, n) => s + n, 0) ===
+      commercial.total,
+  );
+});

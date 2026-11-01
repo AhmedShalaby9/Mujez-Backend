@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { PGlite } from "@electric-sql/pglite";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { SubscriptionsService } from "../dist/modules/platform/subscriptions/subscriptions.service.js";
 const db = new PGlite();
 let service, actor, company, subscription, firstPlan;
@@ -22,12 +22,9 @@ const input = {
   featsAr: "مساحة عمل",
 };
 before(async () => {
-  for (const file of [
-    "001_foundation.sql",
-    "002_password_sessions.sql",
-    "003_companies_onboarding.sql",
-    "004_plans_subscriptions.sql",
-  ])
+  for (const file of (
+    await readdir(new URL("../database/migrations/", import.meta.url))
+  ).sort())
     await db.exec(
       await readFile(
         new URL("../database/migrations/" + file, import.meta.url),
@@ -210,4 +207,60 @@ test("failed auditing rolls back a plan and platform role cannot alter historica
   } finally {
     await db.exec("ROLLBACK");
   }
+});
+
+test("renewal can schedule another plan and cycle without altering current agreed terms", async () => {
+  const all = await service.plans();
+  const current = all.find((p) => p.key === "starter");
+  if (current.archived)
+    await service.archivePlan(current.key, current.version, false, actor);
+  const candidate = await service.createPlan(
+    { ...input, key: "business", nameEn: "Business", nameAr: "أعمال" },
+    actor,
+  );
+  const plan = (await service.plans()).find((p) => p.key === "business");
+  // Use a separate eligible company so previous cancellation tests remain independent.
+  const co = (
+    await db.query(
+      "INSERT INTO platform.companies(public_id,slug,name,status) VALUES('MJ-SCHEDULE','schedule','{\"en\":\"Schedule\",\"ar\":\"جدولة\"}','active') RETURNING id",
+    )
+  ).rows[0];
+  const made = await service.create(
+    {
+      companyId: "MJ-SCHEDULE",
+      plan: "starter",
+      planVersionId: current.planVersionId,
+      cycle: "monthly",
+      status: "active",
+      payment: "bank",
+    },
+    actor,
+  );
+  let sub = (await service.list()).items.find((s) => s.subId === made.subId);
+  sub = await service.action(sub.subId, sub.version, "change", actor, {
+    plan: "business",
+    planVersionId: plan.planVersionId,
+    when: "renewal",
+    cycle: "annual",
+  });
+  assert.equal(sub.plan, "starter");
+  assert.equal(sub.cycle, "monthly");
+  assert.equal(sub.pendingPlan, "business");
+  assert.equal(sub.pendingCycle, "annual");
+  sub = await service.action(sub.subId, sub.version, "renew", actor);
+  assert.equal(sub.plan, "business");
+  assert.equal(sub.cycle, "annual");
+  assert.equal(sub.pendingPlan, null);
+  assert.equal(sub.pendingCycle, null);
+  const history = await service.history(sub.subId);
+  assert.ok(history.items.some((e) => e.action === "subscription.change"));
+  assert.ok(history.items.some((e) => e.action === "subscription.renew"));
+  sub = await service.action(sub.subId, sub.version, "cancel", actor, {
+    when: "now",
+    reason: "closed",
+    note: "Customer requested immediate cancellation",
+  });
+  assert.equal(sub.status, "canceled");
+  assert.equal(sub.cancellationReason, "closed");
+  assert.ok(sub.canceledAt);
 });

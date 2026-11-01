@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
   IsIn,
+  IsEmail,
   IsInt,
   IsOptional,
   IsString,
@@ -24,6 +25,16 @@ export const STAGES = [
   "lost",
 ] as const;
 export class SalesQuery {
+  @IsOptional()
+  @Matches(/^(0|[1-9][0-9]{0,17})$/)
+  @ApiPropertyOptional()
+  budgetMinMinor?: string;
+  @IsOptional()
+  @Matches(/^(0|[1-9][0-9]{0,17})$/)
+  @ApiPropertyOptional()
+  budgetMaxMinor?: string;
+  @IsOptional() @IsIn(["res", "com"]) @ApiPropertyOptional() segment?: string;
+  @IsOptional() @IsUUID() @ApiPropertyOptional() ownerId?: string;
   @IsOptional() @IsUUID() @ApiPropertyOptional() campaignId?: string;
   @IsOptional()
   @Type(() => Number)
@@ -60,6 +71,11 @@ export class SalesRequest {
   declare requestId: string;
 }
 export class LeadInput extends SalesRequest {
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(254)
+  @ApiPropertyOptional({ nullable: true })
+  email?: string | null;
   @IsOptional()
   @IsUUID()
   @ApiPropertyOptional({ type: String, nullable: true })
@@ -168,6 +184,14 @@ export class LeadArchive extends SalesRequest {
   declare reason: string;
 }
 export class LeadNote extends SalesRequest {
+  @IsOptional()
+  @IsIn(["note", "call", "whatsapp", "viewing", "email"])
+  @ApiPropertyOptional()
+  kind?: string;
+  @IsOptional()
+  @IsIn(["interested", "call_back", "no_answer", "not_interested"])
+  @ApiPropertyOptional()
+  outcome?: string;
   @IsInt() @Min(0) @ApiProperty({ type: Number }) declare version: number;
   @IsString()
   @Transform(trim)

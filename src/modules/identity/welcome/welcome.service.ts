@@ -64,7 +64,7 @@ export class OwnerWelcomeService {
     const accountId = (
       await c.query("SELECT platform.provision_company_owner($1,$2,$3) AS id", [
         company.id,
-        company.name.en,
+        company.owner_profile?.name || company.name.en,
         company.admin_email,
       ])
     ).rows[0].id;

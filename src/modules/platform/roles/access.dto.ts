@@ -2,6 +2,7 @@ import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import {
   IsString,
+  IsOptional,
   Length,
   IsInt,
   Min,
@@ -44,6 +45,17 @@ export class UserStatus extends AdminVersion {
   @ApiProperty() @IsIn(["active", "disabled"]) declare status: string;
 }
 export class NewRole extends AdminAuth {
+  @IsOptional() @IsString() @Length(2, 80) @ApiProperty() baseRole?: string;
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  @ApiProperty()
+  descriptionEn?: string;
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  @ApiProperty()
+  descriptionAr?: string;
   @ApiProperty()
   @IsString()
   @Transform(trim)

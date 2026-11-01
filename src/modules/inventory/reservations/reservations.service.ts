@@ -17,7 +17,7 @@ import type {
   ReservationAction,
 } from "./reservations.dto.js";
 import { expireUnitReservations } from "./reservation-expiry.js";
-const SELECT = `SELECT r.*,r.deposit_minor::text AS deposit_minor,CASE WHEN r.status IN ('hold','reserved') AND r.expires_at<=now() THEN 'expired' ELSE r.status END AS effective_status,u.code AS unit_code,l.name AS lead_name,l.public_id AS lead_ref,l.archived_at AS lead_archived_at,a.name AS assignee_name,ct.id AS contract_id,ct.public_id AS contract_ref,now() AS as_of FROM tenant.reservations r JOIN tenant.units u ON u.company_id=r.company_id AND u.id=r.unit_id JOIN tenant.leads l ON l.company_id=r.company_id AND l.id=r.lead_id LEFT JOIN tenant.users a ON a.company_id=r.company_id AND a.id=r.assignee_id LEFT JOIN tenant.contracts ct ON ct.company_id=r.company_id AND ct.reservation_id=r.id`;
+const SELECT = `SELECT r.*,r.deposit_minor::text AS deposit_minor,CASE WHEN r.status IN ('hold','reserved') AND r.expires_at<=now() THEN 'expired' ELSE r.status END AS effective_status,u.code AS unit_code,u.price_minor::text AS unit_price_minor,pr.name AS project_name,ph.name AS phase_name,l.segment AS segment,l.name AS lead_name,l.public_id AS lead_ref,l.archived_at AS lead_archived_at,a.name AS assignee_name,ct.id AS contract_id,ct.public_id AS contract_ref,now() AS as_of FROM tenant.reservations r JOIN tenant.units u ON u.company_id=r.company_id AND u.id=r.unit_id JOIN tenant.leads l ON l.company_id=r.company_id AND l.id=r.lead_id LEFT JOIN tenant.project_buildings b ON b.company_id=u.company_id AND b.id=u.building_id LEFT JOIN tenant.project_phases ph ON ph.company_id=b.company_id AND ph.id=b.phase_id LEFT JOIN tenant.projects pr ON pr.company_id=ph.company_id AND pr.id=ph.project_id LEFT JOIN tenant.users a ON a.company_id=r.company_id AND a.id=r.assignee_id LEFT JOIN tenant.contracts ct ON ct.company_id=r.company_id AND ct.reservation_id=r.id`;
 export function reservationDto(r: any) {
   return {
     id: r.id,
@@ -26,6 +26,12 @@ export function reservationDto(r: any) {
     contractReference: r.contract_ref ?? null,
     unitId: r.unit_id,
     unit: r.unit_code,
+    unitPriceMinor: r.unit_price_minor,
+    project: r.project_name,
+    phase: r.phase_name,
+    segment: r.segment,
+    createdAt: new Date(r.created_at).toISOString(),
+    startedAt: new Date(r.created_at).toISOString(),
     leadId: r.lead_id,
     contact: r.lead_name,
     leadReference: r.lead_ref,
@@ -67,7 +73,17 @@ export class ReservationsService {
             args.push(q[key]);
             w.push(col + "=$" + args.length);
           }
-        if (q.status) {
+        if (q.segment) {
+          args.push(q.segment);
+          w.push("l.segment=$" + args.length);
+        }
+        if (q.expiringWithin)
+          w.push(
+            "r.status IN ('hold','reserved') AND r.expires_at>now() AND r.expires_at<=now()+interval '24 hours'",
+          );
+        if (q.status === "open")
+          w.push("r.status IN ('hold','reserved') AND r.expires_at>now()");
+        else if (q.status) {
           args.push(q.status);
           w.push(
             "(CASE WHEN r.status IN ('hold','reserved') AND r.expires_at<=now() THEN 'expired' ELSE r.status END)=$" +
@@ -98,8 +114,18 @@ export class ReservationsService {
             [...args, q.limit, (q.page - 1) * q.limit],
           )
         ).rows;
+        const summary = (
+          await c.query(
+            "SELECT count(*) FILTER(WHERE effective_status IN ('hold','reserved'))::int AS open,count(*) FILTER(WHERE effective_status IN ('hold','reserved') AND expires_at<=now()+interval '24 hours')::int AS expiring FROM (" +
+              SELECT +
+              where +
+              ") reservations",
+            args,
+          )
+        ).rows[0];
         return {
           items: rows.map(reservationDto),
+          summary,
           total,
           page: q.page,
           limit: q.limit,

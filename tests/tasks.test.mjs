@@ -122,7 +122,9 @@ test("date groups and counts are computed across all filtered records, not only 
   const result = (await h.get("tasks?q=Group%20marker&limit=1")).body;
   assert.equal(result.items.length, 1);
   assert.equal(result.total, 6);
-  assert.deepEqual(result.summary, {
+  const { byAssignee, ...groups } = result.summary;
+  assert.deepEqual(byAssignee, [{ id: p.id, name: p.name, open: 6 }]);
+  assert.deepEqual(groups, {
     overdue: 1,
     today: 1,
     tomorrow: 1,

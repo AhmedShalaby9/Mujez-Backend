@@ -33,7 +33,31 @@ export class PlatformAccessService {
   ) {}
   async roles() {
     return this.db.platform(async (c) => ({
-      permissions: PERMISSIONS,
+      permissions: PERMISSIONS.map((p) => {
+        const group = p.key.startsWith("co.")
+          ? 0
+          : ["plans", "sub.manage", "billing"].includes(p.key)
+            ? 1
+            : ["features", "usage", "integrations", "health"].includes(p.key)
+              ? 2
+              : ["support", "ann"].includes(p.key)
+                ? 3
+                : p.key.startsWith("ws.")
+                  ? 4
+                  : 5;
+        return {
+          ...p,
+          group: [
+            "companies",
+            "revenue",
+            "platform",
+            "operations",
+            "workspace",
+            "administration",
+          ][group],
+          order: group,
+        };
+      }),
       roles: (
         await c.query(
           `SELECT r.*,count(u.id)::int AS members FROM platform.roles r LEFT JOIN platform.users u ON u.role_id=r.id WHERE r.archived_at IS NULL GROUP BY r.id ORDER BY CASE r.key WHEN 'super_admin' THEN 0 WHEN 'platform_admin' THEN 1 WHEN 'support_admin' THEN 2 WHEN 'billing_admin' THEN 3 ELSE 4 END,r.key`,
@@ -42,6 +66,8 @@ export class PlatformAccessService {
         key: r.key,
         nameEn: r.name.en,
         nameAr: r.name.ar,
+        descriptionEn: r.description?.en ?? "",
+        descriptionAr: r.description?.ar ?? "",
         locked: r.key === "super_admin",
         system: r.system,
         members: r.members,
@@ -54,7 +80,7 @@ export class PlatformAccessService {
     return this.db.platform(async (c) => ({
       items: (
         await c.query(
-          `SELECT u.id,u.name,u.email,u.status,u.version,u.last_login_at,r.key AS role,r.name AS role_name,EXISTS(SELECT 1 FROM platform.credentials p WHERE p.user_id=u.id) AS credential_exists,(SELECT count(*)::int FROM platform.sessions s WHERE s.user_id=u.id AND s.expires_at>now()) AS sessions FROM platform.users u JOIN platform.roles r ON r.id=u.role_id ORDER BY u.created_at,u.id LIMIT $1 OFFSET $2`,
+          `SELECT u.id,u.name,u.email,u.status,u.version,u.created_at,u.last_login_at,(SELECT max(i.expires_at) FROM platform.admin_invitations i WHERE i.user_id=u.id AND i.used_at IS NULL AND i.revoked_at IS NULL) AS invitation_expires_at,r.key AS role,r.name AS role_name,EXISTS(SELECT 1 FROM platform.credentials p WHERE p.user_id=u.id) AS credential_exists,(SELECT count(*)::int FROM platform.sessions s WHERE s.user_id=u.id AND s.expires_at>now()) AS sessions FROM platform.users u JOIN platform.roles r ON r.id=u.role_id ORDER BY u.created_at,u.id LIMIT $1 OFFSET $2`,
           [limit, (page - 1) * limit],
         )
       ).rows.map((u) => ({
@@ -67,6 +93,9 @@ export class PlatformAccessService {
         status: u.status,
         version: u.version,
         lastLogin: u.last_login_at,
+        createdAt: u.created_at,
+        invitationExpiresAt:
+          u.status === "invited" ? u.invitation_expires_at : null,
         mfaEnabled: null,
         activeSessions: u.sessions,
         credentialExists: u.credential_exists,
@@ -301,11 +330,18 @@ export class PlatformAccessService {
   }
   async newRole(input: NewRole, actor: string) {
     return this.write(actor, input, async (c) => {
+      const base = input.baseRole ? await this.role(c, input.baseRole) : null;
+      const permissions = base?.permissions ?? ["co.view"];
       const key = "custom-" + randomUUID().slice(0, 12);
       const r = (
         await c.query(
-          "INSERT INTO platform.roles(key,name,permissions) VALUES ($1,$2,ARRAY['co.view']) RETURNING id",
-          [key, { en: input.nameEn, ar: input.nameAr }],
+          "INSERT INTO platform.roles(key,name,permissions,description) VALUES ($1,$2,$3,$4) RETURNING id",
+          [
+            key,
+            { en: input.nameEn, ar: input.nameAr },
+            permissions,
+            { en: input.descriptionEn ?? "", ar: input.descriptionAr ?? "" },
+          ],
         )
       ).rows[0];
       await this.event(
@@ -317,6 +353,8 @@ export class PlatformAccessService {
         {
           key,
           name: { en: input.nameEn, ar: input.nameAr },
+          baseRole: input.baseRole ?? null,
+          permissions,
           reason: input.reason,
         },
       );

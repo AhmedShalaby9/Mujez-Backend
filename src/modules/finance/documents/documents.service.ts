@@ -16,6 +16,7 @@ import type {
   DocumentUpload,
   DocumentQuery,
   DocumentArchive,
+  DocumentReview,
 } from "./documents.dto.js";
 export interface UploadFile {
   originalname: string;
@@ -24,7 +25,7 @@ export interface UploadFile {
   mimetype: string;
 }
 const FROM = `FROM tenant.documents d LEFT JOIN tenant.leads l ON l.company_id=d.company_id AND l.id=d.lead_id LEFT JOIN tenant.contracts c ON c.company_id=d.company_id AND c.id=d.contract_id LEFT JOIN tenant.users u ON u.company_id=d.company_id AND u.id=d.uploaded_by`;
-const META = `SELECT d.id,d.company_id,d.kind,d.title,d.file_name,d.mime_type,d.sha256,d.size_bytes,d.lead_id,d.contract_id,d.uploaded_by,d.expires_date::text AS expires_date,d.archived_at,d.version,d.seed_key,d.created_at,l.name AS lead_name,l.owner_user_id AS lead_owner_id,c.public_id AS contract_ref,c.owner_id AS contract_owner_id,u.name AS uploader,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today ${FROM}`;
+const META = `SELECT d.id,d.company_id,d.kind,d.title,d.file_name,d.mime_type,d.sha256,d.size_bytes,d.lead_id,d.contract_id,d.uploaded_by,d.expires_date::text AS expires_date,d.archived_at,d.version,d.seed_key,d.created_at,d.review_status,d.reviewed_by,d.reviewed_at,d.review_reason,l.name AS lead_name,l.owner_user_id AS lead_owner_id,c.public_id AS contract_ref,c.owner_id AS contract_owner_id,u.name AS uploader,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today ${FROM}`;
 /** A document is visible to an own-scope principal when they uploaded it, or
  * own the lead or contract it is linked to -- following the subject's
  * visibility, as the rest of the own-scope rules do. */
@@ -40,6 +41,10 @@ export function documentDto(d: any) {
     id: d.id,
     kind: d.kind,
     title: d.title,
+    reviewStatus: d.review_status,
+    reviewedBy: d.reviewed_by,
+    reviewedAt: d.reviewed_at ? new Date(d.reviewed_at).toISOString() : null,
+    reviewReason: d.review_reason,
     file: d.file_name,
     mimeType: d.mime_type,
     sha256: d.sha256,
@@ -152,7 +157,36 @@ export class DocumentsService {
             `(d.title ILIKE $${args.length} OR d.file_name ILIKE $${args.length})`,
           );
         }
+        if (q.status) {
+          if (["pending", "verified", "rejected"].includes(q.status)) {
+            args.push(q.status);
+            w.push("d.review_status=$" + args.length);
+          } else if (q.status === "expired")
+            w.push("d.expires_date<(now() AT TIME ZONE 'Africa/Cairo')::date");
+          else if (q.status === "expiring")
+            w.push(
+              "d.expires_date BETWEEN (now() AT TIME ZONE 'Africa/Cairo')::date AND (now() AT TIME ZONE 'Africa/Cairo')::date+30",
+            );
+          else
+            w.push(
+              "(d.expires_date IS NULL OR d.expires_date>(now() AT TIME ZONE 'Africa/Cairo')::date+30)",
+            );
+        }
         const where = " WHERE " + w.join(" AND ");
+        const summaryRows = (
+          await c.query(
+            "SELECT d.kind,count(*)::int AS count,count(*) FILTER(WHERE d.review_status='pending')::int AS pending,count(*) FILTER(WHERE d.expires_date<(now() AT TIME ZONE 'Africa/Cairo')::date)::int AS expired " +
+              FROM +
+              where +
+              " GROUP BY d.kind",
+            args,
+          )
+        ).rows;
+        const summary = {
+          byKind: Object.fromEntries(summaryRows.map((r) => [r.kind, r.count])),
+          pendingReview: summaryRows.reduce((n, r) => n + r.pending, 0),
+          expired: summaryRows.reduce((n, r) => n + r.expired, 0),
+        };
         const total = (
           await c.query("SELECT count(*)::int AS n " + FROM + where, args)
         ).rows[0].n;
@@ -179,6 +213,7 @@ export class DocumentsService {
           page: q.page,
           limit: q.limit,
           storageBytes: bytes,
+          summary,
         };
       },
       true,
@@ -324,6 +359,40 @@ export class DocumentsService {
         content: Buffer.from(file.content),
       };
     });
+  }
+  async review(p: Principal, id: string, b: DocumentReview) {
+    await this.sales.access(p, "documents.manage");
+    if (p.scope !== "company")
+      throw new ForbiddenException(
+        "Document review requires company-wide management access",
+      );
+    return this.sales.write(
+      p,
+      "documents.manage",
+      "document.review:" + id,
+      b,
+      async (c) => {
+        const old = await this.row(c, p, id);
+        if (old.version !== b.version || old.archived_at)
+          throw new ConflictException("Document changed or archived");
+        await c.query(
+          "UPDATE tenant.documents SET review_status=$3,reviewed_by=$4,reviewed_at=now(),review_reason=$5,version=version+1 WHERE company_id=$1 AND id=$2",
+          [p.companyId, id, b.status, p.id, b.reason],
+        );
+        const current = await this.row(c, p, id);
+        await recordTenantEvent(c, {
+          companyId: p.companyId!,
+          actorId: p.id,
+          action: "document.reviewed",
+          resourceType: "document",
+          resourceId: id,
+          before: { status: old.review_status },
+          after: { status: b.status, reason: b.reason },
+          payload: { documentId: id, status: b.status },
+        });
+        return documentDto(current);
+      },
+    );
   }
   async archive(p: Principal, id: string, b: DocumentArchive) {
     return this.sales.write(

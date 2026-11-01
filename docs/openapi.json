@@ -334,6 +334,215 @@
         "tags": ["Platform identity"]
       }
     },
+    "/api/v1/search": {
+      "get": {
+        "operationId": "WorkspaceToolsController_search",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["WorkspaceTools"]
+      }
+    },
+    "/api/v1/navigation-counts": {
+      "get": {
+        "operationId": "WorkspaceToolsController_counts",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["WorkspaceTools"]
+      }
+    },
+    "/api/v1/saved-views": {
+      "get": {
+        "operationId": "WorkspaceToolsController_views",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["WorkspaceTools"]
+      },
+      "post": {
+        "operationId": "WorkspaceToolsController_save",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SavedViewInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["WorkspaceTools"]
+      }
+    },
+    "/api/v1/saved-views/{id}/delete": {
+      "post": {
+        "operationId": "WorkspaceToolsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ViewVersion" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["WorkspaceTools"]
+      }
+    },
+    "/admin/api/v1/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list[0]",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Notifications"]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list[1]",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Notifications"]
+      }
+    },
+    "/admin/api/v1/notifications/{id}/unread": {
+      "post": {
+        "operationId": "NotificationsController_unread[0]",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Notifications"]
+      }
+    },
+    "/api/v1/notifications/{id}/unread": {
+      "post": {
+        "operationId": "NotificationsController_unread[1]",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Notifications"]
+      }
+    },
+    "/admin/api/v1/notifications/read-all": {
+      "post": {
+        "operationId": "NotificationsController_all[0]",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Notifications"]
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "post": {
+        "operationId": "NotificationsController_all[1]",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Notifications"]
+      }
+    },
+    "/admin/api/v1/notifications/read": {
+      "post": {
+        "operationId": "NotificationsController_some[0]",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReadNotifications" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Notifications"]
+      }
+    },
+    "/api/v1/notifications/read": {
+      "post": {
+        "operationId": "NotificationsController_some[1]",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReadNotifications" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Notifications"]
+      }
+    },
+    "/admin/api/v1/notifications/{id}/read": {
+      "post": {
+        "operationId": "NotificationsController_read[0]",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Notifications"]
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {
+        "operationId": "NotificationsController_read[1]",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Notifications"]
+      }
+    },
+    "/admin/api/v1/me/notification-preferences": {
+      "get": {
+        "operationId": "NotificationPreferencesController_get",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["NotificationPreferences"]
+      },
+      "post": {
+        "operationId": "NotificationPreferencesController_save",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPreferences"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["NotificationPreferences"]
+      }
+    },
     "/admin/api/v1/overview": {
       "get": {
         "operationId": "OverviewController_snapshot",
@@ -452,6 +661,30 @@
       "get": {
         "operationId": "LeadsController_list",
         "parameters": [
+          {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "campaignId",
             "required": false,
@@ -876,6 +1109,30 @@
         "operationId": "PipelineController_list",
         "parameters": [
           {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "campaignId",
             "required": false,
             "in": "query",
@@ -945,6 +1202,30 @@
       "get": {
         "operationId": "PipelineController_options",
         "parameters": [
+          {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "campaignId",
             "required": false,
@@ -1132,6 +1413,30 @@
       "get": {
         "operationId": "TasksController_leads",
         "parameters": [
+          {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "campaignId",
             "required": false,
@@ -1396,6 +1701,30 @@
         "operationId": "ProjectsController_list",
         "parameters": [
           {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "campaignId",
             "required": false,
             "in": "query",
@@ -1631,6 +1960,30 @@
         "operationId": "UnitsController_list",
         "parameters": [
           {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "campaignId",
             "required": false,
             "in": "query",
@@ -1792,6 +2145,30 @@
         "operationId": "ReservationsController_list",
         "parameters": [
           {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "campaignId",
             "required": false,
             "in": "query",
@@ -1834,6 +2211,12 @@
           },
           {
             "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "expiringWithin",
             "required": false,
             "in": "query",
             "schema": { "type": "string" }
@@ -1917,6 +2300,30 @@
       "get": {
         "operationId": "ContractsController_list",
         "parameters": [
+          {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "campaignId",
             "required": false,
@@ -2096,6 +2503,30 @@
         "operationId": "CommissionsController_list",
         "parameters": [
           {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "campaignId",
             "required": false,
             "in": "query",
@@ -2241,6 +2672,30 @@
         "operationId": "DocumentsController_list",
         "parameters": [
           {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "campaignId",
             "required": false,
             "in": "query",
@@ -2283,6 +2738,12 @@
           },
           {
             "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
             "required": false,
             "in": "query",
             "schema": { "type": "string" }
@@ -2366,6 +2827,44 @@
         "tags": ["Documents"]
       }
     },
+    "/api/v1/documents/{id}/review": {
+      "post": {
+        "operationId": "DocumentsController_review",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DocumentReview" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Documents"]
+      }
+    },
+    "/api/v1/documents/{id}/preview": {
+      "get": {
+        "operationId": "DocumentsController_preview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Documents"]
+      }
+    },
     "/api/v1/documents/{id}/archive": {
       "post": {
         "operationId": "DocumentsController_archive",
@@ -2393,6 +2892,30 @@
       "get": {
         "operationId": "MarketingController_list",
         "parameters": [
+          {
+            "name": "budgetMinMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "budgetMaxMinor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "campaignId",
             "required": false,
@@ -2678,6 +3201,18 @@
         "operationId": "CompanyAuditController_list",
         "parameters": [
           {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "resourceType",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "q",
             "required": false,
             "in": "query",
@@ -2732,6 +3267,22 @@
         "operationId": "CompanyAuditController_options",
         "parameters": [],
         "responses": { "200": { "description": "" } },
+        "tags": ["CompanyAudit"]
+      }
+    },
+    "/api/v1/company-audit/export": {
+      "post": {
+        "operationId": "CompanyAuditController_export",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompanyAuditExport" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
         "tags": ["CompanyAudit"]
       }
     },
@@ -2877,6 +3428,119 @@
           "content": {
             "application/json": {
               "schema": { "$ref": "#/components/schemas/CompanyInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
+    "/admin/api/v1/companies/quote": {
+      "post": {
+        "operationId": "CompaniesController_quote",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompanyQuoteInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
+    "/admin/api/v1/companies/drafts": {
+      "get": {
+        "operationId": "CompaniesController_drafts",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Companies"]
+      },
+      "post": {
+        "operationId": "CompaniesController_saveDraft",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompanyDraftInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
+    "/admin/api/v1/companies/drafts/{draftId}": {
+      "get": {
+        "operationId": "CompaniesController_draft",
+        "parameters": [
+          {
+            "name": "draftId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Companies"]
+      },
+      "post": {
+        "operationId": "CompaniesController_updateDraft",
+        "parameters": [
+          {
+            "name": "draftId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompanyDraftInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
+    "/admin/api/v1/companies/success-managers": {
+      "get": {
+        "operationId": "CompaniesController_managers",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
+    "/admin/api/v1/companies/onboarding-summary": {
+      "get": {
+        "operationId": "CompaniesController_summary",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
+    "/admin/api/v1/companies/{id}/success-manager": {
+      "post": {
+        "operationId": "CompaniesController_manager",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ManagerInput" }
             }
           }
         },
@@ -3079,6 +3743,44 @@
         "tags": ["Subscriptions"]
       }
     },
+    "/admin/api/v1/subscriptions/{id}/history": {
+      "get": {
+        "operationId": "SubscriptionsController_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
+    },
+    "/admin/api/v1/subscriptions/{id}/cycle": {
+      "post": {
+        "operationId": "SubscriptionsController_cycle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CycleChange" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
+    },
     "/admin/api/v1/subscriptions/{id}/change": {
       "post": {
         "operationId": "SubscriptionsController_change",
@@ -3117,7 +3819,7 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/Revision" }
+              "schema": { "$ref": "#/components/schemas/SubscriptionCancel" }
             }
           }
         },
@@ -3207,6 +3909,21 @@
     "/admin/api/v1/invoices/{number}": {
       "get": {
         "operationId": "BillingController_invoiceDetails",
+        "parameters": [
+          {
+            "name": "number",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Billing"]
+      }
+    },
+    "/admin/api/v1/invoices/{number}/pdf": {
+      "get": {
+        "operationId": "BillingController_pdf",
         "parameters": [
           {
             "name": "number",
@@ -3741,6 +4458,52 @@
         "tags": ["Announcements"]
       }
     },
+    "/admin/api/v1/announcements/{id}/end": {
+      "post": {
+        "operationId": "AnnouncementsController_end",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Version" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Announcements"]
+      }
+    },
+    "/admin/api/v1/announcements/{id}/delete": {
+      "post": {
+        "operationId": "AnnouncementsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Version" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Announcements"]
+      }
+    },
     "/admin/api/v1/announcements/{id}/update": {
       "post": {
         "operationId": "AnnouncementsController_update",
@@ -4152,6 +4915,10 @@
         },
         "required": ["permissions"]
       },
+      "SavedViewInput": { "type": "object", "properties": {} },
+      "ViewVersion": { "type": "object", "properties": {} },
+      "ReadNotifications": { "type": "object", "properties": {} },
+      "NotificationPreferences": { "type": "object", "properties": {} },
       "AuditQuery": {
         "type": "object",
         "properties": {
@@ -4176,6 +4943,7 @@
         "type": "object",
         "properties": {
           "requestId": { "type": "string", "format": "uuid" },
+          "email": { "type": ["object", "null"] },
           "campaignId": { "type": ["string", "null"] },
           "name": { "type": "string" },
           "nameAr": { "type": "string" },
@@ -4200,6 +4968,7 @@
         "type": "object",
         "properties": {
           "requestId": { "type": "string", "format": "uuid" },
+          "email": { "type": ["object", "null"] },
           "campaignId": { "type": ["string", "null"] },
           "name": { "type": "string" },
           "nameAr": { "type": "string" },
@@ -4275,6 +5044,8 @@
         "type": "object",
         "properties": {
           "requestId": { "type": "string", "format": "uuid" },
+          "kind": { "type": "string" },
+          "outcome": { "type": "string" },
           "version": { "type": "number" },
           "note": { "type": "string" }
         },
@@ -4854,6 +5625,16 @@
         },
         "required": ["requestId", "version", "action", "reason"]
       },
+      "DocumentReview": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "status": { "type": "string" },
+          "reason": { "type": "string" }
+        },
+        "required": ["requestId", "version", "status", "reason"]
+      },
       "DocumentArchive": {
         "type": "object",
         "properties": {
@@ -5001,6 +5782,22 @@
         },
         "required": ["requestId", "version", "action"]
       },
+      "CompanyAuditExport": {
+        "type": "object",
+        "properties": {
+          "category": { "type": "string" },
+          "resourceType": { "type": "string" },
+          "q": { "type": "string" },
+          "actor": { "type": "string" },
+          "action": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "cursor": { "type": "string" },
+          "limit": { "type": "object", "default": 50 },
+          "requestId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["requestId"]
+      },
       "TeamInvite": {
         "type": "object",
         "properties": { "role": { "type": "string", "enum": ["agent"] } },
@@ -5014,6 +5811,22 @@
         "required": ["action"]
       },
       "TeamActivate": { "type": "object", "properties": {} },
+      "CompanyQuoteInput": { "type": "object", "properties": {} },
+      "CompanyDraftInput": {
+        "type": "object",
+        "properties": {
+          "nameEn": { "type": "string" },
+          "nameAr": { "type": "string" },
+          "slug": { "type": "string" },
+          "type": { "type": "string" },
+          "city": { "type": "string" },
+          "adminEmail": { "type": "string" },
+          "phone": { "type": "string" },
+          "website": { "type": "string" },
+          "plan": { "type": "string" }
+        }
+      },
+      "ManagerInput": { "type": "object", "properties": {} },
       "CompanyInput": {
         "type": "object",
         "properties": {
@@ -5087,6 +5900,9 @@
       "PlanCreate": {
         "type": "object",
         "properties": {
+          "leads": { "type": ["object", "null"] },
+          "contacts": { "type": ["object", "null"] },
+          "apiPerDay": { "type": ["object", "null"] },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },
           "descEn": { "type": "string" },
@@ -5120,6 +5936,9 @@
       "PlanEdit": {
         "type": "object",
         "properties": {
+          "leads": { "type": ["object", "null"] },
+          "contacts": { "type": ["object", "null"] },
+          "apiPerDay": { "type": ["object", "null"] },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },
           "descEn": { "type": "string" },
@@ -5158,6 +5977,7 @@
         "type": "object",
         "properties": {
           "version": { "type": "number" },
+          "reason": { "type": "string" },
           "archived": { "type": "boolean" }
         },
         "required": ["version", "archived"]
@@ -5181,14 +6001,34 @@
           "planVersionId"
         ]
       },
+      "CycleChange": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "cycle": { "type": "string" }
+        },
+        "required": ["version", "cycle"]
+      },
       "SubscriptionChange": {
         "type": "object",
         "properties": {
           "version": { "type": "number" },
+          "when": { "type": "string" },
+          "cycle": { "type": "string" },
           "plan": { "type": "string" },
           "planVersionId": { "type": "string" }
         },
         "required": ["version", "plan", "planVersionId"]
+      },
+      "SubscriptionCancel": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "when": { "type": "string" },
+          "reason": { "type": "string" },
+          "note": { "type": "string" }
+        },
+        "required": ["version"]
       },
       "Revision": {
         "type": "object",
@@ -5283,6 +6123,7 @@
         "type": "object",
         "properties": {
           "version": { "type": "number" },
+          "deprecated": { "type": "boolean" },
           "action": { "type": "string" },
           "enabled": { "type": "boolean" },
           "rollout": { "type": "number" },
@@ -5305,7 +6146,7 @@
           "companyId": { "type": "string" },
           "featureKey": { "type": "string" },
           "enabled": { "type": "boolean" },
-          "expiresAt": { "type": "string" },
+          "expiresAt": { "type": ["object", "null"] },
           "reason": { "type": "string" }
         },
         "required": [
@@ -5330,6 +6171,8 @@
         "properties": {
           "version": { "type": "number" },
           "reason": { "type": "string" },
+          "limit": { "type": "number" },
+          "days": { "type": "number" },
           "resource": { "type": "string" }
         },
         "required": ["version", "reason", "resource"]
@@ -5402,6 +6245,7 @@
         "type": "object",
         "properties": {
           "version": { "type": "number" },
+          "priority": { "type": "string" },
           "titleEn": { "type": "string" },
           "titleAr": { "type": "string" },
           "bodyEn": { "type": "string" },
@@ -5470,10 +6314,21 @@
         "properties": {
           "password": { "type": "string" },
           "reason": { "type": "string" },
+          "baseRole": { "type": "string" },
+          "descriptionEn": { "type": "string" },
+          "descriptionAr": { "type": "string" },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" }
         },
-        "required": ["password", "reason", "nameEn", "nameAr"]
+        "required": [
+          "password",
+          "reason",
+          "baseRole",
+          "descriptionEn",
+          "descriptionAr",
+          "nameEn",
+          "nameAr"
+        ]
       },
       "PermissionChange": {
         "type": "object",

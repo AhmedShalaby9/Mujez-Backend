@@ -93,6 +93,8 @@ export class FeaturesService {
         })),
         features: features.map((f) => ({
           key: f.key,
+          deprecated: f.deprecated,
+          category: f.category,
           nameEn: f.name.en,
           nameAr: f.name.ar,
           platformOn: f.platform_on,
@@ -106,7 +108,7 @@ export class FeaturesService {
         })),
         overrides: (
           await c.query(
-            `SELECT o.*,c.public_id,c.name FROM platform.feature_overrides o JOIN platform.companies c ON c.id=o.company_id WHERE o.revoked_at IS NULL AND o.expires_at>now() ORDER BY o.expires_at`,
+            `SELECT o.*,c.public_id,c.name,u.name AS creator_name FROM platform.feature_overrides o JOIN platform.companies c ON c.id=o.company_id LEFT JOIN platform.users u ON u.id=o.created_by WHERE o.revoked_at IS NULL AND (o.expires_at IS NULL OR o.expires_at>now()) ORDER BY o.expires_at`,
           )
         ).rows.map((o) => ({
           id: o.id,
@@ -115,7 +117,11 @@ export class FeaturesService {
           companyAr: o.name.ar,
           featureKey: o.feature_key,
           value: o.enabled,
-          expires: new Date(o.expires_at).toISOString(),
+          expires: o.expires_at ? new Date(o.expires_at).toISOString() : null,
+          createdAt: o.created_at ? new Date(o.created_at).toISOString() : null,
+          createdBy: o.created_by
+            ? { id: o.created_by, name: o.creator_name }
+            : null,
           reasonEn: o.reason,
           reasonAr: o.reason,
           version: o.version,
@@ -135,6 +141,19 @@ export class FeaturesService {
       if (f.version !== input.version)
         throw new ConflictException("Feature changed. Refresh first.");
       if (input.action === "plan") {
+        if (
+          f.deprecated &&
+          input.enabled &&
+          !(
+            await c.query(
+              "SELECT 1 FROM platform.feature_plans WHERE feature_key=$1 AND plan_key=$2 AND enabled",
+              [key, input.plan],
+            )
+          ).rowCount
+        )
+          throw new BadRequestException(
+            "Deprecated feature cannot be added to new plans",
+          );
         if (!input.plan || typeof input.enabled !== "boolean")
           throw new BadRequestException("Plan and enabled are required");
         if (
@@ -156,6 +175,9 @@ export class FeaturesService {
           "UPDATE platform.features SET platform_on=$2 WHERE key=$1",
           [key, input.enabled],
         );
+      } else if (input.action === "deprecate") {
+        if (typeof input.deprecated !== "boolean")
+          throw new BadRequestException("Deprecation state required");
       } else {
         if (input.rollout === undefined) throw new BadRequestException();
         await c.query("UPDATE platform.features SET rollout=$2 WHERE key=$1", [
@@ -164,12 +186,13 @@ export class FeaturesService {
         ]);
       }
       await c.query(
-        "UPDATE platform.features SET version=version+1 WHERE key=$1",
-        [key],
+        "UPDATE platform.features SET deprecated=coalesce($2,deprecated),version=version+1 WHERE key=$1",
+        [key, input.deprecated ?? null],
       );
       await this.audit(c, actor, "feature." + input.action, null, {
         key,
         action: input.action,
+        deprecated: input.deprecated,
         reason: input.reason,
         enabled: input.enabled,
         rollout: input.rollout,
@@ -220,7 +243,7 @@ export class FeaturesService {
       if (
         (
           await c.query(
-            "SELECT 1 FROM platform.feature_overrides WHERE company_id=$1 AND feature_key=$2 AND revoked_at IS NULL AND expires_at>now()",
+            "SELECT 1 FROM platform.feature_overrides WHERE company_id=$1 AND feature_key=$2 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",
             [company.id, input.featureKey],
           )
         ).rowCount
@@ -228,17 +251,26 @@ export class FeaturesService {
         throw new ConflictException(
           "Remove the active override before replacing it",
         );
-      const expires = new Date(input.expiresAt).getTime();
-      if (expires <= Date.now() || expires > Date.now() + 366 * 86400000)
+      if (input.expiresAt === undefined)
+        throw new BadRequestException("Expiry or explicit null required");
+      const expires =
+        input.expiresAt === null ? null : new Date(input.expiresAt).getTime();
+      if (
+        expires !== null &&
+        (!Number.isFinite(expires) ||
+          expires <= Date.now() ||
+          expires > Date.now() + 366 * 86400000)
+      )
         throw new BadRequestException("Expiry must be within the next year");
       await c.query(
-        `INSERT INTO platform.feature_overrides(company_id,feature_key,enabled,expires_at,reason) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(company_id,feature_key) DO UPDATE SET enabled=excluded.enabled,expires_at=excluded.expires_at,reason=excluded.reason,revoked_at=NULL,version=platform.feature_overrides.version+1`,
+        `INSERT INTO platform.feature_overrides(company_id,feature_key,enabled,expires_at,reason,created_by,created_at) VALUES ($1,$2,$3,$4,$5,$6,now()) ON CONFLICT(company_id,feature_key) DO UPDATE SET enabled=excluded.enabled,expires_at=excluded.expires_at,reason=excluded.reason,created_by=excluded.created_by,created_at=now(),revoked_at=NULL,version=platform.feature_overrides.version+1`,
         [
           company.id,
           input.featureKey,
           input.enabled,
           input.expiresAt,
           input.reason,
+          actor,
         ],
       );
       await this.audit(c, actor, "feature.override_saved", company, {
@@ -303,9 +335,16 @@ export class FeaturesService {
     const listings = (
       await c.query("SELECT * FROM platform.company_listing_counts")
     ).rows;
+    const crm = (await c.query("SELECT * FROM platform.crm_resource_counts"))
+      .rows;
+    const apiUsage = (
+      await c.query(
+        "SELECT company_id,requests FROM platform.api_usage WHERE day=(now() AT TIME ZONE 'Africa/Cairo')::date",
+      )
+    ).rows;
     const overrides = (
       await c.query(
-        "SELECT * FROM platform.limit_overrides WHERE revoked_at IS NULL AND expires_at>now()",
+        "SELECT * FROM platform.limit_overrides WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",
       )
     ).rows;
     return companies.map((company) => {
@@ -313,16 +352,34 @@ export class FeaturesService {
         ["trial", "active"].includes(company.status) &&
         !!company.plan_version_id;
       const resources: Record<string, any> = {};
-      for (const resource of ["users", "listings", "storage"]) {
+      for (const resource of [
+        "users",
+        "listings",
+        "storage",
+        "leads",
+        "contacts",
+        "projects",
+        "apiPerDay",
+      ]) {
         const used =
           resource === "users"
             ? company.user_count
-            : resource === "listings"
-              ? (listings.find((x) => x.company_id === company.id)?.listings ??
-                0)
-              : Number(
-                  storage.find((x) => x.company_id === company.id)?.bytes ?? 0,
-                ) / 1073741824;
+            : ["leads", "contacts", "projects"].includes(resource)
+              ? Number(
+                  crm.find((x) => x.company_id === company.id)?.[resource] ?? 0,
+                )
+              : resource === "apiPerDay"
+                ? Number(
+                    apiUsage.find((x) => x.company_id === company.id)
+                      ?.requests ?? 0,
+                  )
+                : resource === "listings"
+                  ? (listings.find((x) => x.company_id === company.id)
+                      ?.listings ?? 0)
+                  : Number(
+                      storage.find((x) => x.company_id === company.id)?.bytes ??
+                        0,
+                    ) / 1073741824;
         const base =
           company.limits?.[resource === "storage" ? "storageGb" : resource] ??
           null;
@@ -369,18 +426,23 @@ export class FeaturesService {
         throw new ConflictException(
           "An active override already exists; remove it before extending",
         );
-      if (resource.baseLimit === null || resource.baseLimit === 0)
+      if (
+        input.limit === undefined &&
+        (resource.baseLimit === null || resource.baseLimit === 0)
+      )
         throw new ConflictException(
           "Unlimited resources do not need an override",
         );
-      const next = Math.max(1, Math.ceil(resource.baseLimit * 1.2));
+      const next =
+        input.limit ?? Math.max(1, Math.ceil(resource.baseLimit * 1.2));
       await c.query(
-        `INSERT INTO platform.limit_overrides(company_id,resource,limit_value,expires_at,reason) VALUES ($1,$2,$3,now()+interval '30 days',$4) ON CONFLICT(company_id,resource) DO UPDATE SET limit_value=excluded.limit_value,expires_at=excluded.expires_at,reason=excluded.reason,revoked_at=NULL`,
-        [company.id, input.resource, next, input.reason],
+        `INSERT INTO platform.limit_overrides(company_id,resource,limit_value,expires_at,reason) VALUES ($1,$2,$3,now()+$5*interval '1 day',$4) ON CONFLICT(company_id,resource) DO UPDATE SET limit_value=excluded.limit_value,expires_at=excluded.expires_at,reason=excluded.reason,revoked_at=NULL`,
+        [company.id, input.resource, next, input.reason, input.days ?? 30],
       );
       await this.audit(c, actor, "usage.limit_overridden", company, {
         resource: input.resource,
         limit: next,
+        days: input.days ?? 30,
         reason: input.reason,
       });
       return { status: "saved" };
@@ -416,7 +478,7 @@ export class FeaturesService {
       ).rows;
       const overrides = (
         await c.query(
-          "SELECT * FROM platform.feature_overrides WHERE company_id=$1 AND revoked_at IS NULL AND expires_at>now()",
+          "SELECT * FROM platform.feature_overrides WHERE company_id=$1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())",
           [company.id],
         )
       ).rows;

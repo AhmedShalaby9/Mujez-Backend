@@ -1,3 +1,4 @@
+import { ApiQuotaService } from "../dist/common/auth/api-quota.service.js";
 import { OverviewService } from "../dist/modules/platform/overview/overview.service.js";
 import { SettingsService } from "../dist/modules/platform/settings/settings.service.js";
 import "reflect-metadata";
@@ -30,6 +31,8 @@ before(async () => {
   const module = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(ENV)
     .useValue(env)
+    .overrideProvider(ApiQuotaService)
+    .useValue({ consume: async () => {} })
     .overrideProvider(DatabaseService)
     .useValue({
       ready: async () => {},

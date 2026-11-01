@@ -20,6 +20,8 @@ import {
   Revision,
   SubscriptionCreate,
   SubscriptionChange,
+  SubscriptionCancel,
+  CycleChange,
 } from "./subscriptions.dto.js";
 @Controller("admin/api/v1")
 export class SubscriptionsController {
@@ -53,6 +55,7 @@ export class SubscriptionsController {
       body.version,
       body.archived,
       req.principal.id,
+      body.reason,
     );
   }
   @RequireAccess(["platform"], "sub.manage") @Get("subscriptions") list(
@@ -68,6 +71,20 @@ export class SubscriptionsController {
     @Req() req: AuthRequest,
   ) {
     return this.service.create(body, req.principal.id);
+  }
+  @RequireAccess(["platform"], "sub.manage")
+  @Get("subscriptions/:id/history")
+  history(@Param("id") id: string) {
+    return this.service.history(id);
+  }
+  @RequireAccess(["platform"], "sub.manage")
+  @Post("subscriptions/:id/cycle")
+  cycle(
+    @Param("id") id: string,
+    @Body() input: CycleChange,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.cycle(id, input, req.principal.id);
   }
   @RequireAccess(["platform"], "sub.manage")
   @Post("subscriptions/:id/change")
@@ -88,10 +105,16 @@ export class SubscriptionsController {
   @Post("subscriptions/:id/cancel")
   cancel(
     @Param("id") id: string,
-    @Body() body: Revision,
+    @Body() body: SubscriptionCancel,
     @Req() req: AuthRequest,
   ) {
-    return this.service.action(id, body.version, "cancel", req.principal.id);
+    return this.service.action(
+      id,
+      body.version,
+      "cancel",
+      req.principal.id,
+      body,
+    );
   }
   @RequireAccess(["platform"], "sub.manage")
   @Post("subscriptions/:id/renew")

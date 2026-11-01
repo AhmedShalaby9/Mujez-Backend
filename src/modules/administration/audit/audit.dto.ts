@@ -1,5 +1,6 @@
 import {
   IsOptional,
+  IsIn,
   IsString,
   MaxLength,
   Matches,
@@ -10,6 +11,14 @@ import {
 import { Type, Transform } from "class-transformer";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 export class CompanyAuditQuery {
+  @IsOptional()
+  @IsIn(["all", "leads", "deals", "inventory", "docs", "settings"])
+  @ApiPropertyOptional()
+  category?: string;
+  @IsOptional()
+  @Matches(/^[a-z_]{1,80}$/)
+  @ApiPropertyOptional()
+  resourceType?: string;
   @IsOptional()
   @IsString()
   @MaxLength(100)
@@ -48,3 +57,10 @@ export class CompanyAuditQuery {
   @ApiPropertyOptional({ default: 50 })
   limit = 50;
 }
+
+import { IntersectionType } from "@nestjs/swagger";
+import { SalesRequest } from "../../sales/leads/leads.dto.js";
+export class CompanyAuditExport extends IntersectionType(
+  CompanyAuditQuery,
+  SalesRequest,
+) {}

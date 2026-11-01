@@ -1,3 +1,5 @@
+import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
+import { safeCsv } from "../../growth/reports/reports.service.js";
 import {
   Injectable,
   BadRequestException,
@@ -9,7 +11,7 @@ import { DatabaseService } from "../../../infrastructure/database/database.servi
 import { SalesService } from "../../sales/leads/sales.service.js";
 import { sanitizeAudit } from "../../../infrastructure/outbox/audit-sanitize.js";
 import { taskDate } from "../../sales/tasks/tasks.service.js";
-import type { CompanyAuditQuery } from "./audit.dto.js";
+import type { CompanyAuditQuery, CompanyAuditExport } from "./audit.dto.js";
 const SELECT = `SELECT a.*,a.at::text AS cursor_at,u.name AS actor_name FROM tenant.audit_logs a LEFT JOIN tenant.users u ON u.company_id=a.company_id AND u.id=a.actor_user_id`;
 export function companyAuditDto(a: any) {
   return {
@@ -42,6 +44,70 @@ export function auditCursor(value: string) {
   } catch {
     throw new BadRequestException("Invalid audit cursor");
   }
+}
+function filters(companyId: string, q: CompanyAuditQuery) {
+  const args: any[] = [companyId],
+    w = ["a.company_id=$1"];
+  if (q.actor) {
+    if (q.actor.toLowerCase() === "system") w.push("a.actor_user_id IS NULL");
+    else {
+      args.push(q.actor);
+      w.push("a.actor_user_id=$" + args.length);
+    }
+  }
+  if (q.action) {
+    args.push(q.action);
+    w.push("a.action=$" + args.length);
+  }
+  if (q.from) {
+    args.push(q.from);
+    w.push(
+      "a.at>=($" +
+        args.length +
+        "::date::timestamp AT TIME ZONE 'Africa/Cairo')",
+    );
+  }
+  if (q.to) {
+    args.push(q.to);
+    w.push(
+      "a.at<(($" +
+        args.length +
+        "::date+1)::timestamp AT TIME ZONE 'Africa/Cairo')",
+    );
+  }
+  if (q.q) {
+    args.push("%" + q.q.replace(/[\\%_]/g, "\\$&") + "%");
+    w.push(
+      `(a.action ILIKE $${args.length} OR a.resource_type ILIKE $${args.length} OR a.resource_id::text ILIKE $${args.length} OR u.name ILIKE $${args.length})`,
+    );
+  }
+  const categories: Record<string, string[]> = {
+    leads: ["lead", "contact", "task", "calendar_event", "note"],
+    deals: ["contract", "commission", "reservation", "deal"],
+    inventory: ["unit", "project", "phase", "building"],
+    docs: ["document"],
+    settings: [
+      "user",
+      "role",
+      "routing_rule",
+      "routing",
+      "campaign",
+      "company",
+      "setting",
+      "report",
+      "marketing",
+      "saved_view",
+    ],
+  };
+  if (q.category && q.category !== "all") {
+    args.push(categories[q.category] ?? []);
+    w.push("a.resource_type=ANY($" + args.length + "::text[])");
+  }
+  if (q.resourceType) {
+    args.push(q.resourceType);
+    w.push("a.resource_type=$" + args.length);
+  }
+  return { args, w };
 }
 @Injectable()
 export class CompanyAuditService {
@@ -80,42 +146,7 @@ export class CompanyAuditService {
     return this.db.tenant(
       p.companyId!,
       async (c) => {
-        const args: any[] = [p.companyId],
-          w = ["a.company_id=$1"];
-        if (q.actor) {
-          if (q.actor.toLowerCase() === "system")
-            w.push("a.actor_user_id IS NULL");
-          else {
-            args.push(q.actor);
-            w.push("a.actor_user_id=$" + args.length);
-          }
-        }
-        if (q.action) {
-          args.push(q.action);
-          w.push("a.action=$" + args.length);
-        }
-        if (q.from) {
-          args.push(q.from);
-          w.push(
-            "a.at>=($" +
-              args.length +
-              "::date::timestamp AT TIME ZONE 'Africa/Cairo')",
-          );
-        }
-        if (q.to) {
-          args.push(q.to);
-          w.push(
-            "a.at<(($" +
-              args.length +
-              "::date+1)::timestamp AT TIME ZONE 'Africa/Cairo')",
-          );
-        }
-        if (q.q) {
-          args.push("%" + q.q.replace(/[\\%_]/g, "\\$&") + "%");
-          w.push(
-            `(a.action ILIKE $${args.length} OR a.resource_type ILIKE $${args.length} OR a.resource_id::text ILIKE $${args.length} OR u.name ILIKE $${args.length})`,
-          );
-        }
+        const { args, w } = filters(p.companyId!, q);
         const total = (
           await c.query(
             "SELECT count(*)::int AS n FROM (" +
@@ -162,6 +193,70 @@ export class CompanyAuditService {
         };
       },
       true,
+    );
+  }
+  async export(p: Principal, q: CompanyAuditExport) {
+    await this.sales.access(p, "audit.read");
+    if (q.from) taskDate(q.from);
+    if (q.to) taskDate(q.to);
+    if (q.from && q.to && q.from > q.to)
+      throw new BadRequestException("Choose a valid date range");
+    return this.sales.write(
+      p,
+      "reports.export",
+      "company_audit.export",
+      q,
+      async (c) => {
+        const { args, w } = filters(p.companyId!, q);
+        const rows = (
+          await c.query(
+            SELECT +
+              " WHERE " +
+              w.join(" AND ") +
+              " ORDER BY a.at DESC,a.id DESC LIMIT 10001",
+            args,
+          )
+        ).rows;
+        if (rows.length > 10000)
+          throw new BadRequestException(
+            "Narrow the filters to at most 10,000 events",
+          );
+        const data: unknown[][] = [
+          [
+            "Timestamp (UTC)",
+            "Actor",
+            "Action",
+            "Resource type",
+            "Resource ID",
+            "Before",
+            "After",
+          ],
+        ];
+        for (const row of rows) {
+          const a = companyAuditDto(row);
+          data.push([
+            a.at,
+            a.actor?.name ?? "System",
+            a.action,
+            a.resourceType,
+            a.resourceId,
+            JSON.stringify(a.before),
+            JSON.stringify(a.after),
+          ]);
+        }
+        const csv =
+          "\uFEFF" + data.map((row) => row.map(safeCsv).join(",")).join("\r\n");
+        await recordTenantEvent(c, {
+          companyId: p.companyId!,
+          actorId: p.id,
+          action: "company_audit.exported",
+          resourceType: "report",
+          resourceId: p.id,
+          after: { rows: rows.length, category: q.category ?? "all" },
+          payload: {},
+        });
+        return { csv, rows: rows.length, fileName: "mujez-company-audit.csv" };
+      },
     );
   }
   async detail(p: Principal, id: string) {

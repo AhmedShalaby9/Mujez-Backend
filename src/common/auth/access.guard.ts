@@ -1,3 +1,4 @@
+import { ApiQuotaService } from "./api-quota.service.js";
 import {
   CanActivate,
   ExecutionContext,
@@ -33,6 +34,7 @@ export class AccessGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly sessions: SessionService,
     @Optional() private readonly workspace?: WorkspaceService,
+    @Optional() private readonly quota?: ApiQuotaService,
   ) {}
   async canActivate(context: ExecutionContext) {
     const access = this.reflector.getAllAndOverride<Access>(ACCESS, [
@@ -80,6 +82,8 @@ export class AccessGuard implements CanActivate {
         code: "read_only_session",
         message: "This is a read-only workspace session.",
       });
+    if (!req.path.includes("/auth/") && !req.path.includes("/notifications"))
+      await this.quota?.consume(principal);
     req.principal = principal;
     return true;
   }

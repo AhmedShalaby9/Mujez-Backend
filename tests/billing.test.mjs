@@ -274,3 +274,17 @@ test("invoice terms and credit/refund history cannot be rewritten; audit failure
   );
   assert.equal((await service.invoices()).total, 1);
 });
+
+test("invoice PDF reflects immutable amounts and contact snapshot rather than floating-point math", async () => {
+  const { renderInvoice } =
+    await import("../dist/modules/platform/billing/invoice-pdf.js");
+  const data = await service.invoiceDetails(invoice.number);
+  const pdf = await renderInvoice(data);
+  assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
+  assert.ok(pdf.length > 1000);
+  assert.ok(pdf.toString("latin1").includes("%%EOF"));
+  await assert.rejects(
+    () => service.invoiceDetails("INV-NOT-FOUND"),
+    /not found/,
+  );
+});

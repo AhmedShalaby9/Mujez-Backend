@@ -11,6 +11,10 @@ import {
 } from "class-validator";
 import { Version, trim } from "../support/support.dto.js";
 export class AnnouncementInput extends Version {
+  @IsOptional()
+  @IsIn(["normal", "high"])
+  @ApiProperty({ required: false })
+  priority?: string;
   @ApiProperty()
   @IsString()
   @Transform(trim)

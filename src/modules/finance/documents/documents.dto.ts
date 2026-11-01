@@ -20,6 +20,10 @@ export const DOCUMENT_KINDS = [
   "other",
 ];
 export class DocumentQuery extends SalesQuery {
+  @IsOptional()
+  @IsIn(["expired", "expiring", "current", "pending", "verified", "rejected"])
+  @ApiPropertyOptional()
+  status?: string;
   @IsOptional() @IsIn(DOCUMENT_KINDS) @ApiPropertyOptional() kind?: string;
   @IsOptional() @IsUUID() @ApiPropertyOptional() leadId?: string;
   @IsOptional() @IsUUID() @ApiPropertyOptional() contractId?: string;
@@ -41,4 +45,10 @@ export class DocumentUpload extends SalesRequest {
 export class DocumentArchive extends SalesRequest {
   @IsInt() @Min(0) @ApiProperty() declare version: number;
   @IsIn(["archive", "restore"]) @ApiProperty() declare action: string;
+}
+
+export class DocumentReview extends SalesRequest {
+  @IsInt() @Min(0) @ApiProperty() version!: number;
+  @IsIn(["verified", "rejected"]) @ApiProperty() status!: string;
+  @IsString() @Length(5, 500) @ApiProperty() reason!: string;
 }

@@ -269,3 +269,135 @@ test("unavailable plan rejects company, subscription, owner and email atomically
     0,
   );
 });
+
+test("company profile, administrator and annual billing persist atomically", async () => {
+  const c = await service.create(
+    {
+      ...input,
+      slug: "full-profile",
+      adminEmail: "owner-profile@example.test",
+      country: "SA",
+      address: "Business address",
+      companyEmail: "company-profile@example.test",
+      taxNumber: "TAX-123",
+      crNumber: "CR-123",
+      owner: {
+        name: "Actual Owner",
+        phone: "+201011111111",
+        title: "Founder",
+        lang: "ar",
+      },
+      cycle: "annual",
+      paymentMethod: "instapay",
+    },
+    actor,
+  );
+  assert.equal(c.country, "SA");
+  assert.equal(c.address, "Business address");
+  assert.equal(c.companyEmail, "company-profile@example.test");
+  assert.equal(c.taxNumber, "TAX-123");
+  assert.equal(c.crNumber, "CR-123");
+  assert.equal(c.ownerProfile.name, "Actual Owner");
+  assert.equal(c.cycle, "annual");
+  assert.equal(c.subscriptionStatus, "active");
+  assert.equal(c.lastActiveAt !== null, true);
+  const a = (
+    await db.query(
+      "SELECT name FROM platform.company_owner_accounts WHERE company_id=$1",
+      [c.uuid],
+    )
+  ).rows[0];
+  assert.equal(a.name, "Actual Owner");
+  const sub = (
+    await db.query(
+      "SELECT cycle,payment_method,period_end=period_start+interval '1 year' AS annual FROM platform.subscriptions WHERE company_id=$1",
+      [c.uuid],
+    )
+  ).rows[0];
+  assert.equal(sub.cycle, "annual");
+  assert.equal(sub.payment_method, "instapay");
+  assert.equal(sub.annual, true);
+});
+test("drafts have no owner, subscription or email side effects and finalize exactly once", async () => {
+  const before = (
+    await db.query(
+      "SELECT count(*)::int AS n FROM platform.owner_welcome_emails",
+    )
+  ).rows[0].n;
+  const draft = await service.saveDraft(
+    { nameEn: "Saved work", plan: "starter" },
+    actor,
+  );
+  assert.equal((await service.draft(draft.id)).payload.nameEn, "Saved work");
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::int AS n FROM platform.owner_welcome_emails",
+      )
+    ).rows[0].n,
+    before,
+  );
+  await assert.rejects(
+    service.saveDraft({ nameEn: "Stale", version: 5 }, actor, draft.id),
+    (e) => e.getStatus() === 409,
+  );
+  const saved = await service.saveDraft(
+    { nameEn: "Resumed work", version: 0 },
+    actor,
+    draft.id,
+  );
+  const created = await service.create(
+    {
+      ...input,
+      slug: "draft-finalize",
+      adminEmail: "draft-finalize@example.test",
+      draftId: draft.id,
+      draftVersion: saved.version,
+    },
+    actor,
+  );
+  assert.equal(created.status, "active");
+  await assert.rejects(service.draft(draft.id), (e) => e.getStatus() === 404);
+  await assert.rejects(
+    service.create(
+      {
+        ...input,
+        slug: "draft-double",
+        adminEmail: "draft-double@example.test",
+        draftId: draft.id,
+        draftVersion: saved.version,
+      },
+      actor,
+    ),
+    (e) => e.getStatus() === 409,
+  );
+});
+test("server quotes use immutable offered prices and configured tax; stale plan confirmation rolls back", async () => {
+  await db.query(
+    "UPDATE platform.settings SET value=value||'{\"taxRate\":14}'::jsonb WHERE key='platform'",
+  );
+  const q = await service.quote({ plan: "pro", cycle: "annual" });
+  assert.equal(q.baseMinor, "100000");
+  assert.equal(q.taxMinor, "14000");
+  assert.equal(q.totalMinor, "114000");
+  await assert.rejects(
+    service.create(
+      {
+        ...input,
+        slug: "stale-terms",
+        adminEmail: "stale-terms@example.test",
+        planVersionId: "00000000-0000-4000-8000-000000000000",
+      },
+      actor,
+    ),
+    (e) => e.getStatus() === 409,
+  );
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::int AS n FROM platform.companies WHERE slug='stale-terms'",
+      )
+    ).rows[0].n,
+    0,
+  );
+});

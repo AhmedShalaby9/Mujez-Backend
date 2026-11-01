@@ -9,6 +9,11 @@ export async function createInitialSubscription(
   c: PoolClient,
   company: { id: string; selected_plan: string },
   actor: string,
+  terms: {
+    cycle?: string;
+    paymentMethod?: string;
+    planVersionId?: string;
+  } = {},
 ) {
   const catalog = (
     await c.query(
@@ -28,16 +33,21 @@ export async function createInitialSubscription(
   ).rows[0];
   if (!plan)
     throw new ConflictException("Selected plan has no published terms.");
+  if (terms.planVersionId && terms.planVersionId !== plan.id)
+    throw new ConflictException("Plan terms changed. Refresh the quote.");
   const id = randomUUID();
   const row = (
     await c.query(
-      "INSERT INTO platform.subscriptions(id,public_id,company_id,plan_key,plan_version_id,cycle,status,payment_method,period_end) VALUES($1,$2,$3,$4,$5,'monthly','active','bank',now()+interval '1 month') RETURNING *",
+      "INSERT INTO platform.subscriptions(id,public_id,company_id,plan_key,plan_version_id,cycle,status,payment_method,period_end) VALUES($1,$2,$3,$4,$5,$6,'active',$7,now()+$8::interval) RETURNING *",
       [
         id,
         "SUB-" + id.toUpperCase(),
         company.id,
         company.selected_plan,
         plan.id,
+        terms.cycle ?? "monthly",
+        terms.paymentMethod ?? "bank",
+        terms.cycle === "annual" ? "1 year" : "1 month",
       ],
     )
   ).rows[0];

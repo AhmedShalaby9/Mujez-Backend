@@ -22,6 +22,7 @@ import {
   DocumentQuery,
   DocumentUpload,
   DocumentArchive,
+  DocumentReview,
 } from "./documents.dto.js";
 @RequireAccess(["company_admin"], "documents.read")
 @Controller("api/v1/documents")
@@ -51,6 +52,34 @@ export class DocumentsController {
       "attachment; filename=\"document.bin\"; filename*=UTF-8''" + name,
     );
     res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Length", d.content.length);
+    return new StreamableFile(d.content);
+  }
+  @Post(":id/review")
+  @RequireAccess(["company_admin"], "documents.manage")
+  review(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: DocumentReview,
+  ) {
+    return this.s.review(r.principal, id, b);
+  }
+  @Get(":id/preview") async preview(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const d = await this.s.download(r.principal, id);
+    const safe = [
+      "application/pdf",
+      "image/png",
+      "image/jpeg",
+      "text/plain",
+    ].includes(d.mime);
+    res.setHeader("Content-Type", safe ? d.mime : "application/octet-stream");
+    res.setHeader("Content-Disposition", safe ? "inline" : "attachment");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Length", d.content.length);
     return new StreamableFile(d.content);
   }

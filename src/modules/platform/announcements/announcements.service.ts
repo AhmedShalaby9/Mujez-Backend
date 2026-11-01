@@ -35,6 +35,8 @@ function map(a: any) {
     to: a.ends_at ? new Date(a.ends_at).toISOString() : null,
     status: announcementStatus(a),
     published: a.published,
+    priority: a.priority ?? "normal",
+    audienceCount: a.audience_count ?? null,
     version: a.version,
   };
 }
@@ -45,13 +47,13 @@ export class AnnouncementsService {
     return this.db.platform(async (c) => ({
       items: (
         await c.query(
-          "SELECT * FROM platform.announcements ORDER BY created_at DESC,id LIMIT $1 OFFSET $2",
+          "SELECT a.*,(SELECT count(*)::int FROM platform.companies c WHERE c.status IN ('active','trial') AND EXISTS(SELECT 1 FROM platform.subscriptions s WHERE s.company_id=c.id AND s.status IN ('active','trialing') AND s.period_end>now() AND (a.target='all' OR a.target=s.plan_key))) AS audience_count FROM platform.announcements a WHERE a.deleted_at IS NULL ORDER BY created_at DESC,id LIMIT $1 OFFSET $2",
           [limit, (page - 1) * limit],
         )
       ).rows.map(map),
       total: (
         await c.query(
-          "SELECT count(*)::int AS total FROM platform.announcements",
+          "SELECT count(*)::int AS total FROM platform.announcements WHERE deleted_at IS NULL",
         )
       ).rows[0].total,
     }));
@@ -107,7 +109,8 @@ export class AnnouncementsService {
             [id],
           )
         ).rows[0];
-        if (!before) throw new NotFoundException("Announcement not found");
+        if (!before || before.deleted_at)
+          throw new NotFoundException("Announcement not found");
         if (before.version !== input.version)
           throw new ConflictException("Announcement changed. Refresh first.");
       } else if (input.version !== 0)
@@ -140,6 +143,13 @@ export class AnnouncementsService {
               ],
             )
       ).rows[0];
+      if (input.priority !== undefined) {
+        await c.query(
+          "UPDATE platform.announcements SET priority=$2 WHERE id=$1",
+          [a.id, input.priority],
+        );
+        a.priority = input.priority;
+      }
       await recordPlatformEvent(c, {
         actorId: actor,
         action: id ? "announcement.updated" : "announcement.created",
@@ -160,6 +170,43 @@ export class AnnouncementsService {
       return map(a);
     });
   }
+  async action(
+    id: string,
+    version: number,
+    action: "end" | "delete",
+    actor: string,
+  ) {
+    return this.db.platform(async (c) => {
+      const before = (
+        await c.query(
+          "SELECT * FROM platform.announcements WHERE public_id=$1 FOR UPDATE",
+          [id],
+        )
+      ).rows[0];
+      if (!before || before.deleted_at) throw new NotFoundException();
+      if (before.version !== version)
+        throw new ConflictException("Announcement changed");
+      if (action === "delete" && before.published)
+        throw new BadRequestException("Only drafts can be deleted");
+      if (action === "end" && announcementStatus(before) !== "published")
+        throw new BadRequestException("Only live announcements can end now");
+      const sql =
+        action === "delete"
+          ? "UPDATE platform.announcements SET deleted_at=now(),version=version+1,updated_at=now() WHERE id=$1 RETURNING *"
+          : "UPDATE platform.announcements SET ends_at=greatest(now(),starts_at+interval '1 microsecond'),version=version+1,updated_at=now() WHERE id=$1 RETURNING *";
+      const after = (await c.query(sql, [before.id])).rows[0];
+      await recordPlatformEvent(c, {
+        actorId: actor,
+        action: "announcement." + action,
+        resourceType: "announcement",
+        resourceId: before.id,
+        before: { version: before.version, published: before.published },
+        after: { deleted: action === "delete", endsAt: after.ends_at },
+        payload: { announcementId: id },
+      });
+      return map(after);
+    });
+  }
   async visible(companyId: string, lang: "en" | "ar") {
     return this.db.platform(async (c) => {
       const company = (
@@ -176,7 +223,7 @@ export class AnnouncementsService {
         return [];
       return (
         await c.query(
-          "SELECT * FROM platform.announcements WHERE published AND starts_at<=now() AND (ends_at IS NULL OR ends_at>now()) AND target IN ('all',$1) AND language IN ('both',$2) ORDER BY starts_at DESC,id",
+          "SELECT * FROM platform.announcements WHERE deleted_at IS NULL AND published AND starts_at<=now() AND (ends_at IS NULL OR ends_at>now()) AND target IN ('all',$1) AND language IN ('both',$2) ORDER BY (priority='high') DESC,starts_at DESC,id",
           [company.plan_key, lang],
         )
       ).rows.map((a) => ({
@@ -184,6 +231,7 @@ export class AnnouncementsService {
         title: a.title[lang],
         body: a.body[lang],
         type: a.type,
+        priority: a.priority,
         from: a.starts_at,
         to: a.ends_at,
       }));

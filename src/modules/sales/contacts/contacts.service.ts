@@ -1,3 +1,4 @@
+import { requireCrmSlot } from "../../../common/auth/crm-quota.js";
 import {
   Injectable,
   NotFoundException,
@@ -230,6 +231,7 @@ export class ContactsService {
       async (c) => {
         const ownerId =
           (await this.validateOwner(c, p, b.ownerId ?? p.id)) ?? p.id;
+        await requireCrmSlot(c, p.companyId!, "contacts");
         const row = (
           await c.query(
             `INSERT INTO tenant.contacts(company_id,public_id,type,name,company_name,phones,emails,area,tags,owner_user_id,notes)
@@ -299,6 +301,7 @@ export class ContactsService {
       async (c) => {
         const old = await this.row(c, p, id, true);
         const archiving = b.action === "archive";
+        if (!archiving) await requireCrmSlot(c, p.companyId!, "contacts");
         this.check(old, b.version, !archiving);
         if (archiving === !!old.archived_at)
           throw new ConflictException("Contact already in that state");

@@ -16,6 +16,24 @@ import {
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 export class PlanInput {
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000000000)
+  leads?: number | null;
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000000000)
+  contacts?: number | null;
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000000000)
+  apiPerDay?: number | null;
   @ApiProperty()
   @IsString()
   @Length(2, 80)
@@ -82,6 +100,11 @@ export class PlanEdit extends PlanInput {
   declare selectedIds: string[];
 }
 export class PlanArchive extends Revision {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @Length(5, 500)
+  reason?: string;
   @ApiProperty() @IsBoolean() declare archived: boolean;
 }
 export class SubscriptionCreate {
@@ -96,7 +119,33 @@ export class SubscriptionCreate {
   @ApiProperty() @IsIn(["active"]) declare status: string;
   @ApiProperty() @IsUUID() declare planVersionId: string;
 }
+export class SubscriptionCancel extends Revision {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsIn(["now", "renewal"])
+  when?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsIn(["price", "features", "competitor", "closed", "other"])
+  reason?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  note?: string;
+}
+export class CycleChange extends Revision {
+  @ApiProperty() @IsIn(["monthly", "annual"]) cycle!: string;
+}
 export class SubscriptionChange extends Revision {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsIn(["now", "renewal"])
+  when?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsIn(["monthly", "annual"])
+  cycle?: string;
   @ApiProperty()
   @IsString()
   @Matches(/^[a-z0-9]+(-[a-z0-9]+)*$/)
