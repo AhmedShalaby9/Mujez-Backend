@@ -573,15 +573,33 @@
         "parameters": [
           {
             "name": "page",
-            "required": true,
+            "required": false,
             "in": "query",
-            "schema": { "type": "number" }
+            "schema": {
+              "default": 1,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
-            "schema": { "type": "number" }
+            "schema": {
+              "default": 50,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
           }
         ],
         "responses": { "200": { "description": "" } },
@@ -5000,6 +5018,7 @@
         },
         "required": ["requestId", "fullName", "companyName", "email", "phone"]
       },
+      "Object": { "type": "object", "properties": {} },
       "DemoRequestStatus": {
         "type": "object",
         "properties": {
@@ -5140,7 +5159,6 @@
         },
         "required": ["requestId", "version", "note"]
       },
-      "Object": { "type": "object", "properties": {} },
       "ContactInput": {
         "type": "object",
         "properties": {

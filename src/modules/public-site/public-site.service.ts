@@ -9,7 +9,11 @@ import { createHash } from "node:crypto";
 import { DatabaseService } from "../../infrastructure/database/database.service.js";
 import { ENV, type Environment } from "../../config/env.js";
 import { recordPlatformEvent } from "../../infrastructure/outbox/domain-events.js";
-import type { DemoRequestInput, DemoRequestStatus } from "./public-site.dto.js";
+import type {
+  DemoRequestInput,
+  DemoRequestStatus,
+  DemoRequestQuery,
+} from "./public-site.dto.js";
 @Injectable()
 export class PublicSiteService {
   constructor(
@@ -126,20 +130,51 @@ export class PublicSiteService {
       return { status: "received", requestId: b.requestId };
     });
   }
-  list(page: number, limit: number) {
-    return this.db.platform(async (c) => ({
-      items: (
+  list(q: DemoRequestQuery) {
+    return this.db.platform(async (c) => {
+      await c.query(
+        "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+      );
+      const args: any[] = [],
+        filters: string[] = [];
+      if (q.q) {
+        args.push("%" + q.q.replace(/[\\%_]/g, "\\$&") + "%");
+        filters.push(
+          "(full_name ILIKE $1 OR company_name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1 OR request_id::text ILIKE $1)",
+        );
+      }
+      const where = () =>
+        filters.length ? " WHERE " + filters.join(" AND ") : "";
+      const summary = (
         await c.query(
-          'SELECT id,full_name AS "fullName",company_name AS "companyName",email,phone,plan_key AS plan,cycle,status,version,created_at AS "createdAt" FROM platform.demo_requests ORDER BY created_at DESC,id LIMIT $1 OFFSET $2',
-          [limit, (page - 1) * limit],
+          "SELECT count(*)::int AS all,count(*) FILTER(WHERE status='new')::int AS new,count(*) FILTER(WHERE status='contacted')::int AS contacted,count(*) FILTER(WHERE status='closed')::int AS closed FROM platform.demo_requests" +
+            where(),
+          args,
         )
-      ).rows,
-      total: (
-        await c.query("SELECT count(*)::int n FROM platform.demo_requests")
-      ).rows[0].n,
-      page,
-      limit,
-    }));
+      ).rows[0];
+      if (q.status) {
+        args.push(q.status);
+        filters.push("status=$" + args.length);
+      }
+      const total = (
+        await c.query(
+          "SELECT count(*)::int n FROM platform.demo_requests" + where(),
+          args,
+        )
+      ).rows[0].n;
+      const items = (
+        await c.query(
+          'SELECT id,request_id AS reference,full_name AS "fullName",company_name AS "companyName",email,phone,plan_key AS plan,cycle,status,version,created_at AS "createdAt",updated_at AS "updatedAt" FROM platform.demo_requests' +
+            where() +
+            " ORDER BY created_at DESC,id LIMIT $" +
+            (args.length + 1) +
+            " OFFSET $" +
+            (args.length + 2),
+          [...args, q.limit, (q.page - 1) * q.limit],
+        )
+      ).rows;
+      return { items, total, summary, page: q.page, limit: q.limit };
+    });
   }
   update(id: string, b: DemoRequestStatus, actor: string) {
     return this.db.platform(async (c) => {

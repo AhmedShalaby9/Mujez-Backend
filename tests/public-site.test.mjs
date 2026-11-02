@@ -168,3 +168,80 @@ test("public submissions enforce origin, validation and a strict anonymous per-I
     .send(input())
     .expect(429);
 });
+
+test("admin demo search and summaries cover every matching request before pagination", async () => {
+  for (let i = 0; i < 28; i++)
+    await s.request(
+      input({
+        fullName: "Paged enquiry " + String(i).padStart(2, "0"),
+        companyName: "Inbox pagination verification",
+      }),
+    );
+  const all = await s.list({
+    page: 1,
+    limit: 1,
+    q: "Inbox pagination verification",
+  });
+  assert.equal(all.total, 28);
+  assert.equal(all.summary.all, 28);
+  assert.equal(all.summary.new, 28);
+  assert.equal(all.items.length, 1);
+  assert.ok(all.items[0].reference);
+  await s.update(
+    all.items[0].id,
+    { version: all.items[0].version, status: "contacted" },
+    actor,
+  );
+  const contacted = await s.list({
+    page: 1,
+    limit: 1,
+    q: "Inbox pagination verification",
+    status: "contacted",
+  });
+  assert.equal(contacted.total, 1);
+  assert.equal(contacted.summary.new, 27);
+  assert.equal(contacted.summary.contacted, 1);
+  assert.equal(contacted.items[0].status, "contacted");
+  const next = await s.list({
+    page: 2,
+    limit: 1,
+    q: "Inbox pagination verification",
+  });
+  assert.notEqual(next.items[0].id, all.items[0].id);
+  const reference = await s.list({
+    page: 1,
+    limit: 25,
+    q: all.items[0].reference,
+  });
+  assert.equal(reference.total, 1);
+  assert.equal((await s.list({ page: 1, limit: 25, q: "%" })).total, 0);
+  const original = h.state.principal;
+  try {
+    h.state.principal = {
+      ...original,
+      id: actor,
+      pool: "platform",
+      companyId: undefined,
+      permissions: ["co.view"],
+    };
+    const auth = (r) =>
+      r
+        .set("Origin", h.origin)
+        .set("Cookie", "__Host-mujez_session=" + "a".repeat(64));
+    await auth(
+      h.api().get("/admin/api/v1/demo-requests?status=invalid"),
+    ).expect(400);
+    await auth(h.api().get("/admin/api/v1/demo-requests?limit=0")).expect(400);
+    const r = (
+      await auth(
+        h
+          .api()
+          .get("/admin/api/v1/demo-requests?status=contacted&q=Inbox&limit=1"),
+      ).expect(200)
+    ).body;
+    assert.equal(r.total, 1);
+    assert.equal(r.summary.new, 27);
+  } finally {
+    h.state.principal = original;
+  }
+});
