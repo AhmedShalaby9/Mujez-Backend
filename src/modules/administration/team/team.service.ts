@@ -86,7 +86,6 @@ export class TeamService {
   private async roleId(c: PoolClient, companyId: string, role: TeamRole) {
     const permissions = [
       "leads.read",
-      "leads.manage",
       "pipeline.read",
       "pipeline.manage",
       "contacts.read",
@@ -105,7 +104,7 @@ export class TeamService {
       "documents.read",
       "documents.manage",
     ];
-    if (role === "team_lead") permissions.push("team.self.read");
+    if (role === "team_lead") permissions.push("leads.manage", "team.self.read");
     await c.query(
       `INSERT INTO tenant.roles(company_id,key,name,permissions,scope) VALUES($1,$2,$3,$4,'own') ON CONFLICT(company_id,key) DO NOTHING`,
       [
