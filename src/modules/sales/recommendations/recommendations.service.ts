@@ -31,8 +31,23 @@ import {
   shortlist,
   factReasons,
 } from "./catalog-match.js";
+// PostgreSQL jsonb reorders object keys; fingerprints must depend on values,
+// including nested refinement objects, rather than serialization order.
+function canonical(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(canonical);
+  if (v !== null && typeof v === "object") {
+    return Object.fromEntries(
+      Object.entries(v)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([k, value]) => [k, canonical(value)]),
+    );
+  }
+  return v;
+}
 const hash = (v: unknown) =>
-  createHash("sha256").update(JSON.stringify(v)).digest("hex");
+  createHash("sha256")
+    .update(JSON.stringify(canonical(v)))
+    .digest("hex");
 const errorMessages: Record<string, string> = {
   provider_unavailable:
     "The AI provider is unavailable or has reached its quota. Try again later.",
@@ -94,7 +109,7 @@ export class UnitRecommendationsService {
       language: row.input.language,
       preferences: prefs,
     });
-    const stale = hash(current) !== row.fingerprint;
+    const stale = hash(current) !== hash(row.input);
     const expired =
       row.status === "processing" &&
       new Date(row.lease_until).getTime() <= Date.now();
@@ -184,7 +199,7 @@ export class UnitRecommendationsService {
         )
       ).rows[0];
       if (old) {
-        if (old.lead_id !== leadId || old.fingerprint !== fingerprint)
+        if (old.lead_id !== leadId || hash(old.input) !== fingerprint)
           throw new ConflictException(
             "Request ID was already used for different recommendation inputs.",
           );
@@ -356,7 +371,7 @@ export class UnitRecommendationsService {
             language: row.input.language,
             preferences: row.input.preferences,
           }),
-        ) !== row.fingerprint
+        ) !== hash(row.input)
       )
         throw new RecommendationStale();
       const result = {

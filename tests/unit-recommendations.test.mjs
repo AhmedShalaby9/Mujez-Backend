@@ -204,11 +204,14 @@ test("recommendations enforce authentication, permissions, lead ownership and te
     { ...body(), companyId: other.companyId },
     400,
   );
-  assert.deepEqual((await h.get(`leads/${lead.id}/unit-recommendations`)).body, { run: null });
+  assert.deepEqual(
+    (await h.get(`leads/${lead.id}/unit-recommendations`)).body,
+    { run: null },
+  );
   assert.equal(calls.length, 0);
 });
 test("real HTTP provider calls rank only eligible catalog units with explicit 10% budget warnings and no lead identity", async () => {
-  const req = body();
+  const req = body({ preferences: { location: "New Cairo", type: "apt" } });
   const started = (await h.post(`leads/${lead.id}/unit-recommendations`, req))
     .body;
   assert.equal(started.status, "processing");
@@ -250,8 +253,12 @@ test("real HTTP provider calls rank only eligible catalog units with explicit 10
   const duplicate = (await h.post(`leads/${lead.id}/unit-recommendations`, req))
     .body;
   assert.equal(duplicate.id, started.id);
-  const cached = (await h.post(`leads/${lead.id}/unit-recommendations`, body()))
-    .body;
+  const cached = (
+    await h.post(
+      `leads/${lead.id}/unit-recommendations`,
+      body({ preferences: { type: "apt", location: "New Cairo" } }),
+    )
+  ).body;
   assert.equal(cached.status, "succeeded");
   assert.equal(calls.length, 2);
   assert.equal(
@@ -267,6 +274,21 @@ test("real HTTP provider calls rank only eligible catalog units with explicit 10
     { ...req, preferences: { type: "villa" } },
     409,
   );
+  // Existing rows written with the old insertion-order fingerprint remain readable.
+  await h.db.query(
+    "UPDATE tenant.lead_unit_recommendations SET fingerprint='legacy-order-sensitive-hash' WHERE id=$1",
+    [started.id],
+  );
+  assert.equal(
+    (await h.get(`leads/${lead.id}/unit-recommendations/${started.id}`)).body
+      .status,
+    "succeeded",
+  );
+  assert.equal(
+    (await h.post(`leads/${lead.id}/unit-recommendations`, req)).body.id,
+    started.id,
+  );
+  assert.equal(calls.length, 2);
   h.state.principal = other;
   await h.get(`leads/${lead.id}/unit-recommendations/${started.id}`, 404);
   h.state.principal = p;
