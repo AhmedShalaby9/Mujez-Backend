@@ -78,7 +78,7 @@ export class CompanyOverviewService {
         if (can("pipeline.read"))
           result.metrics.pipeline = (
             await c.query(
-              "SELECT coalesce(sum(o.value_minor) FILTER(WHERE o.deal_type='sale'),0)::text AS \"saleValueMinor\",count(*) FILTER(WHERE o.deal_type='sale')::int AS \"saleCount\",count(*) FILTER(WHERE o.deal_type='lease')::int AS \"leaseCount\" FROM tenant.opportunities o JOIN tenant.leads l ON l.company_id=o.company_id AND l.id=o.lead_id WHERE o.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost') AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2)",
+              "SELECT coalesce(sum(o.value_minor) FILTER(WHERE o.deal_type='sale'),0)::text AS \"saleValueMinor\",count(*) FILTER(WHERE o.deal_type='sale')::int AS \"saleCount\",count(*) FILTER(WHERE o.deal_type='lease')::int AS \"leaseCount\" FROM tenant.opportunities o JOIN tenant.leads l ON l.company_id=o.company_id AND l.id=o.lead_id WHERE o.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost','unqualified') AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2)",
               params,
             )
           ).rows[0];
@@ -91,13 +91,13 @@ export class CompanyOverviewService {
           ).rows[0].n;
           result.scoredLeads = (
             await c.query(
-              "SELECT l.id,l.public_id AS reference,l.name,l.want,l.budget_minor::text AS \"budgetMinor\",l.score,u.name AS owner FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id WHERE l.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost') AND l.score IS NOT NULL AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2) ORDER BY l.score DESC,l.created_at DESC,l.id LIMIT 5",
+              "SELECT l.id,l.public_id AS reference,l.name,l.want,l.budget_minor::text AS \"budgetMinor\",l.score,u.name AS owner FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id WHERE l.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost','unqualified') AND l.score IS NOT NULL AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2) ORDER BY l.score DESC,l.created_at DESC,l.id LIMIT 5",
               params,
             )
           ).rows;
           if (advancedAvailable) {
             const scope =
-              "l.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost') AND l.first_contact_at IS NULL AND r.active AND r.archived_at IS NULL AND r.sla_minutes>0 AND l.assigned_at+make_interval(mins=>r.sla_minutes)<=now() AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2)";
+              "l.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost','unqualified') AND l.first_contact_at IS NULL AND r.active AND r.archived_at IS NULL AND r.sla_minutes>0 AND l.assigned_at+make_interval(mins=>r.sla_minutes)<=now() AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2)";
             const count = (
               await c.query(
                 "SELECT count(*)::int AS n FROM tenant.leads l JOIN tenant.routing_rules r ON r.company_id=l.company_id AND r.id=l.routing_rule_id WHERE " +

@@ -17,13 +17,20 @@ const trim = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim() : value;
 export const STAGES = [
   "new",
+  "attempting",
+  "contacted",
   "qualified",
+  "nurturing",
+  "unresponsive",
   "viewing",
   "offer",
   "contract",
   "won",
   "lost",
+  "unqualified",
 ] as const;
+/** Stages that take a lead out of the active pipeline. */
+export const CLOSED_STAGES = ["won", "lost", "unqualified"] as const;
 export class SalesQuery {
   @IsOptional()
   @Matches(/^(0|[1-9][0-9]{0,17})$/)
@@ -166,7 +173,6 @@ export class StageChange extends SalesRequest {
   @IsOptional()
   @IsString()
   @Transform(trim)
-  @MinLength(10)
   @MaxLength(500)
   @ApiPropertyOptional({ type: String })
   reason?: string;
@@ -189,7 +195,16 @@ export class LeadNote extends SalesRequest {
   @ApiPropertyOptional()
   kind?: string;
   @IsOptional()
-  @IsIn(["interested", "call_back", "no_answer", "not_interested"])
+  @IsIn([
+    "answered",
+    "interested",
+    "call_back",
+    "no_answer",
+    "busy",
+    "switched_off",
+    "wrong_number",
+    "not_interested",
+  ])
   @ApiPropertyOptional()
   outcome?: string;
   @IsInt() @Min(0) @ApiProperty({ type: Number }) declare version: number;

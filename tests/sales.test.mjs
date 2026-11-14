@@ -341,13 +341,8 @@ test("pipeline creates one opportunity per lead and aggregates exact sale values
   ).body;
   assert.equal(candidates.total, 0);
 });
-test("pipeline and lead stage are one source of truth; loss and reopening require reasons", async () => {
+test("pipeline and lead stage are one source of truth; any status can be set from any other", async () => {
   lead = await detail(lead.id);
-  await post(
-    "pipeline/" + deal.id + "/stage",
-    { requestId: randomUUID(), version: lead.version, stage: "won" },
-    409,
-  );
   const move = {
     requestId: randomUUID(),
     version: lead.version,
@@ -361,33 +356,29 @@ test("pipeline and lead stage are one source of truth; loss and reopening requir
     (await get("pipeline")).body.items.find((d) => d.id === deal.id).stage,
     "qualified",
   );
+  for (const stage of ["unresponsive", "contract", "attempting", "lost"]) {
+    lead = (
+      await post("leads/" + lead.id + "/stage", {
+        requestId: randomUUID(),
+        version: lead.version,
+        stage,
+      })
+    ).body;
+    assert.equal(lead.stage, stage);
+  }
   await post(
     "leads/" + lead.id + "/stage",
     { requestId: randomUUID(), version: lead.version, stage: "lost" },
-    400,
-  );
-  lead = (
-    await post("leads/" + lead.id + "/stage", {
-      requestId: randomUUID(),
-      version: lead.version,
-      stage: "lost",
-      reason: "Buyer withdrew their purchase request",
-    })
-  ).body;
-  await post(
-    "pipeline/" + deal.id + "/stage",
-    { requestId: randomUUID(), version: lead.version, stage: "contract" },
     409,
   );
   lead = (
     await post("pipeline/" + deal.id + "/stage", {
       requestId: randomUUID(),
       version: lead.version,
-      stage: "reopen",
-      reason: "Buyer confirmed a renewed enquiry",
+      stage: "contacted",
     })
   ).body;
-  assert.equal(lead.stage, "new");
+  assert.equal(lead.stage, "contacted");
   await post(
     "pipeline/" + deal.id + "/stage",
     { requestId: randomUUID(), version: 0, stage: "qualified" },

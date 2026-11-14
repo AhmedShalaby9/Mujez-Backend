@@ -15,6 +15,7 @@ import { DatabaseService } from "../../../infrastructure/database/database.servi
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
 import {
   STAGES,
+  CLOSED_STAGES,
   type SalesQuery,
   type SalesRequest,
   type LeadInput,
@@ -606,27 +607,10 @@ export class SalesService {
         }
         const l = await this.row(c, p, leadId, true);
         this.check(l, input.version);
-        let next = input.stage;
-        const closed = ["won", "lost"].includes(l.stage);
-        if (next === "reopen") {
-          if (!closed || !input.reason)
-            throw new BadRequestException(
-              "Reopening a closed lead requires a reason",
-            );
-          next = "new";
-        } else if (next === "lost") {
-          if (closed || !input.reason)
-            throw new BadRequestException(
-              "Losing an open lead requires a reason",
-            );
-        } else if (
-          closed ||
-          STAGES.indexOf(next as any) !== STAGES.indexOf(l.stage) + 1 ||
-          next === "lost"
-        )
-          throw new ConflictException(
-            "Move to the next stage, mark lost, or explicitly reopen a closed lead",
-          );
+        // Any status can be set from any other; "reopen" is kept as an alias for "new".
+        const next = input.stage === "reopen" ? "new" : input.stage;
+        if (next === l.stage)
+          throw new ConflictException("Lead already has that status");
         await c.query(
           "UPDATE tenant.leads SET stage=$3,stage_changed_at=now(),version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
           [p.companyId, leadId, next],
@@ -768,7 +752,7 @@ export class SalesService {
       const sql =
         " FROM tenant.leads l WHERE " +
         where +
-        " AND l.stage NOT IN ('won','lost') AND NOT EXISTS(SELECT 1 FROM tenant.opportunities o WHERE o.company_id=l.company_id AND o.lead_id=l.id)";
+        " AND l.stage NOT IN ('won','lost','unqualified') AND NOT EXISTS(SELECT 1 FROM tenant.opportunities o WHERE o.company_id=l.company_id AND o.lead_id=l.id)";
       return {
         items: (
           await c.query(
@@ -790,7 +774,7 @@ export class SalesService {
     return this.write(p, "pipeline.manage", "deal.create", input, async (c) => {
       const l = await this.row(c, p, input.leadId, true);
       this.check(l, input.version);
-      if (["won", "lost"].includes(l.stage))
+      if ((CLOSED_STAGES as readonly string[]).includes(l.stage))
         throw new ConflictException(
           "Reopen the lead before creating its opportunity",
         );

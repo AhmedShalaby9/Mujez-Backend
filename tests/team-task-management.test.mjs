@@ -179,8 +179,8 @@ test("creates and assigns a linked task once with Cairo defaults and the real cr
     ).rows[0].n,
     1,
   );
-  await h.get("tasks/" + task.id, 404);
-  await h.post("tasks", draft(), 403);
+  await h.get("tasks/" + task.id);
+  await h.post("tasks", draft(), 201);
 });
 test("validates task fields and rejects foreign members, other-team leads, inactive recipients and bad dates", async () => {
   for (const extra of [

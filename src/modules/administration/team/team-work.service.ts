@@ -197,7 +197,7 @@ export class TeamWorkService {
         const ids = members.map((m) => m.id);
         const leads = (
           await c.query(
-            `SELECT l.owner_user_id AS id,count(*)::int AS leads,count(*) FILTER(WHERE l.stage NOT IN ('won','lost'))::int AS "openLeads",count(*) FILTER(WHERE l.created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.created_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "newLeads",count(*) FILTER(WHERE l.stage='won' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS won,count(*) FILTER(WHERE l.stage='lost' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS lost,coalesce(sum(o.value_minor) FILTER(WHERE l.stage='won' AND o.deal_type='sale' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo')),0)::text AS "wonSalesMinor" FROM tenant.leads l LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id WHERE l.company_id=$1 AND l.owner_user_id=ANY($2::uuid[]) AND l.archived_at IS NULL GROUP BY l.owner_user_id`,
+            `SELECT l.owner_user_id AS id,count(*)::int AS leads,count(*) FILTER(WHERE l.stage NOT IN ('won','lost','unqualified'))::int AS "openLeads",count(*) FILTER(WHERE l.created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.created_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "newLeads",count(*) FILTER(WHERE l.stage='won' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS won,count(*) FILTER(WHERE l.stage='lost' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS lost,coalesce(sum(o.value_minor) FILTER(WHERE l.stage='won' AND o.deal_type='sale' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo')),0)::text AS "wonSalesMinor" FROM tenant.leads l LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id WHERE l.company_id=$1 AND l.owner_user_id=ANY($2::uuid[]) AND l.archived_at IS NULL GROUP BY l.owner_user_id`,
             [p.companyId, ids, clock.since, clock.today],
           )
         ).rows;
@@ -494,7 +494,7 @@ export class TeamWorkService {
         return previous.response;
       }
       this.sales.check(lead, input.version);
-      if (["won", "lost"].includes(lead.stage))
+      if (["won", "lost", "unqualified"].includes(lead.stage))
         throw new ConflictException("Only open leads can be assigned.");
       if (lead.owner_user_id === input.ownerId)
         throw new ConflictException("Lead is already assigned to this member.");
