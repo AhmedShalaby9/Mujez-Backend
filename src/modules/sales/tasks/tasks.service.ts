@@ -119,19 +119,23 @@ export class TasksService {
         [p.companyId, id],
       )
     ).rows[0];
-    if (!t || (p.scope === "own" && t.assignee_id !== p.id && t.created_by !== p.id))
+    if (!t || (p.scope === "own" && t.assignee_id !== p.id))
       throw new NotFoundException("Task not found");
     return t;
   }
   async options(p: Principal) {
     await this.sales.access(p, "tasks.read");
     return this.db.tenant(p.companyId!, async (c) => ({
-      assignees: (
-        await c.query(
-          "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL ORDER BY name,id LIMIT 1000",
-          [p.companyId],
-        )
-      ).rows,
+      canAssign: p.scope !== "own",
+      assignees:
+        p.scope === "own"
+          ? []
+          : (
+              await c.query(
+                "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL ORDER BY name,id LIMIT 1000",
+                [p.companyId],
+              )
+            ).rows,
       canManage: p.permissions.includes("tasks.manage"),
     }));
   }
@@ -181,12 +185,8 @@ export class TasksService {
         const now = await this.clock(c),
           args: any[] = [p.companyId, now.today],
           where = ["t.company_id=$1", "$2::date IS NOT NULL"];
-        if (p.scope === "own") {
-          args.push(p.id);
-          where.push(
-            "(t.assignee_id=$" + args.length + " OR t.created_by=$" + args.length + ")",
-          );
-        }
+        const own = ownWhere(p, args, "t.assignee_id");
+        if (own) where.push(own);
         if (q.status !== "all") {
           args.push(q.status ?? "open");
           where.push("t.status=$" + args.length);
@@ -306,6 +306,8 @@ export class TasksService {
             ? old.assignee_id
             : p.id
           : input.assigneeId;
+    if (p.scope === "own" && assigneeId !== p.id)
+      throw new ForbiddenException();
     if (leadId !== old?.lead_id && leadId) {
       if (!p.permissions.includes("leads.read"))
         throw new ForbiddenException("Lead access is required to link a task");
