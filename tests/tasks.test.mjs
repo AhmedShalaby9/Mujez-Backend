@@ -380,7 +380,7 @@ test("task seed reruns preserve edited/completed samples and never create identi
   );
 });
 
-test("own scope lists only assigned tasks and rejects a colleague's task or assignment", async () => {
+test("own scope lists tasks assigned to or created by the user and allows assigning a colleague", async () => {
   const colleague = (
     await h.db.query(
       "INSERT INTO tenant.users(company_id,oidc_subject,identity_pool,name,email,role_id,status) SELECT company_id,'task-scope-colleague','company_user','Scope colleague','task-scope-colleague@example.test',role_id,'active' FROM tenant.users WHERE id=$1 RETURNING id",
@@ -393,11 +393,17 @@ test("own scope lists only assigned tasks and rejects a colleague's task or assi
     h.state.principal = { ...p, scope: "own" };
     const list = (await h.get("tasks?limit=100")).body;
     assert.ok(list.items.some((t) => t.id === visible.id));
-    assert.ok(list.items.every((t) => t.assignee?.id === p.id));
-    assert.ok(!list.items.some((t) => t.id === hidden.id));
-    await h.get("tasks/" + hidden.id, 404);
+    assert.ok(list.items.some((t) => t.id === hidden.id));
+    await h.get("tasks/" + hidden.id);
     await h.get("tasks/" + visible.id);
-    await h.post("tasks", body({ assigneeId: colleague }), 403);
+    const assigned = (await h.post("tasks", body({ assigneeId: colleague })))
+      .body;
+    assert.equal(assigned.assignee.id, colleague);
+    await h.db.query(
+      "UPDATE tenant.tasks SET created_by=$2 WHERE id=$1",
+      [hidden.id, colleague],
+    );
+    await h.get("tasks/" + hidden.id, 404);
   } finally {
     h.state.principal = p;
   }
