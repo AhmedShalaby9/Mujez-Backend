@@ -44,6 +44,9 @@ services:
       - path: /opt/mujez-staging/shared/welcome-mail.env
         format: raw
         required: false
+      - path: /opt/mujez-staging/shared/kimi.env
+        format: raw
+        required: false
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
