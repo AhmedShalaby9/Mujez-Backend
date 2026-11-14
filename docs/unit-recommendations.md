@@ -5,7 +5,7 @@ Company owners, sales agents and team leads use the lead detail drawer to reques
 ## Contract
 
 - `POST /api/v1/leads/:leadId/unit-recommendations`: `{requestId,leadVersion,language:'en'|'ar',preferences:{location?,type?,minBedrooms?,minArea?,maxArea?,maxDeliveryYear?}}`. Starts a background job and returns `{id,status,preferences,result?,error?,createdAt}`. Exact request-ID retries are idempotent; changed payloads return 409. Fresh successful identical inputs can be reused for ten minutes. At most one live request per user/company; 20 paid attempts/hour/user and 100/day/company.
-- `GET /api/v1/leads/:leadId/unit-recommendations`: latest request for this user/lead, or null. Reading never invokes Kimi.
+- `GET /api/v1/leads/:leadId/unit-recommendations`: `{run}` containing the latest request for this user/lead, or `{run:null}`. Reading never invokes Kimi.
 - `GET /api/v1/leads/:leadId/unit-recommendations/:runId`: status/results for that user/lead. Every read rechecks lead visibility and permissions. Changed lead/catalog data marks results stale. Interrupted requests expire after three minutes and require an explicit new request; they are never retried automatically.
 
 Kimi first interprets property requirements from the lead's Wants field and explicit refinements, then ranks at most 30 eligible catalog units. Only sanitized property needs and public catalog facts are sent: no lead name, email, phone, company identifiers or activity history. No tools or external actions are offered to the model. Strict output validation accepts only IDs from the shortlist. Explanations and over-budget warnings are calculated from stored facts, not invented model descriptions.

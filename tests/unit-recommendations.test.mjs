@@ -204,6 +204,7 @@ test("recommendations enforce authentication, permissions, lead ownership and te
     { ...body(), companyId: other.companyId },
     400,
   );
+  assert.deepEqual((await h.get(`leads/${lead.id}/unit-recommendations`)).body, { run: null });
   assert.equal(calls.length, 0);
 });
 test("real HTTP provider calls rank only eligible catalog units with explicit 10% budget warnings and no lead identity", async () => {

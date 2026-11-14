@@ -18,11 +18,11 @@ import { UnitRecommendationsService } from "./recommendations.service.js";
 @RequireAccess(["company_admin", "company_user"], "leads.read")
 export class UnitRecommendationsController {
   constructor(private readonly service: UnitRecommendationsService) {}
-  @Get() latest(
+  @Get() async latest(
     @Req() r: AuthRequest,
     @Param("leadId", ParseUUIDPipe) id: string,
   ) {
-    return this.service.latest(r.principal, id);
+    return { run: await this.service.latest(r.principal, id) };
   }
   @Get("options") options(
     @Req() r: AuthRequest,
