@@ -62,5 +62,9 @@ export class CatalogController {
     return this.s.preference(r.principal, k, id, b);
   }
 }
-@Module({ providers: [CatalogService], controllers: [CatalogController] })
+@Module({
+  providers: [CatalogService],
+  controllers: [CatalogController],
+  exports: [CatalogService],
+})
 export class CatalogModule {}
