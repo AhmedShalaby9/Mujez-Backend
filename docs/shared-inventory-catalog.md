@@ -9,12 +9,12 @@ Platform readers need `co.view`; publishing, editing and archiving need `co.crea
 All endpoints require the existing session cookie. POST requires the configured Origin. UUID path IDs remain stable across sorting, pagination and imports.
 
 - `GET /api/v1/catalog/:kind`: `developers`, `compounds`, or `units`. Returns `{items,total,page,limit}`. Default page 1, limit 24, maximum 100.
-- Query: `q` (literal bilingual name/location search), `parentId`, `status`, `type`, `listing`, `bedrooms`, `filter` (`all`, `top`, `verified`, `following`, `favorites`), `sort` (`new`, `name`, `price_asc`, `price_desc`, `area`, `followers`). Unknown query fields are rejected. Count and filtering run in SQL, not over a partial browser page.
-- `GET /api/v1/catalog/:kind/:id`: item with parent link, aggregate child / available counts and actual follower count. Missing or archived records return 404.
+- Query: `q` (literal bilingual name/location search), `parentId`, `status`, `type`, `listing`, `bedrooms`, `filter` (`all`, `top`, `verified`, `favorites`), `sort` (`new`, `name`, `price_asc`, `price_desc`, `area`). Unknown query fields are rejected. Count and filtering run in SQL, not over a partial browser page.
+- `GET /api/v1/catalog/:kind/:id`: item with parent link, aggregate child / available counts. Missing or archived records return 404.
 - `POST /api/v1/catalog/:kind`: body `{requestId,name:{en,ar},parentId,status,priceMinor?,area?,bedrooms?,data}`. Developer has no parent, compound requires a developer, unit requires a compound. Returns created item.
 - `POST /api/v1/catalog/:kind/:id/update`: same body plus current `version`. Replaces the record's editable fields; stale version returns 409. Clients must preserve metadata that is not being edited.
 - `POST /api/v1/catalog/:kind/:id/archive`: `{version}`. Soft archive, requires children to be archived first. Retry of an already archived record is safe.
-- `POST /api/v1/catalog/:kind/:id/preference`: explicit optional `followed`, `favorite`, `muted`, `alerts:{units,price,launch,news}`. The server derives the user from the session. No user/company ID accepted. Returns the saved preference. Preferences persist per user/pool across login and machines; follower counts count actual follows.
+- `POST /api/v1/catalog/:kind/:id/preference`: explicit optional `favorite`, `muted`, `alerts:{units,price,launch,news}`. The server derives the user from the session. No user/company ID accepted. Returns the saved preference. Preferences persist per user/pool across login and machines; follower counts count actual follows.
 
 Money is an exact nullable string in EGP minor units. Missing price/area/bedrooms are null; zero is an actual value. No generated prices, delivery dates, reviews, trust claims, follower counts or availability statistics. Compound starting price is the minimum known price among its available published units. `children` counts direct published children, not a claimed development capacity.
 

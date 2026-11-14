@@ -173,10 +173,10 @@ export const querySchema = z
     listing: z.enum(["primary", "resale", "rental"]).optional(),
     bedrooms: z.coerce.number().int().min(0).max(100).optional(),
     filter: z
-      .enum(["all", "top", "verified", "favorites", "following"])
+      .enum(["all", "top", "verified", "favorites"])
       .default("all"),
     sort: z
-      .enum(["new", "name", "price_asc", "price_desc", "area", "followers"])
+      .enum(["new", "name", "price_asc", "price_desc", "area"])
       .default("new"),
     page: z.coerce.number().int().min(1).max(100000).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(24),
@@ -184,7 +184,6 @@ export const querySchema = z
   .strict();
 export const prefSchema = z
   .object({
-    followed: z.boolean().optional(),
     favorite: z.boolean().optional(),
     muted: z.boolean().optional(),
     alerts: z

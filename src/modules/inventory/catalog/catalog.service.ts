@@ -16,7 +16,7 @@ import {
   prefSchema,
   archiveSchema,
 } from "./catalog.schema.js";
-const PREF = `coalesce(p.followed,false) AS followed,coalesce(p.favorite,false) AS favorite,coalesce(p.muted,false) AS muted,coalesce(p.alerts,'{"units":true,"price":true,"launch":true,"news":false}'::jsonb) AS alerts`;
+const PREF = `coalesce(p.favorite,false) AS favorite,coalesce(p.muted,false) AS muted,coalesce(p.alerts,'{"units":true,"price":true,"launch":true,"news":false}'::jsonb) AS alerts`;
 const dto = (r: any) => ({
   id: r.id,
   kind: r.kind,
@@ -29,12 +29,10 @@ const dto = (r: any) => ({
   data: r.data,
   version: r.version,
   createdAt: r.created_at,
-  followers: Number(r.followers ?? 0),
   children: Number(r.children ?? 0),
   available: Number(r.available ?? 0),
   fromPriceMinor: r.from_price ?? null,
   preference: {
-    followed: r.followed ?? false,
     favorite: r.favorite ?? false,
     muted: r.muted ?? false,
     alerts: r.alerts ?? { units: true, price: true, launch: true, news: false },
@@ -102,7 +100,6 @@ export class CatalogService {
       if (q.filter === "top" || q.filter === "verified")
         add("i.data->>?='true'", q.filter);
       if (q.filter === "favorites") where.push("p.favorite=true");
-      if (q.filter === "following") where.push("p.followed=true");
       const from = `FROM platform.catalog_items i LEFT JOIN platform.catalog_preferences p ON p.item_id=i.id AND p.user_id=$1 AND p.pool=$2 WHERE ${where.join(" AND ")}`;
       const total = Number(
         (await c.query("SELECT count(*)::int AS n " + from, args)).rows[0].n,
@@ -113,11 +110,10 @@ export class CatalogService {
         price_asc: "i.price_minor ASC NULLS LAST,i.id",
         price_desc: "i.price_minor DESC NULLS LAST,i.id",
         area: "i.area DESC NULLS LAST,i.id",
-        followers: "followers DESC,i.id",
       }[q.sort];
       const rows = (
         await c.query(
-          `SELECT i.*,i.price_minor::text,i.area::text,${PREF},(SELECT count(*) FROM platform.catalog_preferences f WHERE f.item_id=i.id AND f.followed) AS followers,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL) AS children,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available') AS available,(SELECT min(ch.price_minor)::text FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available' AND (ch.data->>'listing') IS DISTINCT FROM 'rental') AS from_price ${from} ORDER BY ${order} LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
+          `SELECT i.*,i.price_minor::text,i.area::text,${PREF},(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL) AS children,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available') AS available,(SELECT min(ch.price_minor)::text FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available' AND (ch.data->>'listing') IS DISTINCT FROM 'rental') AS from_price ${from} ORDER BY ${order} LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
           [...args, q.limit, (q.page - 1) * q.limit],
         )
       ).rows;
@@ -130,7 +126,7 @@ export class CatalogService {
     return this.db.platform(async (c) => {
       const r = (
         await c.query(
-          `SELECT i.*,i.price_minor::text,i.area::text,${PREF},(SELECT count(*) FROM platform.catalog_preferences f WHERE f.item_id=i.id AND f.followed) AS followers,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL) AS children,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available') AS available,(SELECT min(ch.price_minor)::text FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available' AND (ch.data->>'listing') IS DISTINCT FROM 'rental') AS from_price FROM platform.catalog_items i LEFT JOIN platform.catalog_preferences p ON p.item_id=i.id AND p.user_id=$1 AND p.pool=$2 WHERE i.id=$3 AND i.kind=$4 AND i.archived_at IS NULL`,
+          `SELECT i.*,i.price_minor::text,i.area::text,${PREF},(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL) AS children,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available') AS available,(SELECT min(ch.price_minor)::text FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available' AND (ch.data->>'listing') IS DISTINCT FROM 'rental') AS from_price FROM platform.catalog_items i LEFT JOIN platform.catalog_preferences p ON p.item_id=i.id AND p.user_id=$1 AND p.pool=$2 WHERE i.id=$3 AND i.kind=$4 AND i.archived_at IS NULL`,
           [p.id, p.pool, id, kind],
         )
       ).rows[0];
@@ -312,12 +308,11 @@ export class CatalogService {
       );
       const r = (
         await c.query(
-          "UPDATE platform.catalog_preferences SET followed=coalesce($4,followed),favorite=coalesce($5,favorite),muted=coalesce($6,muted),alerts=coalesce($7,alerts) WHERE user_id=$1 AND pool=$2 AND item_id=$3 RETURNING followed,favorite,muted,alerts",
+          "UPDATE platform.catalog_preferences SET favorite=coalesce($4,favorite),muted=coalesce($5,muted),alerts=coalesce($6,alerts) WHERE user_id=$1 AND pool=$2 AND item_id=$3 RETURNING favorite,muted,alerts",
           [
             p.id,
             p.pool,
             id,
-            b.followed ?? null,
             b.favorite ?? null,
             b.muted ?? null,
             b.alerts ?? null,

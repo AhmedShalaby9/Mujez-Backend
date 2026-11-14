@@ -109,16 +109,13 @@ test("companies see the same shared records but retain private preferences", asy
   assert.equal(r.items[0].id, unit.id);
   await h.post("catalog/units/" + unit.id + "/preference", {
     favorite: true,
-    followed: true,
     alerts: { units: true, price: false, launch: true, news: false },
   });
   r = (await h.get("catalog/units/" + unit.id)).body;
   assert.equal(r.preference.favorite, true);
-  assert.equal(r.followers, 1);
   h.state.principal = other;
   r = (await h.get("catalog/units/" + unit.id)).body;
   assert.equal(r.preference.favorite, false);
-  assert.equal(r.followers, 1);
   assert.equal((await h.get("catalog/units?filter=favorites")).body.total, 0);
   h.state.principal = owner;
   assert.equal((await h.get("catalog/units?filter=favorites")).body.total, 1);
