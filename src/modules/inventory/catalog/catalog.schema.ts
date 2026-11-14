@@ -25,6 +25,12 @@ export const dataSchema = z
         "office",
         "retail",
         "other",
+        "duplex",
+        "clinic",
+        "penthouse",
+        "loft",
+        "cabin",
+        "family_house",
       ])
       .optional(),
     listing: z.enum(["primary", "resale", "rental"]).optional(),
@@ -49,6 +55,7 @@ export const dataSchema = z
     masterPlan: url.optional(),
     map: url.optional(),
     bathrooms: z.number().int().min(0).max(100).optional(),
+    floorLabel: bi.optional(),
     floor: z.number().int().min(-20).max(300).optional(),
     deliveryYear: z.number().int().min(1900).max(2200).optional(),
     finishing: bi.optional(),
@@ -72,11 +79,49 @@ export const dataSchema = z
           .object({
             name: bi,
             downPercent: z.number().min(0).max(100),
-            years: z.number().int().min(1).max(30),
+            years: z.number().min(0).max(30),
+            currency: z.enum(["EGP", "EUR"]).optional(),
+            frequency: z
+              .enum([
+                "monthly",
+                "quarterly",
+                "annually",
+                "semi-annually",
+                "one-time",
+                "other",
+              ])
+              .optional(),
+            priceMinor: z
+              .string()
+              .regex(/^\d{1,18}$/)
+              .optional(),
+            installmentMinor: z
+              .string()
+              .regex(/^\d{1,18}$/)
+              .optional(),
+            downPaymentMinor: z
+              .string()
+              .regex(/^\d{1,18}$/)
+              .optional(),
+            isCash: z.boolean().optional(),
           })
           .strict(),
       )
       .max(20)
+      .optional(),
+    reference: z
+      .object({
+        source: z.literal("jeeran"),
+        externalId: z.string().max(100),
+        code: z.string().max(200).optional(),
+        sourceUrl: url.optional(),
+        asOf: z.string().max(30).optional(),
+        aiCover: z.boolean().optional(),
+        originalType: z.string().max(100).optional(),
+        isLaunch: z.boolean().optional(),
+        hasOffer: z.boolean().optional(),
+      })
+      .strict()
       .optional(),
     seller: z
       .object({
@@ -103,6 +148,7 @@ export const itemSchema = z
       "resale",
       "sold",
       "soon",
+      "not_set",
       "available",
       "hold",
       "reserved",

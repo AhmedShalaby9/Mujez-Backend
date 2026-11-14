@@ -31,3 +31,15 @@ Alert preferences are stored; external notification delivery is not configured b
 Migration 042 creates the catalog and command/preference tables. **No production seed data, tenant data conversion or uploaded Jeeran export import runs in migration/deployment.** The uploaded exports remain staged privately, pending the user's import instruction. An empty catalog intentionally shows an empty state. The old static data files are design references only and are not imported by the runtime component.
 
 Validation: `tests/catalog.test.mjs` exercises authenticated access, cross-company shared reads, private preferences, input validation, SQL pagination/search, exact prices/nulls, idempotency, version conflicts, hierarchy validation, archives, no tenant publication, subscription gating and atomic audit failure. Existing inventory/reservation/finance tests remain applicable.
+
+## Jeeran export import
+
+`npm run db:import:jeeran -- --source-dir /private/jeeran-export` performs preflight only. `--normalize /private/normalized.json` writes a validated compact bundle (mode 0600). It strips nested copies of developer/compound objects and excludes publisher IDs, creator identities, user favorites and source follower totals. Keep the raw exports and normalized bundle out of Git and web roots.
+
+After a database backup, use the restricted `PLATFORM_DATABASE_URL`, `--bundle /private/normalized.json --apply --actor-email <active-super-admin-email>` to commit the import. Without `--apply`, the importer rolls back. Read the manifest checksums and dry-run counts first. The import is one transaction with an advisory lock, stable source-ID mapping, audit/outbox event and run manifest. A repeated identical bundle changes no records or UUIDs. Changed source records update only if they have not been manually edited since their last import. Audit failure rolls back all changes.
+
+`compounds.json` is the compound authority; `projects.json` is validated as an alias list, never imported as another collection. Exact duplicate property IDs collapse; conflicting duplicate rows or unknown parent IDs stop the import. All records retain Jeeran source IDs in a private mapping table and public reference metadata. Source-inactive developers and their descendants remain archived. Source-null compound statuses become `not_set`, never an invented selling status. Existing tenant inventory and user preferences are untouched.
+
+Properties retain exact EGP listing prices and real property types (including duplex, penthouse, clinic, loft, cabin and family house), media/document URLs, descriptions and bilingual labels. Imported payment plans retain their own currency, actual installment frequency/amount and fractional years. A quarterly or EUR option is never relabeled as a monthly EGP payment. Source metadata identifies reference snapshots and AI cover images. These are reference listings, not a live developer stock/pricing integration.
+
+Migration 043 creates import mapping/run tables. Deploying code **does not** execute the bulk import.
