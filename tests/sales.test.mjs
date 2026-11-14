@@ -684,3 +684,137 @@ test("lead email, segment, owner and typed activity are persisted and filtered a
   );
   await get("leads?segment=invalid", 400);
 });
+
+test("assigned leads appear without invented deal values and become one detailed pipeline card", async () => {
+  const assigned = (
+    await post(
+      "leads",
+      draft({
+        phone: "+12025550761",
+        name: "Assigned pending buyer",
+        budgetMinor: null,
+      }),
+    )
+  ).body;
+  const original = p;
+  try {
+    p = { ...original, scope: "own" };
+    let board = (await get("pipeline?q=Assigned%20pending%20buyer")).body;
+    assert.equal(board.total, 1);
+    const card = board.items[0];
+    assert.equal(card.id, assigned.id);
+    assert.equal(card.opportunityId, null);
+    assert.equal(card.stage, "new");
+    assert.equal(card.valueMinor, null);
+    assert.equal(card.type, null);
+    assert.equal(card.title, null);
+    assert.equal(board.stats.find((s) => s.stage === "new").unsetCount, 1);
+    assert.equal(board.stats.find((s) => s.stage === "new").saleMinor, "0");
+    await post("pipeline/" + card.id + "/stage", {
+      requestId: randomUUID(),
+      version: assigned.version,
+      stage: "qualified",
+    });
+    let current = await detail(assigned.id);
+    assert.equal(current.stage, "qualified");
+    assert.equal(current.opportunity, null);
+    await post(
+      "pipeline/" + card.id + "/stage",
+      { requestId: randomUUID(), version: assigned.version, stage: "viewing" },
+      409,
+    );
+    const details = {
+      requestId: randomUUID(),
+      leadId: assigned.id,
+      version: current.version,
+      title: "Recorded property opportunity",
+      type: "sale",
+      valueMinor: "123456",
+    };
+    const saved = (await post("pipeline", details)).body;
+    assert.equal((await post("pipeline", details)).body.id, saved.id);
+    board = (await get("pipeline?q=Assigned%20pending%20buyer")).body;
+    assert.equal(board.total, 1);
+    assert.equal(board.items[0].id, saved.id);
+    assert.equal(board.items[0].opportunityId, saved.id);
+    assert.equal(board.items[0].valueMinor, "123456");
+    assert.equal(board.items[0].stage, "qualified");
+    assert.equal(
+      board.stats.find((s) => s.stage === "qualified").unsetCount,
+      0,
+    );
+    assert.equal(
+      board.stats.find((s) => s.stage === "qualified").saleMinor,
+      "123456",
+    );
+    current = await detail(assigned.id);
+    await post(
+      "pipeline",
+      { ...details, requestId: randomUUID(), version: current.version },
+      409,
+    );
+    await db.query(
+      "UPDATE tenant.leads SET owner_user_id=NULL WHERE company_id=$1 AND id=$2",
+      [A, assigned.id],
+    );
+    assert.equal(
+      (await get("pipeline?q=Assigned%20pending%20buyer")).body.total,
+      0,
+    );
+    p = original;
+    assert.equal(
+      (await get("pipeline?q=Assigned%20pending%20buyer")).body.total,
+      1,
+    ); // Recorded deal remains visible company-wide.
+    const unassigned = (
+      await post(
+        "leads",
+        draft({ phone: "+12025550762", name: "Unassigned board buyer" }),
+      )
+    ).body;
+    await db.query(
+      "UPDATE tenant.leads SET owner_user_id=NULL WHERE company_id=$1 AND id=$2",
+      [A, unassigned.id],
+    );
+    assert.equal(
+      (await get("pipeline?q=Unassigned%20board%20buyer")).body.total,
+      0,
+    );
+    await db.query(
+      "UPDATE tenant.leads SET owner_user_id=$3 WHERE company_id=$1 AND id=$2",
+      [A, unassigned.id, U],
+    );
+    assert.equal(
+      (await get("pipeline?q=Unassigned%20board%20buyer")).body.total,
+      1,
+    );
+    await db.query(
+      "UPDATE tenant.leads SET owner_user_id=$3 WHERE company_id=$1 AND id=$2",
+      [
+        A,
+        unassigned.id,
+        (
+          await db.query(
+            "SELECT id FROM tenant.users WHERE oidc_subject='sales-scope-colleague'",
+          )
+        ).rows[0].id,
+      ],
+    );
+    p = { ...original, scope: "own" };
+    assert.equal(
+      (await get("pipeline?q=Unassigned%20board%20buyer")).body.total,
+      0,
+    );
+    await post(
+      "pipeline/" + unassigned.id + "/stage",
+      {
+        requestId: randomUUID(),
+        version: unassigned.version,
+        stage: "qualified",
+      },
+      404,
+    );
+  } finally {
+    p = original;
+  }
+});

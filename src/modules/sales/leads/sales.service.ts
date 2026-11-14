@@ -597,7 +597,7 @@ export class SalesService {
         if (deal) {
           const d = (
             await c.query(
-              "SELECT lead_id FROM tenant.opportunities WHERE company_id=$1 AND id=$2",
+              "SELECT l.id AS lead_id FROM tenant.leads l LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id WHERE l.company_id=$1 AND (o.id=$2 OR (l.id=$2 AND o.id IS NULL AND l.owner_user_id IS NOT NULL))",
               [p.companyId, id],
             )
           ).rows[0];
@@ -705,30 +705,37 @@ export class SalesService {
   async pipeline(p: Principal, q: SalesQuery) {
     await this.access(p, "pipeline.read");
     const { where, args } = filters(p, q, true);
+    // Assigned leads are real pipeline cards before an opportunity is recorded.
+    // Keep missing deal details null; do not create synthetic zero-value opportunities.
+    const boardFrom =
+      " FROM tenant.leads l LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id";
+    const boardWhere =
+      where + " AND (o.id IS NOT NULL OR l.owner_user_id IS NOT NULL)";
     return this.db.tenant(
       p.companyId!,
       async (c) => {
         const rows = (
           await c.query(
-            `SELECT o.*,o.value_minor::text AS value_minor,l.public_id AS lead_ref,l.name AS contact,l.owner_user_id,u.name AS owner_name,l.stage,l.segment,l.stage_changed_at,l.version AS lead_version,l.seed_key AS lead_seed_key FROM tenant.opportunities o JOIN tenant.leads l ON l.company_id=o.company_id AND l.id=o.lead_id LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id WHERE ${where} ORDER BY o.created_at DESC,o.id LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
+            `SELECT coalesce(o.id,l.id) AS id,o.id AS opportunity_id,coalesce(o.public_id,l.public_id) AS public_id,l.id AS lead_id,o.title,o.deal_type,o.value_minor::text AS value_minor,o.version,l.public_id AS lead_ref,l.name AS contact,l.owner_user_id,u.name AS owner_name,l.stage,l.segment,l.stage_changed_at,l.version AS lead_version,o.seed_key,l.seed_key AS lead_seed_key${boardFrom} WHERE ${boardWhere} ORDER BY coalesce(o.created_at,l.assigned_at,l.created_at) DESC,l.id LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
             [...args, q.limit, (q.page - 1) * q.limit],
           )
         ).rows;
         const stats = (
           await c.query(
-            `SELECT l.stage,count(*)::int AS count,coalesce(sum(o.value_minor) FILTER(WHERE o.deal_type='sale'),0)::text AS sale_minor FROM tenant.opportunities o JOIN tenant.leads l ON l.company_id=o.company_id AND l.id=o.lead_id WHERE ${where} GROUP BY l.stage`,
+            `SELECT l.stage,count(*)::int AS count,count(*) FILTER(WHERE o.id IS NULL)::int AS unset_count,coalesce(sum(o.value_minor) FILTER(WHERE o.deal_type='sale'),0)::text AS sale_minor${boardFrom} WHERE ${boardWhere} GROUP BY l.stage`,
             args,
           )
         ).rows;
         return {
           items: rows.map((r) => ({
             id: r.id,
+            opportunityId: r.opportunity_id,
             reference: r.public_id,
             leadId: r.lead_id,
             leadReference: r.lead_ref,
             title: r.title,
             contact: r.contact,
-            valueMinor: String(r.value_minor),
+            valueMinor: r.value_minor === null ? null : String(r.value_minor),
             type: r.deal_type,
             owner: r.owner_user_id
               ? { id: r.owner_user_id, name: r.owner_name }
@@ -736,7 +743,7 @@ export class SalesService {
             stage: r.stage,
             segment: r.segment,
             stageChangedAt: iso(r.stage_changed_at),
-            version: r.version,
+            version: r.version ?? r.lead_version,
             leadVersion: r.lead_version,
             sample: !!(r.seed_key || r.lead_seed_key),
           })),
@@ -745,6 +752,7 @@ export class SalesService {
             stage,
             count: stats.find((r) => r.stage === stage)?.count ?? 0,
             saleMinor: stats.find((r) => r.stage === stage)?.sale_minor ?? "0",
+            unsetCount: stats.find((r) => r.stage === stage)?.unset_count ?? 0,
           })),
           page: q.page,
           limit: q.limit,
