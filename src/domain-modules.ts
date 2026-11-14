@@ -1,3 +1,4 @@
+import { CatalogModule } from "./modules/inventory/catalog/catalog.module.js";
 import { PlatformOverviewModule } from "./modules/platform/overview/overview.module.js";
 import { PlatformAuditModule } from "./modules/platform/audit/audit.module.js";
 import { SalesLeadsModule } from "./modules/sales/leads/leads.module.js";
@@ -31,6 +32,7 @@ import { PlatformHealthModule } from "./modules/platform/health/health.module.js
 import { PlatformWorkspaceModule } from "./modules/platform/workspace/workspace.module.js";
 
 export const DOMAIN_MODULES = [
+  CatalogModule,
   PlatformOverviewModule,
   PlatformAuditModule,
   SalesLeadsModule,
