@@ -260,3 +260,42 @@ test("catalog writes roll back when the audit cannot be recorded", async () => {
     0,
   );
 });
+
+test("compound sale starting prices exclude rental listings in list and detail responses", async () => {
+  h.state.principal = admin;
+  const dev = (
+    await h.post(
+      "catalog/developers",
+      req({ name: { en: "Mixed listings developer", ar: "" } }),
+    )
+  ).body;
+  const co = (await h.post("catalog/compounds", req({ parentId: dev.id })))
+    .body;
+  await h.post(
+    "catalog/units",
+    req({
+      parentId: co.id,
+      status: "available",
+      priceMinor: "5500000",
+      data: { listing: "rental" },
+    }),
+  );
+  await h.post(
+    "catalog/units",
+    req({
+      parentId: co.id,
+      status: "available",
+      priceMinor: "2680000000",
+      data: { listing: "resale" },
+    }),
+  );
+  assert.equal(
+    (await h.get("catalog/compounds/" + co.id)).body.fromPriceMinor,
+    "2680000000",
+  );
+  assert.equal(
+    (await h.get("catalog/compounds?parentId=" + dev.id)).body.items[0]
+      .fromPriceMinor,
+    "2680000000",
+  );
+});

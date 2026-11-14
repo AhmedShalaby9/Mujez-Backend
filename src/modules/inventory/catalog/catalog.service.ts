@@ -117,7 +117,7 @@ export class CatalogService {
       }[q.sort];
       const rows = (
         await c.query(
-          `SELECT i.*,i.price_minor::text,i.area::text,${PREF},(SELECT count(*) FROM platform.catalog_preferences f WHERE f.item_id=i.id AND f.followed) AS followers,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL) AS children,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available') AS available,(SELECT min(ch.price_minor)::text FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available') AS from_price ${from} ORDER BY ${order} LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
+          `SELECT i.*,i.price_minor::text,i.area::text,${PREF},(SELECT count(*) FROM platform.catalog_preferences f WHERE f.item_id=i.id AND f.followed) AS followers,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL) AS children,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available') AS available,(SELECT min(ch.price_minor)::text FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available' AND (ch.data->>'listing') IS DISTINCT FROM 'rental') AS from_price ${from} ORDER BY ${order} LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
           [...args, q.limit, (q.page - 1) * q.limit],
         )
       ).rows;
@@ -130,7 +130,7 @@ export class CatalogService {
     return this.db.platform(async (c) => {
       const r = (
         await c.query(
-          `SELECT i.*,i.price_minor::text,i.area::text,${PREF},(SELECT count(*) FROM platform.catalog_preferences f WHERE f.item_id=i.id AND f.followed) AS followers,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL) AS children,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available') AS available,(SELECT min(ch.price_minor)::text FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available') AS from_price FROM platform.catalog_items i LEFT JOIN platform.catalog_preferences p ON p.item_id=i.id AND p.user_id=$1 AND p.pool=$2 WHERE i.id=$3 AND i.kind=$4 AND i.archived_at IS NULL`,
+          `SELECT i.*,i.price_minor::text,i.area::text,${PREF},(SELECT count(*) FROM platform.catalog_preferences f WHERE f.item_id=i.id AND f.followed) AS followers,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL) AS children,(SELECT count(*) FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available') AS available,(SELECT min(ch.price_minor)::text FROM platform.catalog_items ch WHERE ch.parent_id=i.id AND ch.archived_at IS NULL AND ch.status='available' AND (ch.data->>'listing') IS DISTINCT FROM 'rental') AS from_price FROM platform.catalog_items i LEFT JOIN platform.catalog_preferences p ON p.item_id=i.id AND p.user_id=$1 AND p.pool=$2 WHERE i.id=$3 AND i.kind=$4 AND i.archived_at IS NULL`,
           [p.id, p.pool, id, kind],
         )
       ).rows[0];
