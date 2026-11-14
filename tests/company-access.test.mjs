@@ -14,6 +14,7 @@ import { configureApp } from "../dist/common/http/configure-app.js";
 import { hashPassword } from "../dist/common/auth/password.js";
 import { CompanyAccessService } from "../dist/modules/identity/company-access/company-access.service.js";
 import { SessionService } from "../dist/common/auth/session.service.js";
+import { WorkspaceService } from "../dist/modules/platform/workspace/workspace.service.js";
 const db = new PGlite(),
   cache = { consume: async () => true, ready: async () => {} };
 const password = randomBytes(18).toString("base64url"),
@@ -583,4 +584,81 @@ test("same browser login rotates the previous identity session across realms", a
     .set("Origin", origin)
     .send({})
     .expect(200);
+});
+
+test("workspace entry, elevation, expiry, drop and exit persist UUID-backed events", async () => {
+  await db.query("UPDATE platform.companies SET status='active' WHERE id=$1", [
+    companyA.id,
+  ]);
+  const service = app.get(WorkspaceService);
+  const actor = {
+    id: root,
+    pool: "platform",
+    name: "Root",
+    email: "root@company-access.test",
+    permissions: ["ws.read", "ws.manage"],
+  };
+  const entered = await service.enter(actor, companyA.public_id, {
+    mode: "read",
+  });
+  assert.equal(entered.company.id, companyA.public_id);
+  let principal = await service.resolve(entered.token, actor);
+  assert.equal(principal.workspace.company.uuid, companyA.id);
+  assert.equal(principal.workspace.mode, "read");
+  assert.ok(!principal.permissions.some((p) => p.endsWith(".manage")));
+  const elevate = async () =>
+    service.elevate(principal.workspace, root, {
+      reason: "Verify workspace form lifecycle",
+      durationMinutes: 30,
+      password,
+    });
+  await elevate();
+  principal = await service.resolve(entered.token, actor);
+  assert.equal(principal.workspace.mode, "manage");
+  await service.drop(principal.workspace, root);
+  principal = await service.resolve(entered.token, actor);
+  assert.equal(principal.workspace.mode, "read");
+  await elevate();
+  await db.query(
+    "UPDATE platform.workspace_sessions SET manage_expires_at=now()-interval '1 minute' WHERE id=$1",
+    [principal.workspace.sessionId],
+  );
+  principal = await service.resolve(entered.token, actor);
+  assert.equal(principal.workspace.mode, "read");
+  await service.exit(principal.workspace, root);
+  assert.equal(await service.resolve(entered.token, actor), null);
+  const events = (
+    await db.query(
+      "SELECT kind,aggregate_id FROM platform.outbox_events WHERE company_id=$1 AND kind LIKE 'workspace.%'",
+      [companyA.id],
+    )
+  ).rows;
+  assert.ok(
+    [
+      "workspace.entered",
+      "workspace.elevated",
+      "workspace.dropped_to_read",
+      "workspace.mode_auto_dropped",
+      "workspace.exited",
+    ].every((kind) => events.some((e) => e.kind === kind)),
+  );
+  assert.ok(events.every((e) => e.aggregate_id === companyA.id));
+  failedAudit = true;
+  try {
+    await assert.rejects(
+      () => service.enter(actor, companyA.public_id, { mode: "read" }),
+      /Audit unavailable/,
+    );
+  } finally {
+    failedAudit = false;
+  }
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::int AS n FROM platform.workspace_sessions WHERE platform_user_id=$1 AND ended_at IS NULL",
+        [root],
+      )
+    ).rows[0].n,
+    0,
+  );
 });

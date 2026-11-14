@@ -123,7 +123,7 @@ export class WorkspaceService {
         action: "workspace.entered",
         companyId: company.id,
         resourceType: "company",
-        resourceId: company.public_id,
+        resourceId: company.id,
         after: { mode: input.mode, reason: input.reason ?? null },
         payload: { sessionId: row.id },
       });
@@ -181,7 +181,7 @@ export class WorkspaceService {
           action: "workspace.mode_auto_dropped",
           companyId: row.co_uuid,
           resourceType: "company",
-          resourceId: row.public_id,
+          resourceId: row.co_uuid,
           after: { mode: "read" },
           payload: { sessionId: row.id },
         });
@@ -254,7 +254,7 @@ export class WorkspaceService {
         action: "workspace.elevated",
         companyId: company.id,
         resourceType: "company",
-        resourceId: company.public_id,
+        resourceId: company.id,
         after: { mode: "manage", reason: input.reason },
         payload: { sessionId: workspace.sessionId },
       });
@@ -276,7 +276,7 @@ export class WorkspaceService {
         action: "workspace.dropped_to_read",
         companyId: workspace.company.uuid,
         resourceType: "company",
-        resourceId: workspace.company.id,
+        resourceId: workspace.company.uuid,
         after: { mode: "read" },
         payload: { sessionId: workspace.sessionId },
       });
@@ -299,7 +299,7 @@ export class WorkspaceService {
         action: "workspace.exited",
         companyId: workspace.company.uuid,
         resourceType: "company",
-        resourceId: workspace.company.id,
+        resourceId: workspace.company.uuid,
         after: { reason: reason ?? null },
         payload: { sessionId: workspace.sessionId },
       });
