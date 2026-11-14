@@ -3387,6 +3387,114 @@
         "tags": ["CompanyAudit"]
       }
     },
+    "/api/v1/team/my-team/tasks": {
+      "post": {
+        "operationId": "TeamController_createTask",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TeamTaskCreate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      },
+      "get": {
+        "operationId": "TeamController_tasks",
+        "parameters": [
+          {
+            "name": "memberId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 25,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["open", "done", "cancelled"]
+            }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/my-team/tasks/{id}/assign": {
+      "post": {
+        "operationId": "TeamController_assignTask",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TeamTaskAssignment" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/my-team/tasks/{id}/status": {
+      "post": {
+        "operationId": "TeamController_taskStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskStatus" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
     "/api/v1/team/my-team/leads": {
       "get": {
         "operationId": "TeamController_leads",
@@ -3436,54 +3544,6 @@
                 "won",
                 "lost"
               ]
-            }
-          }
-        ],
-        "responses": { "200": { "description": "" } },
-        "tags": ["Team"]
-      }
-    },
-    "/api/v1/team/my-team/tasks": {
-      "get": {
-        "operationId": "TeamController_tasks",
-        "parameters": [
-          {
-            "name": "memberId",
-            "required": false,
-            "in": "query",
-            "schema": { "format": "uuid", "type": "string" }
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 1,
-              "allOf": [{ "$ref": "#/components/schemas/Object" }]
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 25,
-              "allOf": [{ "$ref": "#/components/schemas/Object" }]
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["open", "done", "cancelled"]
             }
           }
         ],
@@ -6122,6 +6182,33 @@
           "requestId": { "type": "string", "format": "uuid" }
         },
         "required": ["requestId"]
+      },
+      "TeamTaskCreate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "titleAr": { "type": "string" },
+          "description": { "type": "string" },
+          "leadId": { "type": ["string", "null"], "format": "uuid" },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Africa/Cairo calendar date; defaults to server today on creation"
+          },
+          "priority": { "type": "string", "enum": ["high", "med", "low"] },
+          "assigneeId": { "type": "string", "format": "uuid" }
+        },
+        "required": ["requestId", "title", "priority", "assigneeId"]
+      },
+      "TeamTaskAssignment": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "assigneeId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number", "minimum": 0 }
+        },
+        "required": ["requestId", "assigneeId", "version"]
       },
       "TeamLeadAssignment": {
         "type": "object",

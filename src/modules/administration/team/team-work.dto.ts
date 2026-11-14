@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional, PickType } from "@nestjs/swagger";
 import { Type, Transform } from "class-transformer";
 import {
   IsOptional,
@@ -58,5 +58,22 @@ export class TeamPerformanceQuery {
 }
 export class TeamLeadAssignment extends SalesRequest {
   @IsUUID() @ApiProperty({ format: "uuid" }) declare ownerId: string;
+  @IsInt() @Min(0) @ApiProperty({ minimum: 0 }) declare version: number;
+}
+
+import { TaskInput } from "../../sales/tasks/tasks.dto.js";
+export class TeamTaskCreate extends PickType(TaskInput, [
+  "requestId",
+  "title",
+  "titleAr",
+  "description",
+  "leadId",
+  "dueDate",
+  "priority",
+] as const) {
+  @IsUUID() @ApiProperty({ format: "uuid" }) declare assigneeId: string;
+}
+export class TeamTaskAssignment extends SalesRequest {
+  @IsUUID() @ApiProperty({ format: "uuid" }) declare assigneeId: string;
   @IsInt() @Min(0) @ApiProperty({ minimum: 0 }) declare version: number;
 }

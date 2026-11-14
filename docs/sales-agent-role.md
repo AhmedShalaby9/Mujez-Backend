@@ -64,3 +64,15 @@ Group/role changes use company advisory locks and tenant transactions with audit
 - `POST /api/v1/team/my-team/leads/:id/assign`: `{requestId, version, ownerId}`. Requires `leads.manage`; only open, unarchived leads already owned within the team can be reassigned to an active team employee. Company-wide unassigned leads and other teams' leads are excluded. Tasks, contracts and other records retain their existing owners/assignees.
 
 Assignment locks team membership before the common sales lock and lead row, checks current version, resets routing metadata on owner change, and records `lead.assigned` activity/audit/outbox plus the idempotency response in one transaction. Identical retries return the recorded response; mismatched/stale writes conflict. Scope is checked even for retries. Migration 041 provides a tenant-filtered account-status view containing only company/user IDs and status so disabled/revoked accounts cannot receive work.
+
+## Team task management
+
+Team leads with `tasks.manage` can create and assign tasks, reassign open tasks, and complete/reopen/cancel team tasks from My team. Their personal Tasks screen remains own-scope. No new migration or environment setting is required.
+
+- `POST /api/v1/team/my-team/tasks`: `{requestId,title,titleAr?,description?,assigneeId,dueDate?,priority,leadId?}`. An active employee in the current team is required. Dates default to server Cairo today, with real calendar-date validation. Optional linked leads must be unarchived and owned within the current team, and require `leads.read`.
+- `POST /api/v1/team/my-team/tasks/:id/assign`: `{requestId,version,assigneeId}`. The source task must currently belong to a team member, and the recipient must be active in the same team. Closed tasks must be reopened first.
+- `POST /api/v1/team/my-team/tasks/:id/status`: `{requestId,version,action,reason?}`. Actions are `complete`, `reopen`, `cancel`, sharing the personal-task transition rules. Cancelling an open task requires a reason of at least 10 characters. Completion records the actual team lead as `completed_by`; reopening clears completion fields. Performance counts assigned tasks completed in the period.
+
+Task lists now include `version`, and performance includes `canManageTasks` independently of lead-assignment permission. Mutation responses include `{id,reference,version,status}`. Create opens the Tasks tab filtered to the saved reference, so the user can review the created task even when many older overdue tasks exist.
+
+All mutations serialize team membership and sales writes, validate current scope before idempotency replay, and atomically persist task state, shared task/lead activity, audit/outbox events and the request ledger. No company-wide scope is granted to the employee principal. Stale versions, inactive recipients, other teams and other companies fail closed. The dashboard preserves failed drafts and supports refreshing stale tasks before retrying.

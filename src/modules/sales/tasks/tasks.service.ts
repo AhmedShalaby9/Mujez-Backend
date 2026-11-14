@@ -46,6 +46,22 @@ export function taskDate(s: string) {
     throw new BadRequestException("Choose a valid calendar date");
   return s;
 }
+/** Shared by personal tasks and the scoped team task endpoints. */
+export function taskNextStatus(
+  old: { status: string },
+  action: string,
+  reason?: string,
+) {
+  if (action === "reopen" ? old.status === "open" : old.status !== "open")
+    throw new ConflictException("Task cannot make that status transition");
+  if (action === "cancel" && !reason)
+    throw new BadRequestException("Cancelling a task requires a reason");
+  return action === "complete"
+    ? "done"
+    : action === "cancel"
+      ? "cancelled"
+      : "open";
+}
 export function taskDto(t: any, today: string) {
   return {
     id: t.id,
@@ -450,20 +466,7 @@ export class TasksService {
       async (c) => {
         const old = await this.row(c, p, id, true);
         this.check(old, b.version);
-        if (
-          b.action === "reopen" ? old.status === "open" : old.status !== "open"
-        )
-          throw new ConflictException(
-            "Task cannot make that status transition",
-          );
-        if (b.action === "cancel" && !b.reason)
-          throw new BadRequestException("Cancelling a task requires a reason");
-        const next =
-          b.action === "complete"
-            ? "done"
-            : b.action === "cancel"
-              ? "cancelled"
-              : "open";
+        const next = taskNextStatus(old, b.action, b.reason);
         await c.query(
           `UPDATE tenant.tasks SET status=$3,completed_at=CASE WHEN $3='done' THEN now() ELSE NULL END,completed_by=CASE WHEN $3='done' THEN $4::uuid ELSE NULL END,updated_by=$4,updated_at=now(),version=version+1 WHERE company_id=$1 AND id=$2`,
           [p.companyId, id, next, p.id],

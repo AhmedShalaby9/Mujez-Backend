@@ -3,13 +3,23 @@ import {
   ForbiddenException,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from "@nestjs/common";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { Principal } from "../../../common/auth/access.js";
 import { DatabaseService } from "../../../infrastructure/database/database.service.js";
 import { SalesService } from "../../sales/leads/sales.service.js";
+import {
+  TasksService,
+  taskDate,
+  taskNextStatus,
+} from "../../sales/tasks/tasks.service.js";
+import type { TaskStatus } from "../../sales/tasks/tasks.dto.js";
+import type { SalesRequest } from "../../sales/leads/leads.dto.js";
 import type {
+  TeamTaskCreate,
+  TeamTaskAssignment,
   TeamLeadQuery,
   TeamTaskQuery,
   TeamPerformanceQuery,
@@ -21,6 +31,7 @@ export class TeamWorkService {
   constructor(
     private readonly db: DatabaseService,
     private readonly sales: SalesService,
+    private readonly taskService: TasksService,
   ) {}
   private async access(p: Principal, permission: string) {
     await this.sales.access(p, "team.self.read");
@@ -137,7 +148,7 @@ export class TeamWorkService {
         ).rows[0].n;
         const rows = (
           await c.query(
-            `SELECT t.id,t.public_id AS reference,t.title,t.status,t.priority,t.due_date::text AS due_date,t.completed_at,(t.status='open' AND t.due_date<(now() AT TIME ZONE 'Africa/Cairo')::date) AS overdue,u.id AS assignee_id,u.name AS assignee_name ${from} WHERE ${where} ORDER BY t.due_date,t.created_at DESC,t.id LIMIT $6 OFFSET $7`,
+            `SELECT t.id,t.version,t.public_id AS reference,t.title,t.status,t.priority,t.due_date::text AS due_date,t.completed_at,(t.status='open' AND t.due_date<(now() AT TIME ZONE 'Africa/Cairo')::date) AS overdue,u.id AS assignee_id,u.name AS assignee_name ${from} WHERE ${where} ORDER BY t.due_date,t.created_at DESC,t.id LIMIT $6 OFFSET $7`,
             [...args, q.limit, (q.page - 1) * q.limit],
           )
         ).rows;
@@ -146,6 +157,7 @@ export class TeamWorkService {
             id: r.id,
             reference: r.reference,
             title: r.title,
+            version: r.version,
             status: r.status,
             priority: r.priority,
             dueDate: r.due_date,
@@ -247,9 +259,201 @@ export class TeamWorkService {
           asOf: new Date(clock.at).toISOString(),
           timeZone: "Africa/Cairo",
           canAssign: p.permissions.includes("leads.manage"),
+          canManageTasks: p.permissions.includes("tasks.manage"),
         };
       },
       true,
+    );
+  }
+  private async teamTask(
+    c: PoolClient,
+    p: Principal,
+    teamId: string,
+    id: string,
+  ) {
+    const task = (
+      await c.query(
+        `SELECT t.*,t.due_date::text AS due_date FROM tenant.tasks t JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id WHERE t.company_id=$1 AND t.id=$2 AND u.team_id=$3 AND u.deleted_at IS NULL FOR UPDATE OF t`,
+        [p.companyId, id, teamId],
+      )
+    ).rows[0];
+    if (!task) throw new NotFoundException("Task not found");
+    return task;
+  }
+  private async taskWrite(
+    p: Principal,
+    operation: string,
+    input: SalesRequest,
+    scope: (c: PoolClient, teamId: string) => Promise<any>,
+    work: (c: PoolClient, context: any) => Promise<any>,
+  ) {
+    await this.access(p, "tasks.manage");
+    const hash = createHash("sha256")
+      .update(
+        JSON.stringify([
+          operation,
+          Object.keys(input)
+            .sort()
+            .map((k) => [k, (input as any)[k]]),
+        ]),
+      )
+      .digest("hex");
+    return this.db.tenant(p.companyId!, async (c) => {
+      await c.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1,80425140))",
+        [p.companyId],
+      );
+      await c.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1,80425113))",
+        ["sales:" + p.companyId],
+      );
+      const team = await this.team(c, p);
+      const context = await scope(c, team.id);
+      const previous = (
+        await c.query(
+          "SELECT * FROM tenant.sales_requests WHERE company_id=$1 AND request_id=$2",
+          [p.companyId, input.requestId],
+        )
+      ).rows[0];
+      if (previous) {
+        if (previous.actor_id !== p.id || previous.body_hash !== hash)
+          throw new ConflictException(
+            "Request ID already used for a different operation",
+          );
+        // A successful retry must not disclose a task moved out of this team.
+        await this.teamTask(c, p, team.id, previous.response.id);
+        return previous.response;
+      }
+      const result = await work(c, context);
+      await c.query(
+        "INSERT INTO tenant.sales_requests(company_id,request_id,actor_id,body_hash,response) VALUES($1,$2,$3,$4,$5)",
+        [p.companyId, input.requestId, p.id, hash, result],
+      );
+      return result;
+    });
+  }
+  async createTask(p: Principal, input: TeamTaskCreate) {
+    return this.taskWrite(
+      p,
+      "team.task.create",
+      input,
+      async (c, teamId) => {
+        await this.member(c, p, teamId, input.assigneeId, true);
+        if (input.leadId) {
+          if (!p.permissions.includes("leads.read"))
+            throw new ForbiddenException(
+              "Lead access is required to link a task",
+            );
+          const lead = (
+            await c.query(
+              `SELECT l.id FROM tenant.leads l JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id WHERE l.company_id=$1 AND l.id=$2 AND u.team_id=$3 AND u.deleted_at IS NULL AND l.archived_at IS NULL FOR SHARE OF l`,
+              [p.companyId, input.leadId, teamId],
+            )
+          ).rows[0];
+          if (!lead)
+            throw new NotFoundException("Team lead record unavailable");
+        }
+        return {
+          dueDate: input.dueDate
+            ? taskDate(input.dueDate)
+            : (await this.taskService.clock(c)).today,
+        };
+      },
+      async (c, context) => {
+        const task = (
+          await c.query(
+            `INSERT INTO tenant.tasks(company_id,public_id,title,description,lead_id,assignee_id,due_date,priority,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$9) RETURNING *,due_date::text AS due_date`,
+            [
+              p.companyId,
+              "T-" + randomBytes(6).toString("hex").toUpperCase(),
+              { en: input.title, ar: input.titleAr ?? input.title },
+              input.description ?? "",
+              input.leadId ?? null,
+              input.assigneeId,
+              context.dueDate,
+              input.priority,
+              p.id,
+            ],
+          )
+        ).rows[0];
+        await this.taskService.event(c, p, task, "task.created");
+        return {
+          id: task.id,
+          reference: task.public_id,
+          version: task.version,
+          status: task.status,
+        };
+      },
+    );
+  }
+  async assignTask(p: Principal, id: string, input: TeamTaskAssignment) {
+    return this.taskWrite(
+      p,
+      "team.task.assign:" + id,
+      input,
+      async (c, teamId) => {
+        const task = await this.teamTask(c, p, teamId, id);
+        await this.member(c, p, teamId, input.assigneeId, true);
+        return task;
+      },
+      async (c, old) => {
+        this.taskService.check(old, input.version);
+        if (old.status !== "open")
+          throw new ConflictException("Reopen this task before assigning it");
+        if (old.assignee_id === input.assigneeId)
+          throw new ConflictException(
+            "Task is already assigned to this member",
+          );
+        const task = (
+          await c.query(
+            `UPDATE tenant.tasks SET assignee_id=$3,version=version+1,updated_by=$4,updated_at=now() WHERE company_id=$1 AND id=$2 RETURNING *,due_date::text AS due_date`,
+            [p.companyId, id, input.assigneeId, p.id],
+          )
+        ).rows[0];
+        await this.taskService.event(c, p, task, "task.assigned", old);
+        return {
+          id: task.id,
+          reference: task.public_id,
+          version: task.version,
+          status: task.status,
+        };
+      },
+    );
+  }
+  async taskStatus(p: Principal, id: string, input: TaskStatus) {
+    return this.taskWrite(
+      p,
+      "team.task.status:" + id,
+      input,
+      (c, teamId) => this.teamTask(c, p, teamId, id),
+      async (c, old) => {
+        this.taskService.check(old, input.version);
+        const next = taskNextStatus(old, input.action, input.reason);
+        const task = (
+          await c.query(
+            `UPDATE tenant.tasks SET status=$3,completed_at=CASE WHEN $3='done' THEN now() ELSE NULL END,completed_by=CASE WHEN $3='done' THEN $4::uuid ELSE NULL END,updated_by=$4,updated_at=now(),version=version+1 WHERE company_id=$1 AND id=$2 RETURNING *,due_date::text AS due_date`,
+            [p.companyId, id, next, p.id],
+          )
+        ).rows[0];
+        await this.taskService.event(
+          c,
+          p,
+          task,
+          input.action === "complete"
+            ? "task.completed"
+            : input.action === "cancel"
+              ? "task.cancelled"
+              : "task.reopened",
+          old,
+          input.reason,
+        );
+        return {
+          id: task.id,
+          reference: task.public_id,
+          version: task.version,
+          status: task.status,
+        };
+      },
     );
   }
   async assign(p: Principal, id: string, input: TeamLeadAssignment) {

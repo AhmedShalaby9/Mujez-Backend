@@ -27,13 +27,39 @@ import {
   TeamTaskQuery,
   TeamPerformanceQuery,
   TeamLeadAssignment,
+  TeamTaskCreate,
+  TeamTaskAssignment,
 } from "./team-work.dto.js";
+import { TaskStatus } from "../../sales/tasks/tasks.dto.js";
 @Controller("api/v1/team")
 export class TeamController {
   constructor(
     private readonly service: TeamService,
     private readonly work: TeamWorkService,
   ) {}
+  @Post("my-team/tasks")
+  @RequireAccess(["company_user"], "team.self.read")
+  createTask(@Req() req: AuthRequest, @Body() input: TeamTaskCreate) {
+    return this.work.createTask(req.principal, input);
+  }
+  @Post("my-team/tasks/:id/assign")
+  @RequireAccess(["company_user"], "team.self.read")
+  assignTask(
+    @Req() req: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: TeamTaskAssignment,
+  ) {
+    return this.work.assignTask(req.principal, id, input);
+  }
+  @Post("my-team/tasks/:id/status")
+  @RequireAccess(["company_user"], "team.self.read")
+  taskStatus(
+    @Req() req: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: TaskStatus,
+  ) {
+    return this.work.taskStatus(req.principal, id, input);
+  }
   @Get("my-team/leads")
   @RequireAccess(["company_user"], "team.self.read")
   leads(@Req() req: AuthRequest, @Query() q: TeamLeadQuery) {
