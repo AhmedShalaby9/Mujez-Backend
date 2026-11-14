@@ -19,7 +19,7 @@ import {
   ContactArchive,
   ContactNote,
 } from "./contacts.dto.js";
-@RequireAccess(["company_admin"], "contacts.read")
+@RequireAccess(["company_admin", "company_user"], "contacts.read")
 @Controller("api/v1/contacts")
 export class ContactsController {
   constructor(private readonly service: ContactsService) {}
@@ -42,14 +42,13 @@ export class ContactsController {
   ) {
     return this.service.activities(r.principal, id, q);
   }
-  @Post() @RequireAccess(["company_admin"], "contacts.manage") create(
-    @Req() r: AuthRequest,
-    @Body() b: ContactInput,
-  ) {
+  @Post()
+  @RequireAccess(["company_admin", "company_user"], "contacts.manage")
+  create(@Req() r: AuthRequest, @Body() b: ContactInput) {
     return this.service.create(r.principal, b);
   }
   @Post(":id/update")
-  @RequireAccess(["company_admin"], "contacts.manage")
+  @RequireAccess(["company_admin", "company_user"], "contacts.manage")
   update(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -58,7 +57,7 @@ export class ContactsController {
     return this.service.update(r.principal, id, b);
   }
   @Post(":id/archive")
-  @RequireAccess(["company_admin"], "contacts.manage")
+  @RequireAccess(["company_admin", "company_user"], "contacts.manage")
   archive(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -66,7 +65,9 @@ export class ContactsController {
   ) {
     return this.service.archive(r.principal, id, b);
   }
-  @Post(":id/notes") @RequireAccess(["company_admin"], "contacts.manage") note(
+  @Post(":id/notes")
+  @RequireAccess(["company_admin", "company_user"], "contacts.manage")
+  note(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() b: ContactNote,

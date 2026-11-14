@@ -3387,6 +3387,82 @@
         "tags": ["CompanyAudit"]
       }
     },
+    "/api/v1/team/groups": {
+      "get": {
+        "operationId": "TeamController_groups",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Team"]
+      },
+      "post": {
+        "operationId": "TeamController_createGroup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SalesTeamInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/my-team": {
+      "get": {
+        "operationId": "TeamController_myTeam",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/groups/{id}": {
+      "post": {
+        "operationId": "TeamController_updateGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SalesTeamUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/{id}/role": {
+      "post": {
+        "operationId": "TeamController_role",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EmployeeRole" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
     "/api/v1/team": {
       "get": {
         "operationId": "TeamController_list",
@@ -5905,9 +5981,45 @@
         },
         "required": ["requestId"]
       },
+      "SalesTeamInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+          "leadUserId": { "type": "string", "format": "uuid" },
+          "memberUserIds": {
+            "maxItems": 500,
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["name", "leadUserId", "memberUserIds"]
+      },
+      "SalesTeamUpdate": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+          "leadUserId": { "type": "string", "format": "uuid" },
+          "memberUserIds": {
+            "maxItems": 500,
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "version": { "type": "number", "minimum": 0 }
+        },
+        "required": ["name", "leadUserId", "memberUserIds", "version"]
+      },
+      "EmployeeRole": {
+        "type": "object",
+        "properties": {
+          "role": { "type": "string", "enum": ["agent", "team_lead"] }
+        },
+        "required": ["role"]
+      },
       "TeamInvite": {
         "type": "object",
-        "properties": { "role": { "type": "string", "enum": ["agent"] } },
+        "properties": {
+          "role": { "type": "string", "enum": ["agent", "team_lead"] }
+        },
         "required": ["role"]
       },
       "TeamStatus": {

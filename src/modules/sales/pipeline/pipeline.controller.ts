@@ -17,7 +17,7 @@ import {
   DealUpdate,
   StageChange,
 } from "../leads/leads.dto.js";
-@RequireAccess(["company_admin"], "pipeline.read")
+@RequireAccess(["company_admin", "company_user"], "pipeline.read")
 @Controller("api/v1/pipeline")
 export class PipelineController {
   constructor(private readonly service: SalesService) {}
@@ -30,14 +30,13 @@ export class PipelineController {
   ) {
     return this.service.leadOptions(req.principal, q);
   }
-  @Post() @RequireAccess(["company_admin"], "pipeline.manage") create(
-    @Req() req: AuthRequest,
-    @Body() b: DealInput,
-  ) {
+  @Post()
+  @RequireAccess(["company_admin", "company_user"], "pipeline.manage")
+  create(@Req() req: AuthRequest, @Body() b: DealInput) {
     return this.service.createDeal(req.principal, b);
   }
   @Post(":id/update")
-  @RequireAccess(["company_admin"], "pipeline.manage")
+  @RequireAccess(["company_admin", "company_user"], "pipeline.manage")
   update(
     @Req() req: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -45,7 +44,9 @@ export class PipelineController {
   ) {
     return this.service.updateDeal(req.principal, id, b);
   }
-  @Post(":id/stage") @RequireAccess(["company_admin"], "pipeline.manage") stage(
+  @Post(":id/stage")
+  @RequireAccess(["company_admin", "company_user"], "pipeline.manage")
+  stage(
     @Req() req: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() b: StageChange,

@@ -16,7 +16,7 @@ import {
   HoldInput,
   ReservationAction,
 } from "./reservations.dto.js";
-@RequireAccess(["company_admin"], "reservations.read")
+@RequireAccess(["company_admin", "company_user"], "reservations.read")
 @Controller("api/v1/reservations")
 export class ReservationsController {
   constructor(private readonly s: ReservationsService) {}
@@ -29,14 +29,13 @@ export class ReservationsController {
   ) {
     return this.s.detail(r.principal, id);
   }
-  @Post() @RequireAccess(["company_admin"], "reservations.manage") hold(
-    @Req() r: AuthRequest,
-    @Body() b: HoldInput,
-  ) {
+  @Post()
+  @RequireAccess(["company_admin", "company_user"], "reservations.manage")
+  hold(@Req() r: AuthRequest, @Body() b: HoldInput) {
     return this.s.hold(r.principal, b);
   }
   @Post(":id/action")
-  @RequireAccess(["company_admin"], "reservations.manage")
+  @RequireAccess(["company_admin", "company_user"], "reservations.manage")
   action(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,

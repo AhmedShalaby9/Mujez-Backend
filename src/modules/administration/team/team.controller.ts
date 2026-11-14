@@ -5,16 +5,56 @@ import {
   HttpCode,
   Param,
   Post,
+  ParseUUIDPipe,
   Req,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { Public, RequireAccess } from "../../../common/auth/access.js";
 import type { AuthRequest } from "../../../common/auth/access.guard.js";
 import { TeamService } from "./team.service.js";
-import { TeamInvite, TeamStatus, TeamActivate } from "./team.dto.js";
+import {
+  TeamInvite,
+  TeamStatus,
+  TeamActivate,
+  EmployeeRole,
+  SalesTeamInput,
+  SalesTeamUpdate,
+} from "./team.dto.js";
 @Controller("api/v1/team")
 export class TeamController {
   constructor(private readonly service: TeamService) {}
+  @Get("groups") @RequireAccess(["company_admin"], "team.read") groups(
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.groups(req.principal);
+  }
+  @Get("my-team") @RequireAccess(["company_user"], "team.self.read") myTeam(
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.myTeam(req.principal);
+  }
+  @Post("groups") @RequireAccess(["company_admin"], "team.manage") createGroup(
+    @Body() input: SalesTeamInput,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.saveGroup(req.principal, input);
+  }
+  @Post("groups/:id")
+  @RequireAccess(["company_admin"], "team.manage")
+  updateGroup(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: SalesTeamUpdate,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.saveGroup(req.principal, input, id);
+  }
+  @Post(":id/role") @RequireAccess(["company_admin"], "team.manage") role(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: EmployeeRole,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.changeRole(req.principal, id, input.role);
+  }
   @Get() @RequireAccess(["company_admin"]) list(@Req() req: AuthRequest) {
     return this.service.list(req.principal);
   }

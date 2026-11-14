@@ -17,7 +17,7 @@ import {
   CommissionUpdate,
   CommissionAction,
 } from "./commissions.dto.js";
-@RequireAccess(["company_admin"], "commissions.read")
+@RequireAccess(["company_admin", "company_user"], "commissions.read")
 @Controller("api/v1/commissions")
 export class CommissionsController {
   constructor(private readonly s: CommissionsService) {}
@@ -33,14 +33,13 @@ export class CommissionsController {
   ) {
     return this.s.detail(r.principal, id);
   }
-  @Post() @RequireAccess(["company_admin"], "commissions.manage") create(
-    @Req() r: AuthRequest,
-    @Body() b: CommissionInput,
-  ) {
+  @Post()
+  @RequireAccess(["company_admin", "company_user"], "commissions.manage")
+  create(@Req() r: AuthRequest, @Body() b: CommissionInput) {
     return this.s.calculate(r.principal, b);
   }
   @Post(":id/recalculate")
-  @RequireAccess(["company_admin"], "commissions.manage")
+  @RequireAccess(["company_admin", "company_user"], "commissions.manage")
   recalculate(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -49,7 +48,7 @@ export class CommissionsController {
     return this.s.calculate(r.principal, b, id);
   }
   @Post(":id/action")
-  @RequireAccess(["company_admin"], "commissions.manage")
+  @RequireAccess(["company_admin", "company_user"], "commissions.manage")
   action(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,

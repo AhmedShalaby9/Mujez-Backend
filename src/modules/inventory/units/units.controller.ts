@@ -17,7 +17,7 @@ import {
   UnitUpdate,
   InventoryArchive,
 } from "../projects/inventory.dto.js";
-@RequireAccess(["company_admin"], "units.read")
+@RequireAccess(["company_admin", "company_user"], "units.read")
 @Controller("api/v1/units")
 export class UnitsController {
   constructor(private readonly s: InventoryService) {}
@@ -30,13 +30,14 @@ export class UnitsController {
   ) {
     return this.s.unit(r.principal, id);
   }
-  @Post() @RequireAccess(["company_admin"], "units.manage") create(
-    @Req() r: AuthRequest,
-    @Body() b: UnitInput,
-  ) {
+  @Post()
+  @RequireAccess(["company_admin", "company_user"], "units.manage")
+  create(@Req() r: AuthRequest, @Body() b: UnitInput) {
     return this.s.saveUnit(r.principal, b);
   }
-  @Post(":id/update") @RequireAccess(["company_admin"], "units.manage") update(
+  @Post(":id/update")
+  @RequireAccess(["company_admin", "company_user"], "units.manage")
+  update(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() b: UnitUpdate,
@@ -44,7 +45,7 @@ export class UnitsController {
     return this.s.saveUnit(r.principal, b, id);
   }
   @Post(":id/archive")
-  @RequireAccess(["company_admin"], "units.manage")
+  @RequireAccess(["company_admin", "company_user"], "units.manage")
   archive(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,

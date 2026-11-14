@@ -24,7 +24,7 @@ import {
   DocumentArchive,
   DocumentReview,
 } from "./documents.dto.js";
-@RequireAccess(["company_admin"], "documents.read")
+@RequireAccess(["company_admin", "company_user"], "documents.read")
 @Controller("api/v1/documents")
 export class DocumentsController {
   constructor(private readonly s: DocumentsService) {}
@@ -56,7 +56,7 @@ export class DocumentsController {
     return new StreamableFile(d.content);
   }
   @Post(":id/review")
-  @RequireAccess(["company_admin"], "documents.manage")
+  @RequireAccess(["company_admin", "company_user"], "documents.manage")
   review(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -84,7 +84,7 @@ export class DocumentsController {
     return new StreamableFile(d.content);
   }
   @Post()
-  @RequireAccess(["company_admin"], "documents.manage")
+  @RequireAccess(["company_admin", "company_user"], "documents.manage")
   @UseInterceptors(
     FileInterceptor("file", {
       limits: { fileSize: 5242880, files: 1, fields: 10, fieldSize: 4000 },
@@ -114,7 +114,7 @@ export class DocumentsController {
     return this.s.upload(r.principal, b, file);
   }
   @Post(":id/archive")
-  @RequireAccess(["company_admin"], "documents.manage")
+  @RequireAccess(["company_admin", "company_user"], "documents.manage")
   archive(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,

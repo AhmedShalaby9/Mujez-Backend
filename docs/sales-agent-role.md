@@ -30,8 +30,26 @@ Permissions granted: `leads.{read,manage}`, `pipeline.{read,manage}`, `contacts.
 
 ## Known limitations
 
-- Only one employee role (`agent`) exists. `manager` (`scope='team'`) and `finance`/`marketing` (`scope='company'`, narrower permissions than the owner) are modeled in `tenant.roles.scope` but have no provisioning path or UI yet.
+- `agent` and `team_lead` are supported. Both retain `scope='own'`; team leads additionally receive `team.self.read`. Other employee roles remain unimplemented.
 - No "Agent / Broker" scope toggle (that's a `manager`/`scope='team'` feature — team-wide visibility isn't implemented, only `own` and `company`).
 - The Team page shows a raw activation link for the owner to copy/send manually; there is no outbound email for employee invites (same gap as owner activation).
 - `status()` (disable/enable) updates `platform.company_employee_accounts` and `tenant.users` in two separate transactions (different connection pools/roles) rather than one atomic one — `provision_company_employee`/`activate_company_employee` use `SECURITY DEFINER` to write both schemas atomically where it matters (account creation, activation); the lower-stakes status toggle does not.
 - No "My " framing (My leads, My tasks, …) or per-role dashboard copy — agents see the same screens and labels as the owner, just scoped to their own rows.
+
+## Company teams and Team Lead (migration 040)
+
+Company admins manage employees and team groups on `/company/team`. They can invite an employee as Sales Agent or Team Lead, change existing employee roles, and create/edit teams with one lead and multiple employees. Choosing a sales agent as lead automatically promotes that employee to Team Lead. Replacing a lead preserves the previous lead's role; an admin may then change it back to Sales Agent. An employee may belong to one team, and cannot lead two teams. Invited employees may be assigned before activation. Disabled/revoked employees cannot be newly assigned. Changing a current lead to Sales Agent is rejected until another lead is assigned.
+
+Team leads see the same personal sales modules as agents, plus `/company/my-team`. This is a **read-only roster**, not access to colleagues' CRM records or team administration. The endpoint selects by the authenticated lead and tenant, with no caller-controlled identity filter. All sales routes now admit `company_user` principals and still require their existing module permissions and own-row checks. The dashboard overview filters lead/pipeline/task/contract/commission/reservation data by the authenticated user's ownership; inventory remains shared read-only. Reports, routing, marketing, audit, and company administration remain unavailable to agents and team leads.
+
+API contract:
+
+- `GET /api/v1/team`: admin employee accounts, including `teamId` and role.
+- `POST /api/v1/team/invite`: `role` accepts `agent` or `team_lead`; existing activation/login flow applies.
+- `POST /api/v1/team/:accountId/role`: `{role}`; admin only, current lead demotion conflicts.
+- `GET /api/v1/team/groups`: admin roster grouped by team.
+- `POST /api/v1/team/groups`: `{name, leadUserId, memberUserIds}`. Lead is automatically included in membership. Returns `{id, version}`.
+- `POST /api/v1/team/groups/:id`: same fields plus current `version`; stale updates return 409. Full membership replacement supports adding/removing employees. Cross-team moves require removal from the old team first. Duplicate team names within the company conflict.
+- `GET /api/v1/team/my-team`: Team Lead only, `{items:[{id,name,leadUserId,version,createdAt,updatedAt,members:[{id,name,email,status,role}]}]}`. No assignment returns an empty list.
+
+Group/role changes use company advisory locks and tenant transactions with audit/outbox writes. A failed audit rolls back membership and promotion together. Existing sessions resolve role/permissions from the database on each request; refresh the browser after an administrator changes your role to update the navigation.

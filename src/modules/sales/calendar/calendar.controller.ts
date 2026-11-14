@@ -17,7 +17,7 @@ import {
   EventUpdate,
   EventStatus,
 } from "./calendar.dto.js";
-@RequireAccess(["company_admin"], "calendar.read")
+@RequireAccess(["company_admin", "company_user"], "calendar.read")
 @Controller("api/v1/events")
 export class CalendarController {
   constructor(private readonly service: CalendarService) {}
@@ -33,14 +33,13 @@ export class CalendarController {
   ) {
     return this.service.detail(r.principal, id);
   }
-  @Post() @RequireAccess(["company_admin"], "calendar.manage") create(
-    @Req() r: AuthRequest,
-    @Body() b: EventInput,
-  ) {
+  @Post()
+  @RequireAccess(["company_admin", "company_user"], "calendar.manage")
+  create(@Req() r: AuthRequest, @Body() b: EventInput) {
     return this.service.create(r.principal, b);
   }
   @Post(":id/update")
-  @RequireAccess(["company_admin"], "calendar.manage")
+  @RequireAccess(["company_admin", "company_user"], "calendar.manage")
   update(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -49,7 +48,7 @@ export class CalendarController {
     return this.service.update(r.principal, id, b);
   }
   @Post(":id/status")
-  @RequireAccess(["company_admin"], "calendar.manage")
+  @RequireAccess(["company_admin", "company_user"], "calendar.manage")
   status(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,

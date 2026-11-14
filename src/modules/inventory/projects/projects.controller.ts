@@ -21,7 +21,7 @@ import {
   BuildingUpdate,
   InventoryArchive,
 } from "./inventory.dto.js";
-@RequireAccess(["company_admin"], "projects.read")
+@RequireAccess(["company_admin", "company_user"], "projects.read")
 @Controller("api/v1/projects")
 export class ProjectsController {
   constructor(private readonly s: InventoryService) {}
@@ -34,14 +34,13 @@ export class ProjectsController {
   ) {
     return this.s.project(r.principal, id);
   }
-  @Post() @RequireAccess(["company_admin"], "projects.manage") create(
-    @Req() r: AuthRequest,
-    @Body() b: ProjectInput,
-  ) {
+  @Post()
+  @RequireAccess(["company_admin", "company_user"], "projects.manage")
+  create(@Req() r: AuthRequest, @Body() b: ProjectInput) {
     return this.s.createProject(r.principal, b);
   }
   @Post(":id/update")
-  @RequireAccess(["company_admin"], "projects.manage")
+  @RequireAccess(["company_admin", "company_user"], "projects.manage")
   update(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -50,7 +49,7 @@ export class ProjectsController {
     return this.s.updateProject(r.principal, id, b);
   }
   @Post(":id/archive")
-  @RequireAccess(["company_admin"], "projects.manage")
+  @RequireAccess(["company_admin", "company_user"], "projects.manage")
   archive(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -59,7 +58,7 @@ export class ProjectsController {
     return this.s.archive(r.principal, "projects", id, b);
   }
   @Post(":id/phases")
-  @RequireAccess(["company_admin"], "projects.manage")
+  @RequireAccess(["company_admin", "company_user"], "projects.manage")
   phase(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -68,7 +67,7 @@ export class ProjectsController {
     return this.s.phase(r.principal, id, b);
   }
   @Post(":id/phases/:phase/update")
-  @RequireAccess(["company_admin"], "projects.manage")
+  @RequireAccess(["company_admin", "company_user"], "projects.manage")
   phaseUpdate(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -78,7 +77,7 @@ export class ProjectsController {
     return this.s.phase(r.principal, id, b, ph);
   }
   @Post("phases/:phase/buildings")
-  @RequireAccess(["company_admin"], "projects.manage")
+  @RequireAccess(["company_admin", "company_user"], "projects.manage")
   building(
     @Req() r: AuthRequest,
     @Param("phase", ParseUUIDPipe) ph: string,
@@ -87,7 +86,7 @@ export class ProjectsController {
     return this.s.building(r.principal, ph, b);
   }
   @Post("phases/:phase/buildings/:building/update")
-  @RequireAccess(["company_admin"], "projects.manage")
+  @RequireAccess(["company_admin", "company_user"], "projects.manage")
   buildingUpdate(
     @Req() r: AuthRequest,
     @Param("phase", ParseUUIDPipe) ph: string,

@@ -12,8 +12,13 @@ export class CompanyOverviewService {
     private readonly reports: CompanyReportsService,
   ) {}
   async overview(p: Principal, segment?: string) {
-    await this.sales.access(p, "workspace.view");
-    const can = (key: string) => p.permissions.includes(key);
+    await this.sales.access(
+      p,
+      p.scope === "own" ? "leads.read" : "workspace.view",
+    );
+    const can = (key: string) =>
+      p.permissions.includes(key) &&
+      (p.scope !== "own" || !["reports.read", "routing.read"].includes(key));
     let worker: any = null;
     if (can("routing.read"))
       worker = await this.db.platform(
@@ -32,8 +37,17 @@ export class CompanyOverviewService {
               "SELECT now() AS at,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today",
             )
           ).rows[0],
-          params = [p.companyId, segment ?? null],
-          dated = [...params, clock.today],
+          params = [
+            p.companyId,
+            segment ?? null,
+            p.scope === "own" ? p.id : null,
+          ],
+          dated = [
+            p.companyId,
+            segment ?? null,
+            clock.today,
+            p.scope === "own" ? p.id : null,
+          ],
           result: any = {
             asOf: new Date(clock.at).toISOString(),
             today: clock.today,
@@ -64,26 +78,26 @@ export class CompanyOverviewService {
         if (can("pipeline.read"))
           result.metrics.pipeline = (
             await c.query(
-              "SELECT coalesce(sum(o.value_minor) FILTER(WHERE o.deal_type='sale'),0)::text AS \"saleValueMinor\",count(*) FILTER(WHERE o.deal_type='sale')::int AS \"saleCount\",count(*) FILTER(WHERE o.deal_type='lease')::int AS \"leaseCount\" FROM tenant.opportunities o JOIN tenant.leads l ON l.company_id=o.company_id AND l.id=o.lead_id WHERE o.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost') AND ($2::text IS NULL OR l.segment=$2)",
+              "SELECT coalesce(sum(o.value_minor) FILTER(WHERE o.deal_type='sale'),0)::text AS \"saleValueMinor\",count(*) FILTER(WHERE o.deal_type='sale')::int AS \"saleCount\",count(*) FILTER(WHERE o.deal_type='lease')::int AS \"leaseCount\" FROM tenant.opportunities o JOIN tenant.leads l ON l.company_id=o.company_id AND l.id=o.lead_id WHERE o.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost') AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2)",
               params,
             )
           ).rows[0];
         if (can("leads.read")) {
           result.metrics.newLeads7d = (
             await c.query(
-              "SELECT count(*)::int AS n FROM tenant.leads l WHERE l.company_id=$1 AND l.created_at>=(($3::date-6)::timestamp AT TIME ZONE 'Africa/Cairo') AND l.created_at<(($3::date+1)::timestamp AT TIME ZONE 'Africa/Cairo') AND ($2::text IS NULL OR l.segment=$2)",
+              "SELECT count(*)::int AS n FROM tenant.leads l WHERE l.company_id=$1 AND l.created_at>=(($3::date-6)::timestamp AT TIME ZONE 'Africa/Cairo') AND l.created_at<(($3::date+1)::timestamp AT TIME ZONE 'Africa/Cairo') AND ($4::uuid IS NULL OR l.owner_user_id=$4) AND ($2::text IS NULL OR l.segment=$2)",
               dated,
             )
           ).rows[0].n;
           result.scoredLeads = (
             await c.query(
-              "SELECT l.id,l.public_id AS reference,l.name,l.want,l.budget_minor::text AS \"budgetMinor\",l.score,u.name AS owner FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id WHERE l.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost') AND l.score IS NOT NULL AND ($2::text IS NULL OR l.segment=$2) ORDER BY l.score DESC,l.created_at DESC,l.id LIMIT 5",
+              "SELECT l.id,l.public_id AS reference,l.name,l.want,l.budget_minor::text AS \"budgetMinor\",l.score,u.name AS owner FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id WHERE l.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost') AND l.score IS NOT NULL AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2) ORDER BY l.score DESC,l.created_at DESC,l.id LIMIT 5",
               params,
             )
           ).rows;
           if (advancedAvailable) {
             const scope =
-              "l.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost') AND l.first_contact_at IS NULL AND r.active AND r.archived_at IS NULL AND r.sla_minutes>0 AND l.assigned_at+make_interval(mins=>r.sla_minutes)<=now() AND ($2::text IS NULL OR l.segment=$2)";
+              "l.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost') AND l.first_contact_at IS NULL AND r.active AND r.archived_at IS NULL AND r.sla_minutes>0 AND l.assigned_at+make_interval(mins=>r.sla_minutes)<=now() AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2)";
             const count = (
               await c.query(
                 "SELECT count(*)::int AS n FROM tenant.leads l JOIN tenant.routing_rules r ON r.company_id=l.company_id AND r.id=l.routing_rule_id WHERE " +
@@ -104,7 +118,7 @@ export class CompanyOverviewService {
         }
         if (can("tasks.read")) {
           const scope =
-            "t.company_id=$1 AND t.status='open' AND ($2::text IS NULL OR l.segment=$2)";
+            "t.company_id=$1 AND t.status='open' AND ($4::uuid IS NULL OR t.assignee_id=$4) AND ($2::text IS NULL OR l.segment=$2)";
           result.todayTasks = (
             await c.query(
               'SELECT t.id,t.title,t.priority,t.lead_id AS "leadId",u.name AS assignee FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id WHERE ' +
@@ -137,7 +151,7 @@ export class CompanyOverviewService {
         if (can("contracts.read")) {
           result.keyDates = (
             await c.query(
-              "SELECT ct.id,ct.public_id AS reference,ct.title,ct.value_minor::text AS \"valueMinor\",ct.key_date::text AS date,ct.status,u.name AS owner FROM tenant.contracts ct JOIN tenant.leads l ON l.company_id=ct.company_id AND l.id=ct.lead_id LEFT JOIN tenant.users u ON u.company_id=ct.company_id AND u.id=ct.owner_id WHERE ct.company_id=$1 AND ct.status<>'void' AND ct.key_date BETWEEN $3::date AND $3::date+14 AND ($2::text IS NULL OR l.segment=$2) ORDER BY ct.key_date,ct.id LIMIT 8",
+              "SELECT ct.id,ct.public_id AS reference,ct.title,ct.value_minor::text AS \"valueMinor\",ct.key_date::text AS date,ct.status,u.name AS owner FROM tenant.contracts ct JOIN tenant.leads l ON l.company_id=ct.company_id AND l.id=ct.lead_id LEFT JOIN tenant.users u ON u.company_id=ct.company_id AND u.id=ct.owner_id WHERE ct.company_id=$1 AND ct.status<>'void' AND ct.key_date BETWEEN $3::date AND $3::date+14 AND ($4::uuid IS NULL OR ct.owner_id=$4) AND ($2::text IS NULL OR l.segment=$2) ORDER BY ct.key_date,ct.id LIMIT 8",
               dated,
             )
           ).rows;
@@ -145,7 +159,7 @@ export class CompanyOverviewService {
             "missing-evidence",
             (
               await c.query(
-                "SELECT count(*)::int AS n FROM tenant.contracts ct JOIN tenant.leads l ON l.company_id=ct.company_id AND l.id=ct.lead_id WHERE ct.company_id=$1 AND ct.status IN ('draft','sent') AND ($2::text IS NULL OR l.segment=$2) AND EXISTS(SELECT 1 FROM tenant.contract_requirements r LEFT JOIN tenant.documents d ON d.company_id=r.company_id AND d.id=r.document_id WHERE r.company_id=ct.company_id AND r.contract_id=ct.id AND r.required AND (d.id IS NULL OR d.archived_at IS NOT NULL OR d.expires_date<$3::date))",
+                "SELECT count(*)::int AS n FROM tenant.contracts ct JOIN tenant.leads l ON l.company_id=ct.company_id AND l.id=ct.lead_id WHERE ct.company_id=$1 AND ct.status IN ('draft','sent') AND ($4::uuid IS NULL OR ct.owner_id=$4) AND ($2::text IS NULL OR l.segment=$2) AND EXISTS(SELECT 1 FROM tenant.contract_requirements r LEFT JOIN tenant.documents d ON d.company_id=r.company_id AND d.id=r.document_id WHERE r.company_id=ct.company_id AND r.contract_id=ct.id AND r.required AND (d.id IS NULL OR d.archived_at IS NOT NULL OR d.expires_date<$3::date))",
                 dated,
               )
             ).rows[0].n,
@@ -155,7 +169,7 @@ export class CompanyOverviewService {
         if (commissionsAvailable) {
           result.metrics.paidCommissionMtd = (
             await c.query(
-              "SELECT coalesce(sum(m.gross_minor),0)::text AS amount FROM tenant.commissions m JOIN tenant.contracts ct ON ct.company_id=m.company_id AND ct.id=m.contract_id JOIN tenant.leads l ON l.company_id=ct.company_id AND l.id=ct.lead_id WHERE m.company_id=$1 AND m.status='paid' AND m.paid_date BETWEEN date_trunc('month',$3::date)::date AND $3::date AND ($2::text IS NULL OR l.segment=$2)",
+              "SELECT coalesce(sum(m.gross_minor),0)::text AS amount FROM tenant.commissions m JOIN tenant.contracts ct ON ct.company_id=m.company_id AND ct.id=m.contract_id JOIN tenant.leads l ON l.company_id=ct.company_id AND l.id=ct.lead_id WHERE m.company_id=$1 AND m.status='paid' AND m.paid_date BETWEEN date_trunc('month',$3::date)::date AND $3::date AND ($4::uuid IS NULL OR ct.owner_id=$4) AND ($2::text IS NULL OR l.segment=$2)",
               dated,
             )
           ).rows[0].amount;
@@ -163,7 +177,7 @@ export class CompanyOverviewService {
             "payable-commissions",
             (
               await c.query(
-                "SELECT count(*)::int AS n FROM tenant.commissions m JOIN tenant.contracts ct ON ct.company_id=m.company_id AND ct.id=m.contract_id JOIN tenant.leads l ON l.company_id=ct.company_id AND l.id=ct.lead_id WHERE m.company_id=$1 AND m.status='payable' AND ($2::text IS NULL OR l.segment=$2)",
+                "SELECT count(*)::int AS n FROM tenant.commissions m JOIN tenant.contracts ct ON ct.company_id=m.company_id AND ct.id=m.contract_id JOIN tenant.leads l ON l.company_id=ct.company_id AND l.id=ct.lead_id WHERE m.company_id=$1 AND m.status='payable' AND ($3::uuid IS NULL OR ct.owner_id=$3) AND ($2::text IS NULL OR l.segment=$2)",
                 params,
               )
             ).rows[0].n,
@@ -175,7 +189,7 @@ export class CompanyOverviewService {
             "expiring-reservations",
             (
               await c.query(
-                "SELECT count(*)::int AS n FROM tenant.reservations r JOIN tenant.leads l ON l.company_id=r.company_id AND l.id=r.lead_id WHERE r.company_id=$1 AND r.status IN ('hold','reserved') AND r.expires_at>now() AND r.expires_at<=now()+interval '24 hours' AND ($2::text IS NULL OR l.segment=$2)",
+                "SELECT count(*)::int AS n FROM tenant.reservations r JOIN tenant.leads l ON l.company_id=r.company_id AND l.id=r.lead_id WHERE r.company_id=$1 AND r.status IN ('hold','reserved') AND r.expires_at>now() AND r.expires_at<=now()+interval '24 hours' AND ($3::uuid IS NULL OR r.assignee_id=$3) AND ($2::text IS NULL OR l.segment=$2)",
                 params,
               )
             ).rows[0].n,

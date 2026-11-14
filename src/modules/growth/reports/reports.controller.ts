@@ -18,7 +18,7 @@ export class CompanyReportsController {
     return this.s.export(r.principal, b);
   }
 }
-@RequireAccess(["company_admin"], "workspace.view")
+@RequireAccess(["company_admin", "company_user"])
 @Controller("api/v1/company-overview")
 export class CompanyOverviewController {
   constructor(private readonly s: CompanyOverviewService) {}

@@ -21,7 +21,7 @@ import {
   LeadContact,
   ActivityQuery,
 } from "./leads.dto.js";
-@RequireAccess(["company_admin"], "leads.read")
+@RequireAccess(["company_admin", "company_user"], "leads.read")
 @Controller("api/v1/leads")
 export class LeadsController {
   constructor(private readonly service: SalesService) {}
@@ -44,20 +44,23 @@ export class LeadsController {
   ) {
     return this.service.activities(req.principal, id, q);
   }
-  @Post() @RequireAccess(["company_admin"], "leads.manage") create(
-    @Req() req: AuthRequest,
-    @Body() b: LeadInput,
-  ) {
+  @Post()
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  create(@Req() req: AuthRequest, @Body() b: LeadInput) {
     return this.service.create(req.principal, b);
   }
-  @Post(":id/update") @RequireAccess(["company_admin"], "leads.manage") update(
+  @Post(":id/update")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  update(
     @Req() req: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() b: LeadUpdate,
   ) {
     return this.service.update(req.principal, id, b);
   }
-  @Post(":id/stage") @RequireAccess(["company_admin"], "leads.manage") stage(
+  @Post(":id/stage")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  stage(
     @Req() req: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() b: StageChange,
@@ -65,7 +68,7 @@ export class LeadsController {
     return this.service.stage(req.principal, id, b);
   }
   @Post(":id/archive")
-  @RequireAccess(["company_admin"], "leads.manage")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
   archive(
     @Req() req: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -74,7 +77,7 @@ export class LeadsController {
     return this.service.archive(req.principal, id, b);
   }
   @Post(":id/contact")
-  @RequireAccess(["company_admin"], "leads.manage")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
   contact(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -82,7 +85,9 @@ export class LeadsController {
   ) {
     return this.service.contact(r.principal, id, b);
   }
-  @Post(":id/notes") @RequireAccess(["company_admin"], "leads.manage") note(
+  @Post(":id/notes")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  note(
     @Req() req: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() b: LeadNote,

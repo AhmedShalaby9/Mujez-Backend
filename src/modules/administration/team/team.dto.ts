@@ -2,6 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import {
   IsEmail,
+  IsArray,
+  IsUUID,
+  IsInt,
+  Min,
+  ArrayMaxSize,
+  ArrayUnique,
   IsIn,
   IsOptional,
   IsString,
@@ -11,7 +17,7 @@ import {
 } from "class-validator";
 const trim = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim() : value;
-export const TEAM_ROLES = ["agent"] as const;
+export const TEAM_ROLES = ["agent", "team_lead"] as const;
 export type TeamRole = (typeof TEAM_ROLES)[number];
 export class TeamInvite {
   @IsString()
@@ -41,4 +47,29 @@ export class TeamQuery {
   @IsIn(["all", "invited", "active", "disabled"])
   @ApiPropertyOptional({ type: String })
   status?: string;
+}
+
+export class EmployeeRole {
+  @IsIn(TEAM_ROLES) @ApiProperty({ enum: TEAM_ROLES }) declare role: TeamRole;
+}
+export class SalesTeamInput {
+  @ApiProperty({ minLength: 2, maxLength: 120 })
+  @IsString()
+  @Transform(trim)
+  @MinLength(2)
+  @MaxLength(120)
+  declare name: string;
+  @ApiProperty({ format: "uuid" }) @IsUUID() declare leadUserId: string;
+  @ApiProperty({ type: [String], maxItems: 500 })
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  declare memberUserIds: string[];
+}
+export class SalesTeamUpdate extends SalesTeamInput {
+  @ApiProperty({ type: Number, minimum: 0 })
+  @IsInt()
+  @Min(0)
+  declare version: number;
 }
