@@ -3387,6 +3387,148 @@
         "tags": ["CompanyAudit"]
       }
     },
+    "/api/v1/team/my-team/leads": {
+      "get": {
+        "operationId": "TeamController_leads",
+        "parameters": [
+          {
+            "name": "memberId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 25,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "stage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "qualified",
+                "viewing",
+                "offer",
+                "contract",
+                "won",
+                "lost"
+              ]
+            }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/my-team/tasks": {
+      "get": {
+        "operationId": "TeamController_tasks",
+        "parameters": [
+          {
+            "name": "memberId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 25,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["open", "done", "cancelled"]
+            }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/my-team/performance": {
+      "get": {
+        "operationId": "TeamController_performance",
+        "parameters": [
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 30, "type": "number", "enum": [7, 30, 90] }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/my-team/leads/{id}/assign": {
+      "post": {
+        "operationId": "TeamController_assign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TeamLeadAssignment" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
     "/api/v1/team/groups": {
       "get": {
         "operationId": "TeamController_groups",
@@ -5980,6 +6122,15 @@
           "requestId": { "type": "string", "format": "uuid" }
         },
         "required": ["requestId"]
+      },
+      "TeamLeadAssignment": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "ownerId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number", "minimum": 0 }
+        },
+        "required": ["requestId", "ownerId", "version"]
       },
       "SalesTeamInput": {
         "type": "object",

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Query,
   HttpCode,
   Param,
   Post,
@@ -20,9 +21,43 @@ import {
   SalesTeamInput,
   SalesTeamUpdate,
 } from "./team.dto.js";
+import { TeamWorkService } from "./team-work.service.js";
+import {
+  TeamLeadQuery,
+  TeamTaskQuery,
+  TeamPerformanceQuery,
+  TeamLeadAssignment,
+} from "./team-work.dto.js";
 @Controller("api/v1/team")
 export class TeamController {
-  constructor(private readonly service: TeamService) {}
+  constructor(
+    private readonly service: TeamService,
+    private readonly work: TeamWorkService,
+  ) {}
+  @Get("my-team/leads")
+  @RequireAccess(["company_user"], "team.self.read")
+  leads(@Req() req: AuthRequest, @Query() q: TeamLeadQuery) {
+    return this.work.leads(req.principal, q);
+  }
+  @Get("my-team/tasks")
+  @RequireAccess(["company_user"], "team.self.read")
+  tasks(@Req() req: AuthRequest, @Query() q: TeamTaskQuery) {
+    return this.work.tasks(req.principal, q);
+  }
+  @Get("my-team/performance")
+  @RequireAccess(["company_user"], "team.self.read")
+  performance(@Req() req: AuthRequest, @Query() q: TeamPerformanceQuery) {
+    return this.work.performance(req.principal, q);
+  }
+  @Post("my-team/leads/:id/assign")
+  @RequireAccess(["company_user"], "team.self.read")
+  assign(
+    @Req() req: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: TeamLeadAssignment,
+  ) {
+    return this.work.assign(req.principal, id, input);
+  }
   @Get("groups") @RequireAccess(["company_admin"], "team.read") groups(
     @Req() req: AuthRequest,
   ) {
