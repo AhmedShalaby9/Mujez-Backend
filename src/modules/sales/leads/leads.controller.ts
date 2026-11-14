@@ -18,7 +18,6 @@ import {
   StageChange,
   LeadArchive,
   LeadNote,
-  LeadContact,
   ActivityQuery,
 } from "./leads.dto.js";
 @RequireAccess(["company_admin", "company_user"], "leads.read")
@@ -75,15 +74,6 @@ export class LeadsController {
     @Body() b: LeadArchive,
   ) {
     return this.service.archive(req.principal, id, b);
-  }
-  @Post(":id/contact")
-  @RequireAccess(["company_admin", "company_user"], "leads.manage")
-  contact(
-    @Req() r: AuthRequest,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body() b: LeadContact,
-  ) {
-    return this.service.contact(r.principal, id, b);
   }
   @Post(":id/notes")
   @RequireAccess(["company_admin", "company_user"], "leads.manage")

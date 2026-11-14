@@ -119,7 +119,7 @@ test("explicit assignment overrides automatic routing, retries do not consume an
     409,
   );
 });
-test("SLA worker reassigns actual overdue uncontacted leads, stops after recorded contact, and writes system audit atomically", async () => {
+test("SLA worker reassigns actual overdue uncontacted leads, stops after a logged call, and writes system audit atomically", async () => {
   await h.db.query(
     "UPDATE tenant.leads SET assigned_at=now()-interval '5 minutes' WHERE id=$1",
     [lead.id],
@@ -137,15 +137,14 @@ test("SLA worker reassigns actual overdue uncontacted leads, stops after recorde
   );
   lead = (
     await h.post(
-      "leads/" + lead.id + "/contact",
+      "leads/" + lead.id + "/notes",
       req({
         version: lead.version,
-        channel: "phone",
-        note: "Recorded external first contact for verification",
+        kind: "call",
+        note: "Called the buyer for verification",
       }),
     )
   ).body;
-  assert.ok(lead.firstContactAt);
   assert.equal(lead.slaDueAt, null);
   await h.db.query(
     "UPDATE tenant.leads SET assigned_at=now()-interval '5 minutes' WHERE id=$1",

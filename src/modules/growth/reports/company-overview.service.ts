@@ -1,3 +1,4 @@
+import { NOT_CONTACTED_SQL } from "../../sales/leads/contact-sql.js";
 import { tenantFeature } from "../../../common/auth/tenant-features.js";
 import { Injectable } from "@nestjs/common";
 import type { Principal } from "../../../common/auth/access.js";
@@ -97,7 +98,7 @@ export class CompanyOverviewService {
           ).rows;
           if (advancedAvailable) {
             const scope =
-              "l.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost','unqualified') AND l.first_contact_at IS NULL AND r.active AND r.archived_at IS NULL AND r.sla_minutes>0 AND l.assigned_at+make_interval(mins=>r.sla_minutes)<=now() AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2)";
+              "l.company_id=$1 AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost','unqualified') AND " + NOT_CONTACTED_SQL + " AND r.active AND r.archived_at IS NULL AND r.sla_minutes>0 AND l.assigned_at+make_interval(mins=>r.sla_minutes)<=now() AND ($3::uuid IS NULL OR l.owner_user_id=$3) AND ($2::text IS NULL OR l.segment=$2)";
             const count = (
               await c.query(
                 "SELECT count(*)::int AS n FROM tenant.leads l JOIN tenant.routing_rules r ON r.company_id=l.company_id AND r.id=l.routing_rule_id WHERE " +

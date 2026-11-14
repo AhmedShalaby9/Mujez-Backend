@@ -280,15 +280,3 @@ export class DealUpdate extends SalesRequest {
   declare valueMinor: string;
 }
 
-export class LeadContact extends SalesRequest {
-  @IsInt() @Min(0) @ApiProperty() declare version: number;
-  @IsIn(["phone", "email", "meeting", "other"])
-  @ApiProperty()
-  declare channel: string;
-  @IsString()
-  @Transform(trim)
-  @MinLength(10)
-  @MaxLength(1000)
-  @ApiProperty()
-  declare note: string;
-}

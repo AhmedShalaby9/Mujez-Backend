@@ -1,3 +1,4 @@
+import { NOT_CONTACTED_SQL } from "./contact-sql.js";
 import { requireCrmSlot } from "../../../common/auth/crm-quota.js";
 import { tenantFeature } from "../../../common/auth/tenant-features.js";
 import { pickRoute } from "../../administration/routing/routing-picker.js";
@@ -23,7 +24,6 @@ import {
   type StageChange,
   type LeadArchive,
   type LeadNote,
-  type LeadContact,
   type ActivityQuery,
   type DealInput,
   type DealUpdate,
@@ -40,7 +40,7 @@ export function normalizePhone(value: string) {
     );
   return s;
 }
-const LEAD = `SELECT l.*,(SELECT max(a.created_at) FROM tenant.lead_activities a WHERE a.company_id=l.company_id AND a.lead_id=l.id) AS last_activity_at,l.budget_minor::text AS budget_minor,u.name AS owner_name,o.id AS opportunity_id,o.public_id AS deal_ref,o.title AS deal_title,o.value_minor::text AS deal_value,o.deal_type,o.version AS deal_version,mc.name AS campaign_name,rr.name AS routing_rule_name,CASE WHEN l.first_contact_at IS NULL AND rr.active AND rr.archived_at IS NULL AND rr.sla_minutes>0 THEN l.assigned_at+make_interval(mins=>rr.sla_minutes) ELSE NULL END AS sla_due_at FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id LEFT JOIN tenant.marketing_campaigns mc ON mc.company_id=l.company_id AND mc.id=l.campaign_id LEFT JOIN tenant.routing_rules rr ON rr.company_id=l.company_id AND rr.id=l.routing_rule_id`;
+const LEAD = `SELECT l.*,(SELECT max(a.created_at) FROM tenant.lead_activities a WHERE a.company_id=l.company_id AND a.lead_id=l.id) AS last_activity_at,l.budget_minor::text AS budget_minor,u.name AS owner_name,o.id AS opportunity_id,o.public_id AS deal_ref,o.title AS deal_title,o.value_minor::text AS deal_value,o.deal_type,o.version AS deal_version,mc.name AS campaign_name,rr.name AS routing_rule_name,CASE WHEN ${NOT_CONTACTED_SQL} AND rr.active AND rr.archived_at IS NULL AND rr.sla_minutes>0 THEN l.assigned_at+make_interval(mins=>rr.sla_minutes) ELSE NULL END AS sla_due_at FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id LEFT JOIN tenant.marketing_campaigns mc ON mc.company_id=l.company_id AND mc.id=l.campaign_id LEFT JOIN tenant.routing_rules rr ON rr.company_id=l.company_id AND rr.id=l.routing_rule_id`;
 const ref = (prefix: string) =>
   prefix + "-" + randomBytes(6).toString("hex").toUpperCase();
 const iso = (value: any) => (value ? new Date(value).toISOString() : null);
@@ -62,7 +62,6 @@ export function leadDto(l: any) {
       ? { id: l.campaign_id, name: l.campaign_name }
       : null,
     assignedAt: iso(l.assigned_at),
-    firstContactAt: iso(l.first_contact_at),
     routingRule: l.routing_rule_id
       ? { id: l.routing_rule_id, name: l.routing_rule_name }
       : null,
@@ -439,25 +438,6 @@ export class SalesService {
         "Choose an active company campaign with the same lead source",
       );
     return id;
-  }
-  async contact(p: Principal, id: string, b: LeadContact) {
-    return this.write(p, "leads.manage", "lead.contact:" + id, b, async (c) => {
-      const old = await this.row(c, p, id, true);
-      this.check(old, b.version);
-      if (old.archived_at || old.first_contact_at)
-        throw new ConflictException(
-          "Lead is archived or first contact is already recorded",
-        );
-      await c.query(
-        "UPDATE tenant.leads SET first_contact_at=now(),version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
-        [p.companyId, id],
-      );
-      await this.event(c, p, id, "lead.contact_recorded", {
-        channel: b.channel,
-        note: b.note,
-      });
-      return leadDto(await this.row(c, p, id));
-    });
   }
   async create(p: Principal, input: LeadInput) {
     return this.write(p, "leads.manage", "lead.create", input, async (c) => {
