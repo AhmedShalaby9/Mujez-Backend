@@ -1,3 +1,4 @@
+import { teamSnapshot } from "./insights/team-snapshot.js";
 import {
   Injectable,
   ForbiddenException,
@@ -180,88 +181,105 @@ export class TeamWorkService {
     await this.sales.access(p, "tasks.read");
     return this.db.tenant(
       p.companyId!,
-      async (c) => {
-        const team = await this.team(c, p);
-        const clock = (
-          await c.query(
-            `SELECT now() AS at,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today,((now() AT TIME ZONE 'Africa/Cairo')::date-($1::int-1))::text AS since`,
-            [q.days],
-          )
-        ).rows[0];
-        const members = (
-          await c.query(MEMBER + " ORDER BY u.name,u.id", [
-            p.companyId,
-            team.id,
-          ])
-        ).rows;
-        const ids = members.map((m) => m.id);
-        const leads = (
-          await c.query(
-            `SELECT l.owner_user_id AS id,count(*)::int AS leads,count(*) FILTER(WHERE l.stage NOT IN ('won','lost','unqualified'))::int AS "openLeads",count(*) FILTER(WHERE l.created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.created_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "newLeads",count(*) FILTER(WHERE l.stage='won' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS won,count(*) FILTER(WHERE l.stage='lost' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS lost,coalesce(sum(o.value_minor) FILTER(WHERE l.stage='won' AND o.deal_type='sale' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo')),0)::text AS "wonSalesMinor" FROM tenant.leads l LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id WHERE l.company_id=$1 AND l.owner_user_id=ANY($2::uuid[]) AND l.archived_at IS NULL GROUP BY l.owner_user_id`,
-            [p.companyId, ids, clock.since, clock.today],
-          )
-        ).rows;
-        const tasks = (
-          await c.query(
-            `SELECT assignee_id AS id,count(*) FILTER(WHERE status='open')::int AS "openTasks",count(*) FILTER(WHERE status='open' AND due_date<$4::date)::int AS "overdueTasks",count(*) FILTER(WHERE status='done' AND completed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND completed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "completedTasks" FROM tenant.tasks WHERE company_id=$1 AND assignee_id=ANY($2::uuid[]) GROUP BY assignee_id`,
-            [p.companyId, ids, clock.since, clock.today],
-          )
-        ).rows;
-        const zero = {
-          leads: 0,
-          openLeads: 0,
-          newLeads: 0,
-          won: 0,
-          lost: 0,
-          wonSalesMinor: "0",
-          openTasks: 0,
-          overdueTasks: 0,
-          completedTasks: 0,
-        };
-        const items = members.map((m) => ({
-          ...zero,
-          ...leads.find((l) => l.id === m.id),
-          ...tasks.find((t) => t.id === m.id),
-          id: m.id,
-          name: m.name,
-          email: m.email,
-          role: m.role,
-          status: m.account_status,
-          canAssign:
-            m.status === "active" &&
-            m.account_status === "active" &&
-            ["agent", "team_lead"].includes(m.role),
-        }));
-        const summary = { ...zero };
-        for (const item of items) {
-          for (const key of [
-            "leads",
-            "openLeads",
-            "newLeads",
-            "won",
-            "lost",
-            "openTasks",
-            "overdueTasks",
-            "completedTasks",
-          ] as const)
-            summary[key] += item[key];
-          summary.wonSalesMinor = (
-            BigInt(summary.wonSalesMinor) + BigInt(item.wonSalesMinor)
-          ).toString();
-        }
-        return {
-          team,
-          items,
-          summary,
-          days: q.days,
-          from: clock.since,
-          to: clock.today,
-          asOf: new Date(clock.at).toISOString(),
-          timeZone: "Africa/Cairo",
-          canAssign: p.permissions.includes("leads.manage"),
-          canManageTasks: p.permissions.includes("tasks.manage"),
-        };
-      },
+      (c) => this.performanceData(c, p, q),
+      true,
+    );
+  }
+  private async performanceData(
+    c: PoolClient,
+    p: Principal,
+    q: TeamPerformanceQuery,
+  ) {
+    const team = await this.team(c, p);
+    const clock = (
+      await c.query(
+        `SELECT now() AS at,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today,((now() AT TIME ZONE 'Africa/Cairo')::date-($1::int-1))::text AS since`,
+        [q.days],
+      )
+    ).rows[0];
+    const members = (
+      await c.query(MEMBER + " ORDER BY u.name,u.id", [p.companyId, team.id])
+    ).rows;
+    const ids = members.map((m) => m.id);
+    const leads = (
+      await c.query(
+        `SELECT l.owner_user_id AS id,count(*)::int AS leads,count(*) FILTER(WHERE l.stage NOT IN ('won','lost','unqualified'))::int AS "openLeads",count(*) FILTER(WHERE l.created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.created_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "newLeads",count(*) FILTER(WHERE l.stage='won' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS won,count(*) FILTER(WHERE l.stage='lost' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS lost,coalesce(sum(o.value_minor) FILTER(WHERE l.stage='won' AND o.deal_type='sale' AND l.stage_changed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo')),0)::text AS "wonSalesMinor" FROM tenant.leads l LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id WHERE l.company_id=$1 AND l.owner_user_id=ANY($2::uuid[]) AND l.archived_at IS NULL GROUP BY l.owner_user_id`,
+        [p.companyId, ids, clock.since, clock.today],
+      )
+    ).rows;
+    const tasks = (
+      await c.query(
+        `SELECT assignee_id AS id,count(*) FILTER(WHERE status='open')::int AS "openTasks",count(*) FILTER(WHERE status='open' AND due_date<$4::date)::int AS "overdueTasks",count(*) FILTER(WHERE status='done' AND completed_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND completed_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "completedTasks" FROM tenant.tasks WHERE company_id=$1 AND assignee_id=ANY($2::uuid[]) GROUP BY assignee_id`,
+        [p.companyId, ids, clock.since, clock.today],
+      )
+    ).rows;
+    const zero = {
+      leads: 0,
+      openLeads: 0,
+      newLeads: 0,
+      won: 0,
+      lost: 0,
+      wonSalesMinor: "0",
+      openTasks: 0,
+      overdueTasks: 0,
+      completedTasks: 0,
+    };
+    const items = members.map((m) => ({
+      ...zero,
+      ...leads.find((l) => l.id === m.id),
+      ...tasks.find((t) => t.id === m.id),
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      role: m.role,
+      status: m.account_status,
+      canAssign:
+        m.status === "active" &&
+        m.account_status === "active" &&
+        ["agent", "team_lead"].includes(m.role),
+    }));
+    const summary = { ...zero };
+    for (const item of items) {
+      for (const key of [
+        "leads",
+        "openLeads",
+        "newLeads",
+        "won",
+        "lost",
+        "openTasks",
+        "overdueTasks",
+        "completedTasks",
+      ] as const)
+        summary[key] += item[key];
+      summary.wonSalesMinor = (
+        BigInt(summary.wonSalesMinor) + BigInt(item.wonSalesMinor)
+      ).toString();
+    }
+    return {
+      team,
+      items,
+      summary,
+      days: q.days,
+      from: clock.since,
+      to: clock.today,
+      asOf: new Date(clock.at).toISOString(),
+      timeZone: "Africa/Cairo",
+      canAssign: p.permissions.includes("leads.manage"),
+      canManageTasks: p.permissions.includes("tasks.manage"),
+    };
+  }
+  async analytics(p: Principal, days: number) {
+    await this.access(p, "leads.read");
+    await this.sales.access(p, "tasks.read");
+    await this.sales.access(p, "pipeline.read");
+    return this.db.tenant(
+      p.companyId!,
+      async (c) =>
+        teamSnapshot(
+          c,
+          p.companyId!,
+          await this.performanceData(c, p, { days }),
+        ),
       true,
     );
   }
