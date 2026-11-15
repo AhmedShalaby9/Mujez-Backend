@@ -50,6 +50,10 @@ export class KimiClient {
         baseUrl: input.KIMI_BASE_URL as KimiConfiguration["baseUrl"],
         model: input.KIMI_MODEL as KimiConfiguration["model"],
         thinking: true,
+        timeoutMs:
+          input.KIMI_TIMEOUT_MS === undefined
+            ? undefined
+            : Number(input.KIMI_TIMEOUT_MS),
         reasoningEffort:
           input.KIMI_REASONING_EFFORT as KimiConfiguration["reasoningEffort"],
       },

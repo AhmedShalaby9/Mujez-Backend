@@ -6,7 +6,10 @@ import {
 @Injectable()
 export class KimiTeamInsightsGateway {
   createClient() {
-    return KimiClient.fromEnvironment();
+    return KimiClient.fromEnvironment({
+      ...process.env,
+      KIMI_TIMEOUT_MS: "120000",
+    });
   }
   assertConfigured() {
     this.createClient();

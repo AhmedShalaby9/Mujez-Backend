@@ -126,3 +126,50 @@ test("Kimi cancels timed-out HTTP calls and rejects truncated output", async () 
     },
   );
 });
+test("environment timeouts are bounded and configurable for longer explicit AI analyses", async () => {
+  assert.throws(() =>
+    KimiClient.fromEnvironment({
+      KIMI_API_KEY: secret,
+      KIMI_TIMEOUT_MS: "120001",
+    }),
+  );
+  assert.throws(() =>
+    KimiClient.fromEnvironment({
+      KIMI_API_KEY: secret,
+      KIMI_TIMEOUT_MS: "invalid",
+    }),
+  );
+  await httpFixture(
+    async (req, res) => {
+      for await (const _ of req) {
+      }
+      await new Promise((r) => setTimeout(r, 30));
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          choices: [{ finish_reason: "stop", message: { content: "ok" } }],
+          usage: { prompt_tokens: 1, completion_tokens: 1 },
+        }),
+      );
+    },
+    async (transport) => {
+      const short = KimiClient.fromEnvironment(
+        { KIMI_API_KEY: secret, KIMI_TIMEOUT_MS: "5" },
+        transport,
+      );
+      await assert.rejects(
+        short.complete([{ role: "user", content: "test" }], 64),
+        (e) => e.kind === "timeout",
+      );
+      const longer = KimiClient.fromEnvironment(
+        { KIMI_API_KEY: secret, KIMI_TIMEOUT_MS: "120000" },
+        transport,
+      );
+      assert.equal(
+        (await longer.complete([{ role: "user", content: "test" }], 64))
+          .content,
+        "ok",
+      );
+    },
+  );
+});
