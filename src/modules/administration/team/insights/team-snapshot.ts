@@ -6,54 +6,59 @@ export type Metric = {
   unit: "count" | "money" | "percent" | "days";
   memberKey?: string;
 };
-export async function teamSnapshot(c: PoolClient, companyId: string, p: any) {
+export async function teamSnapshot(
+  c: PoolClient,
+  companyId: string,
+  p: any,
+  companyScope = false,
+) {
   const ids = p.items.map((m: any) => m.id);
   const args = [companyId, ids, p.from, p.to, p.days];
   const previous = (
     await c.query(
-      `SELECT ($3::date-$4::int)::text AS "from",($3::date-1)::text AS "to",count(*) FILTER(WHERE l.created_at>= (($3::date-$4::int)::timestamp AT TIME ZONE 'Africa/Cairo') AND l.created_at<($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "newLeads",count(*) FILTER(WHERE l.stage='won' AND l.stage_changed_at>= (($3::date-$4::int)::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS won,count(*) FILTER(WHERE l.stage='lost' AND l.stage_changed_at>= (($3::date-$4::int)::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS lost,coalesce(sum(o.value_minor) FILTER(WHERE l.stage='won' AND o.deal_type='sale' AND l.stage_changed_at>= (($3::date-$4::int)::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<($3::date::timestamp AT TIME ZONE 'Africa/Cairo')),0)::text AS "wonSalesMinor" FROM tenant.leads l LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id WHERE l.company_id=$1 AND l.owner_user_id=ANY($2::uuid[]) AND l.archived_at IS NULL`,
+      `SELECT ($3::date-$4::int)::text AS "from",($3::date-1)::text AS "to",count(*) FILTER(WHERE l.created_at>= (($3::date-$4::int)::timestamp AT TIME ZONE 'Africa/Cairo') AND l.created_at<($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "newLeads",count(*) FILTER(WHERE l.stage='won' AND l.stage_changed_at>= (($3::date-$4::int)::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS won,count(*) FILTER(WHERE l.stage='lost' AND l.stage_changed_at>= (($3::date-$4::int)::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS lost,coalesce(sum(o.value_minor) FILTER(WHERE l.stage='won' AND o.deal_type='sale' AND l.stage_changed_at>= (($3::date-$4::int)::timestamp AT TIME ZONE 'Africa/Cairo') AND l.stage_changed_at<($3::date::timestamp AT TIME ZONE 'Africa/Cairo')),0)::text AS "wonSalesMinor" FROM tenant.leads l LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id WHERE l.company_id=$1 AND (l.owner_user_id=ANY($2::uuid[]) OR ${companyScope}) AND l.archived_at IS NULL`,
       [...args.slice(0, 3), args[4]],
     )
   ).rows[0];
   const stages = (
     await c.query(
-      `SELECT l.stage,count(*)::int AS count,coalesce(sum(o.value_minor) FILTER(WHERE o.deal_type='sale'),0)::text AS "saleMinor",count(*) FILTER(WHERE o.id IS NULL OR o.value_minor IS NULL)::int AS "unknownValue",count(*) FILTER(WHERE o.deal_type='lease')::int AS leases FROM tenant.leads l LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id WHERE l.company_id=$1 AND l.owner_user_id=ANY($2::uuid[]) AND l.archived_at IS NULL GROUP BY l.stage ORDER BY l.stage`,
+      `SELECT l.stage,count(*)::int AS count,coalesce(sum(o.value_minor) FILTER(WHERE o.deal_type='sale'),0)::text AS "saleMinor",count(*) FILTER(WHERE o.id IS NULL OR o.value_minor IS NULL)::int AS "unknownValue",count(*) FILTER(WHERE o.deal_type='lease')::int AS leases FROM tenant.leads l LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id WHERE l.company_id=$1 AND (l.owner_user_id=ANY($2::uuid[]) OR ${companyScope}) AND l.archived_at IS NULL GROUP BY l.stage ORDER BY l.stage`,
       args.slice(0, 2),
     )
   ).rows;
   const sources = (
     await c.query(
-      `SELECT source,count(*)::int AS count,count(*) FILTER(WHERE stage='won')::int AS won FROM tenant.leads WHERE company_id=$1 AND owner_user_id=ANY($2::uuid[]) AND archived_at IS NULL AND created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND created_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo') GROUP BY source ORDER BY source`,
+      `SELECT source,count(*)::int AS count,count(*) FILTER(WHERE stage='won')::int AS won FROM tenant.leads WHERE company_id=$1 AND (owner_user_id=ANY($2::uuid[]) OR ${companyScope}) AND archived_at IS NULL AND created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND created_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo') GROUP BY source ORDER BY source`,
       args.slice(0, 4),
     )
   ).rows;
   const aging = (
     await c.query(
-      `SELECT count(*) FILTER(WHERE l.stage_changed_at< (($3::date-7)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "stalledLeads",count(*) FILTER(WHERE l.updated_at< (($3::date-7)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "inactiveLeads",coalesce(round(avg(greatest(0,$3::date-(l.stage_changed_at AT TIME ZONE 'Africa/Cairo')::date)),1),0)::text AS "averageStageDays" FROM tenant.leads l WHERE l.company_id=$1 AND l.owner_user_id=ANY($2::uuid[]) AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost','unqualified')`,
+      `SELECT count(*) FILTER(WHERE l.stage_changed_at< (($3::date-7)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "stalledLeads",count(*) FILTER(WHERE l.updated_at< (($3::date-7)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "inactiveLeads",coalesce(round(avg(greatest(0,$3::date-(l.stage_changed_at AT TIME ZONE 'Africa/Cairo')::date)),1),0)::text AS "averageStageDays" FROM tenant.leads l WHERE l.company_id=$1 AND (l.owner_user_id=ANY($2::uuid[]) OR ${companyScope}) AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost','unqualified')`,
       [companyId, ids, p.to],
     )
   ).rows[0];
   const taskCounts = (
     await c.query(
-      `SELECT count(*)::int AS total,count(*) FILTER(WHERE status='open' AND due_date=$4::date)::int AS "dueToday",count(*) FILTER(WHERE status='open' AND priority='high')::int AS "highPriorityOpen",count(*) FILTER(WHERE status='done' AND completed_at>= (($3::date-$5::int)::timestamp AT TIME ZONE 'Africa/Cairo') AND completed_at<($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "previousCompletedTasks",count(*) FILTER(WHERE status='cancelled' AND updated_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND updated_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "cancelledTasks" FROM tenant.tasks WHERE company_id=$1 AND assignee_id=ANY($2::uuid[])`,
+      `SELECT count(*)::int AS total,count(*) FILTER(WHERE status='open' AND due_date=$4::date)::int AS "dueToday",count(*) FILTER(WHERE status='open' AND priority='high')::int AS "highPriorityOpen",count(*) FILTER(WHERE status='done' AND completed_at>= (($3::date-$5::int)::timestamp AT TIME ZONE 'Africa/Cairo') AND completed_at<($3::date::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "previousCompletedTasks",count(*) FILTER(WHERE status='cancelled' AND updated_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND updated_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo'))::int AS "cancelledTasks" FROM tenant.tasks WHERE company_id=$1 AND (assignee_id=ANY($2::uuid[]) OR ${companyScope})`,
       args,
     )
   ).rows[0];
   const activity = (
     await c.query(
-      `SELECT count(*)::int AS count FROM tenant.lead_activities a JOIN tenant.leads l ON l.company_id=a.company_id AND l.id=a.lead_id WHERE a.company_id=$1 AND l.owner_user_id=ANY($2::uuid[]) AND l.archived_at IS NULL AND a.kind IN ('lead.note_added','lead.call_logged','lead.whatsapp_logged','lead.viewing_logged') AND a.created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND a.created_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo')`,
+      `SELECT count(*)::int AS count FROM tenant.lead_activities a JOIN tenant.leads l ON l.company_id=a.company_id AND l.id=a.lead_id WHERE a.company_id=$1 AND (l.owner_user_id=ANY($2::uuid[]) OR ${companyScope}) AND l.archived_at IS NULL AND a.kind IN ('lead.note_added','lead.call_logged','lead.whatsapp_logged','lead.viewing_logged') AND a.created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND a.created_at<(($4::date+1)::timestamp AT TIME ZONE 'Africa/Cairo')`,
       args.slice(0, 4),
     )
   ).rows[0];
   const series = (
     await c.query(
-      `WITH dates AS (SELECT generate_series($3::date,$4::date,interval '1 day')::date AS day),l AS (SELECT (created_at AT TIME ZONE 'Africa/Cairo')::date AS day,count(*)::int AS n FROM tenant.leads WHERE company_id=$1 AND owner_user_id=ANY($2::uuid[]) AND archived_at IS NULL GROUP BY day),w AS (SELECT (stage_changed_at AT TIME ZONE 'Africa/Cairo')::date AS day,count(*) FILTER(WHERE stage='won')::int AS won,count(*) FILTER(WHERE stage='lost')::int AS lost FROM tenant.leads WHERE company_id=$1 AND owner_user_id=ANY($2::uuid[]) AND archived_at IS NULL GROUP BY day),t AS (SELECT (completed_at AT TIME ZONE 'Africa/Cairo')::date AS day,count(*)::int AS n FROM tenant.tasks WHERE company_id=$1 AND assignee_id=ANY($2::uuid[]) AND status='done' GROUP BY day) SELECT d.day::text AS date,coalesce(l.n,0)::int AS "newLeads",coalesce(w.won,0)::int AS won,coalesce(w.lost,0)::int AS lost,coalesce(t.n,0)::int AS "completedTasks" FROM dates d LEFT JOIN l ON l.day=d.day LEFT JOIN w ON w.day=d.day LEFT JOIN t ON t.day=d.day ORDER BY d.day`,
+      `WITH dates AS (SELECT generate_series($3::date,$4::date,interval '1 day')::date AS day),l AS (SELECT (created_at AT TIME ZONE 'Africa/Cairo')::date AS day,count(*)::int AS n FROM tenant.leads WHERE company_id=$1 AND (owner_user_id=ANY($2::uuid[]) OR ${companyScope}) AND archived_at IS NULL GROUP BY day),w AS (SELECT (stage_changed_at AT TIME ZONE 'Africa/Cairo')::date AS day,count(*) FILTER(WHERE stage='won')::int AS won,count(*) FILTER(WHERE stage='lost')::int AS lost FROM tenant.leads WHERE company_id=$1 AND (owner_user_id=ANY($2::uuid[]) OR ${companyScope}) AND archived_at IS NULL GROUP BY day),t AS (SELECT (completed_at AT TIME ZONE 'Africa/Cairo')::date AS day,count(*)::int AS n FROM tenant.tasks WHERE company_id=$1 AND (assignee_id=ANY($2::uuid[]) OR ${companyScope}) AND status='done' GROUP BY day) SELECT d.day::text AS date,coalesce(l.n,0)::int AS "newLeads",coalesce(w.won,0)::int AS won,coalesce(w.lost,0)::int AS lost,coalesce(t.n,0)::int AS "completedTasks" FROM dates d LEFT JOIN l ON l.day=d.day LEFT JOIN w ON w.day=d.day LEFT JOIN t ON t.day=d.day ORDER BY d.day`,
       args.slice(0, 4),
     )
   ).rows;
   const revision = (
     await c.query(
-      `SELECT 'leads' AS kind,count(*)::int AS n,coalesce(sum(version),0)::text AS versions FROM tenant.leads WHERE company_id=$1 AND owner_user_id=ANY($2::uuid[]) AND archived_at IS NULL UNION ALL SELECT 'tasks',count(*)::int,coalesce(sum(version),0)::text FROM tenant.tasks WHERE company_id=$1 AND assignee_id=ANY($2::uuid[]) UNION ALL SELECT 'opportunities',count(*)::int,coalesce(sum(o.version),0)::text FROM tenant.opportunities o JOIN tenant.leads l ON l.company_id=o.company_id AND l.id=o.lead_id WHERE l.company_id=$1 AND l.owner_user_id=ANY($2::uuid[]) AND l.archived_at IS NULL`,
+      `SELECT 'leads' AS kind,count(*)::int AS n,coalesce(sum(version),0)::text AS versions FROM tenant.leads WHERE company_id=$1 AND (owner_user_id=ANY($2::uuid[]) OR ${companyScope}) AND archived_at IS NULL UNION ALL SELECT 'tasks',count(*)::int,coalesce(sum(version),0)::text FROM tenant.tasks WHERE company_id=$1 AND (assignee_id=ANY($2::uuid[]) OR ${companyScope}) UNION ALL SELECT 'opportunities',count(*)::int,coalesce(sum(o.version),0)::text FROM tenant.opportunities o JOIN tenant.leads l ON l.company_id=o.company_id AND l.id=o.lead_id WHERE l.company_id=$1 AND (l.owner_user_id=ANY($2::uuid[]) OR ${companyScope}) AND l.archived_at IS NULL`,
       args.slice(0, 2),
     )
   ).rows;
