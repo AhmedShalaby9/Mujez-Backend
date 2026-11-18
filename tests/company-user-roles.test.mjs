@@ -149,7 +149,7 @@ test("multiple roles do not broaden lead visibility; removing sales revokes exis
   const p = await sessions.resolveEmployee(token);
   assert.deepEqual(p.roles, ["employee"]);
   assert.equal(p.role, "employee");
-  assert.deepEqual(p.permissions, []);
+  assert.deepEqual(p.permissions, ["leave.self"]);
   assert.equal(p.scope, "own");
   h.state.principal = p;
   await h.get("leads", 403);
@@ -294,7 +294,7 @@ test("role mutation and normalized grants roll back on audit failure; tenant gra
 test("employee-only invitations can gain sales access later with the full existing agent permission set", async () => {
   h.state.principal = other;
   const a = await invite("FutureSales", ["employee"]);
-  assert.deepEqual((await profile(a)).permissions, []);
+  assert.deepEqual((await profile(a)).permissions, ["leave.self"]);
   await change(a, ["agent", "employee"]);
   const p = await profile(a);
   assert.ok(p.permissions.includes("leads.manage"));

@@ -203,7 +203,7 @@ export class DocumentsService {
         ).rows;
         const bytes = (
           await c.query(
-            "SELECT (coalesce((SELECT sum(size_bytes) FROM tenant.documents WHERE company_id=$1),0)+coalesce((SELECT sum(size_bytes) FROM tenant.hr_documents WHERE company_id=$1),0))::text AS n",
+            "SELECT (coalesce((SELECT sum(size_bytes) FROM tenant.documents WHERE company_id=$1),0)+coalesce((SELECT sum(size_bytes) FROM tenant.hr_documents WHERE company_id=$1),0)+coalesce((SELECT sum(size_bytes) FROM tenant.leave_attachments WHERE company_id=$1),0))::text AS n",
             [p.companyId],
           )
         ).rows[0].n;
@@ -295,7 +295,7 @@ export class DocumentsService {
         const used = BigInt(
           (
             await c.query(
-              "SELECT (coalesce((SELECT sum(size_bytes) FROM tenant.documents WHERE company_id=$1),0)+coalesce((SELECT sum(size_bytes) FROM tenant.hr_documents WHERE company_id=$1),0))::text AS n",
+              "SELECT (coalesce((SELECT sum(size_bytes) FROM tenant.documents WHERE company_id=$1),0)+coalesce((SELECT sum(size_bytes) FROM tenant.hr_documents WHERE company_id=$1),0)+coalesce((SELECT sum(size_bytes) FROM tenant.leave_attachments WHERE company_id=$1),0))::text AS n",
               [p.companyId],
             )
           ).rows[0].n,

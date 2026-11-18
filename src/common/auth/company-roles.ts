@@ -45,14 +45,17 @@ export const COMPANY_ROLE_DEFINITIONS: Record<
     name: { en: "Team Lead", ar: "قائد الفريق" },
     permissions: [...salesPermissions, "team.self.read"],
   },
-  employee: { name: { en: "Employee", ar: "موظف" }, permissions: [] },
+  employee: {
+    name: { en: "Employee", ar: "موظف" },
+    permissions: ["leave.self"],
+  },
   hr_officer: {
     name: { en: "HR Officer", ar: "مسؤول الموارد البشرية" },
-    permissions: ["hr.read", "hr.manage"],
+    permissions: ["hr.read", "hr.manage", "leave.manage"],
   },
   hr_manager: {
     name: { en: "HR Manager", ar: "مدير الموارد البشرية" },
-    permissions: ["hr.read", "hr.manage"],
+    permissions: ["hr.read", "hr.manage", "leave.manage", "leave.approve"],
   },
   payroll_officer: {
     name: { en: "Payroll Officer", ar: "مسؤول الرواتب" },

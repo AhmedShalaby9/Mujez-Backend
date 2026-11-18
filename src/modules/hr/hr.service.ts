@@ -483,7 +483,7 @@ export class HrService {
         if (!policy?.subscription_id) throw new ForbiddenException();
         const used = (
           await c.query(
-            "SELECT (coalesce((SELECT sum(size_bytes) FROM tenant.documents WHERE company_id=$1),0)+coalesce((SELECT sum(size_bytes) FROM tenant.hr_documents WHERE company_id=$1),0))::text AS n",
+            "SELECT (coalesce((SELECT sum(size_bytes) FROM tenant.documents WHERE company_id=$1),0)+coalesce((SELECT sum(size_bytes) FROM tenant.hr_documents WHERE company_id=$1),0)+coalesce((SELECT sum(size_bytes) FROM tenant.leave_attachments WHERE company_id=$1),0))::text AS n",
             [p.companyId],
           )
         ).rows[0].n;

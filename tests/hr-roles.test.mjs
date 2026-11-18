@@ -53,7 +53,18 @@ test("HR Officer and HR Manager receive only current HR permissions, combined wi
     const p = await profile(a);
     assert.equal(p.role, key);
     assert.equal(p.scope, "own");
-    assert.deepEqual(p.permissions, ["hr.manage", "hr.read"]);
+    assert.deepEqual(
+      p.permissions,
+      key === "hr_manager"
+        ? [
+            "hr.manage",
+            "hr.read",
+            "leave.approve",
+            "leave.manage",
+            "leave.self",
+          ]
+        : ["hr.manage", "hr.read", "leave.manage", "leave.self"],
+    );
     assert.ok(p.roles.includes("employee"));
     h.state.principal = p;
     await h.get("hr/employees");
@@ -143,7 +154,7 @@ test("authorized HR staff manage company records, files and onboarding without a
 test("Payroll Officer is assignable and has no current payroll, CRM, HR-management or role-admin grants", async () => {
   const p = await profile(payroll);
   assert.equal(p.role, "payroll_officer");
-  assert.deepEqual(p.permissions, []);
+  assert.deepEqual(p.permissions, ["leave.self"]);
   assert.deepEqual([...p.roles].sort(), ["employee", "payroll_officer"]);
   h.state.principal = p;
   for (const route of [

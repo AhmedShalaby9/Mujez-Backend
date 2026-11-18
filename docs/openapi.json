@@ -776,6 +776,138 @@
         "tags": ["Hr"]
       }
     },
+    "/api/v1/leave/context": {
+      "get": {
+        "operationId": "LeaveController_context",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Leave"]
+      }
+    },
+    "/api/v1/leave/policy": {
+      "get": {
+        "operationId": "LeaveController_policy",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Leave"]
+      },
+      "post": {
+        "operationId": "LeaveController_policySave",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leave"]
+      }
+    },
+    "/api/v1/leave/options": {
+      "get": {
+        "operationId": "LeaveController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Leave"]
+      }
+    },
+    "/api/v1/leave/balance": {
+      "get": {
+        "operationId": "LeaveController_balance",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Leave"]
+      }
+    },
+    "/api/v1/leave/balances": {
+      "get": {
+        "operationId": "LeaveController_balances",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Leave"]
+      },
+      "post": {
+        "operationId": "LeaveController_balanceSave",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leave"]
+      }
+    },
+    "/api/v1/leave/requests": {
+      "get": {
+        "operationId": "LeaveController_list",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Leave"]
+      },
+      "post": {
+        "operationId": "LeaveController_create",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leave"]
+      }
+    },
+    "/api/v1/leave/requests/{id}/action": {
+      "post": {
+        "operationId": "LeaveController_action",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leave"]
+      }
+    },
+    "/api/v1/leave/requests/{id}/history": {
+      "get": {
+        "operationId": "LeaveController_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Leave"]
+      }
+    },
+    "/api/v1/leave/calendar": {
+      "get": {
+        "operationId": "LeaveController_calendar",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Leave"]
+      }
+    },
+    "/api/v1/leave/requests/{id}/attachment": {
+      "post": {
+        "operationId": "LeaveController_upload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leave"]
+      },
+      "get": {
+        "operationId": "LeaveController_download",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Leave"]
+      }
+    },
     "/api/v1/leads": {
       "get": {
         "operationId": "LeadsController_list",
