@@ -7,6 +7,7 @@ import {
   IsInt,
   Min,
   ArrayMaxSize,
+  ArrayMinSize,
   ArrayUnique,
   IsIn,
   IsOptional,
@@ -17,7 +18,7 @@ import {
 } from "class-validator";
 const trim = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim() : value;
-export const TEAM_ROLES = ["agent", "team_lead"] as const;
+export const TEAM_ROLES = ["agent", "team_lead", "employee"] as const;
 export type TeamRole = (typeof TEAM_ROLES)[number];
 export class TeamInvite {
   @IsString()
@@ -29,9 +30,18 @@ export class TeamInvite {
   @Transform(trim)
   @MaxLength(254)
   declare email: string;
+  @IsOptional()
   @IsIn(TEAM_ROLES)
-  @ApiProperty({ type: String, enum: TEAM_ROLES })
-  declare role: TeamRole;
+  @ApiPropertyOptional({ type: String, enum: TEAM_ROLES })
+  declare role?: TeamRole;
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(3)
+  @ArrayUnique()
+  @IsIn(TEAM_ROLES, { each: true })
+  @ApiPropertyOptional({ type: [String], enum: TEAM_ROLES })
+  declare roles?: TeamRole[];
 }
 export class TeamStatus {
   @IsIn(["disable", "enable"])
@@ -72,4 +82,15 @@ export class SalesTeamUpdate extends SalesTeamInput {
   @IsInt()
   @Min(0)
   declare version: number;
+}
+
+export class EmployeeRoles {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(3)
+  @ArrayUnique()
+  @IsIn(TEAM_ROLES, { each: true })
+  @ApiProperty({ type: [String], enum: TEAM_ROLES })
+  declare roles: TeamRole[];
+  @IsInt() @Min(0) @ApiProperty({ minimum: 0 }) declare version: number;
 }

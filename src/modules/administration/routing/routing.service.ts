@@ -115,7 +115,7 @@ export class RoutingService {
     return this.db.tenant(p.companyId!, async (c) => ({
       users: (
         await c.query(
-          "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL ORDER BY name,id LIMIT 1000",
+          "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL AND role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND key<>'employee') ORDER BY name,id LIMIT 1000",
           [p.companyId],
         )
       ).rows,
@@ -147,7 +147,7 @@ export class RoutingService {
       if (
         !(
           await c.query(
-            "SELECT 1 FROM tenant.users WHERE company_id=$1 AND id=$2 AND status='active' AND deleted_at IS NULL",
+            "SELECT 1 FROM tenant.users WHERE company_id=$1 AND id=$2 AND status='active' AND deleted_at IS NULL AND role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND key<>'employee')",
             [p.companyId, t.userId],
           )
         ).rowCount
@@ -298,7 +298,7 @@ export class RoutingService {
             active &&
             !(
               await c.query(
-                "SELECT 1 FROM tenant.routing_targets t JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.user_id WHERE t.company_id=$1 AND t.rule_id=$2 AND u.status='active' AND u.deleted_at IS NULL",
+                "SELECT 1 FROM tenant.routing_targets t JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.user_id WHERE t.company_id=$1 AND t.rule_id=$2 AND u.status='active' AND u.deleted_at IS NULL AND u.role_id IN(SELECT id FROM tenant.roles WHERE company_id=u.company_id AND key<>'employee')",
                 [p.companyId, id],
               )
             ).rowCount

@@ -1,3 +1,4 @@
+import { COMPANY_ROLE_FIELDS } from "../../../common/auth/company-roles.js";
 import {
   Injectable,
   BadRequestException,
@@ -29,6 +30,8 @@ function memberDto(r: any) {
     name: r.name,
     email: r.email,
     role: r.role_key,
+    roles: r.roles ?? [r.role_key],
+    rolesVersion: r.roles_version ?? 0,
     roleName: r.role_name,
     teamId: r.team_id ?? null,
     status: r.status,
@@ -65,7 +68,7 @@ export class TeamService {
       async (c) =>
         (
           await c.query(
-            `SELECT u.id AS user_id,u.team_id,u.last_login_at,r.key AS role_key,r.name AS role_name FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=ANY($2::uuid[])`,
+            `SELECT u.id AS user_id,u.team_id,u.last_login_at,r.key AS role_key,r.name AS role_name,${COMPANY_ROLE_FIELDS} FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=ANY($2::uuid[])`,
             [p.companyId, accounts.map((a) => a.user_id)],
           )
         ).rows,
@@ -86,6 +89,7 @@ export class TeamService {
   private async roleId(c: PoolClient, companyId: string, role: TeamRole) {
     const permissions = [
       "leads.read",
+      "leads.manage",
       "pipeline.read",
       "pipeline.manage",
       "contacts.read",
@@ -104,7 +108,8 @@ export class TeamService {
       "documents.read",
       "documents.manage",
     ];
-    if (role === "team_lead") permissions.push("leads.manage", "team.self.read");
+    if (role === "employee") permissions.splice(0);
+    if (role === "team_lead") permissions.push("team.self.read");
     await c.query(
       `INSERT INTO tenant.roles(company_id,key,name,permissions,scope) VALUES($1,$2,$3,$4,'own') ON CONFLICT(company_id,key) DO NOTHING`,
       [
@@ -112,7 +117,9 @@ export class TeamService {
         role,
         role === "team_lead"
           ? { en: "Team Lead", ar: "قائد الفريق" }
-          : { en: "Sales Agent", ar: "وكيل المبيعات" },
+          : role === "employee"
+            ? { en: "Employee", ar: "موظف" }
+            : { en: "Sales Agent", ar: "وكيل المبيعات" },
         permissions,
       ],
     );
@@ -123,7 +130,26 @@ export class TeamService {
       )
     ).rows[0].id;
   }
+  private owner(p: Principal) {
+    if (
+      p.pool !== "company_admin" ||
+      p.role !== "company_owner" ||
+      p.scope !== "company" ||
+      p.workspace
+    )
+      throw new ForbiddenException("Only the company owner can assign roles");
+  }
   async changeRole(p: Principal, accountId: string, role: TeamRole) {
+    return this.changeRoles(p, accountId, [role], undefined, true);
+  }
+  async changeRoles(
+    p: Principal,
+    accountId: string,
+    selected: TeamRole[],
+    version?: number,
+    legacy = false,
+  ) {
+    this.owner(p);
     await this.sales.access(p, "team.manage");
     const account = (
       await this.db.platform((c) =>
@@ -138,13 +164,33 @@ export class TeamService {
       await this.lock(c, p.companyId!);
       const user = (
         await c.query(
-          "SELECT u.*,r.key AS role FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=$2 AND u.identity_pool='company_user' AND u.deleted_at IS NULL FOR UPDATE OF u",
+          `SELECT u.*,r.key AS role,${COMPANY_ROLE_FIELDS} FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=$2 AND u.identity_pool='company_user' AND u.deleted_at IS NULL FOR UPDATE OF u`,
           [p.companyId, account.user_id],
         )
       ).rows[0];
       if (!user) throw new NotFoundException("Employee not found");
+      if (version !== undefined && version !== user.roles_version)
+        throw new ConflictException("Roles changed. Refresh before saving.");
+      const roles = [
+        ...new Set([
+          ...selected,
+          ...(legacy && user.roles.includes("employee")
+            ? ["employee" as TeamRole]
+            : []),
+        ]),
+      ];
       if (
-        role !== "team_lead" &&
+        !roles.length ||
+        roles.some((r) => !["agent", "team_lead", "employee"].includes(r))
+      )
+        throw new BadRequestException("Choose supported company roles");
+      const primary = roles.includes("team_lead")
+        ? "team_lead"
+        : roles.includes("agent")
+          ? "agent"
+          : "employee";
+      if (
+        !roles.includes("team_lead") &&
         (
           await c.query(
             "SELECT 1 FROM tenant.teams WHERE company_id=$1 AND lead_user_id=$2",
@@ -153,25 +199,53 @@ export class TeamService {
         ).rowCount
       )
         throw new ConflictException(
-          "Assign another team lead before changing this role.",
+          "Assign another team lead before removing the Team Lead role.",
         );
-      if (user.role === role) return { status: "unchanged" };
-      const roleId = await this.roleId(c, p.companyId!, role);
+      if ([...user.roles].sort().join(",") === [...roles].sort().join(","))
+        return {
+          status: "unchanged",
+          role: primary,
+          roles: user.roles,
+          rolesVersion: user.roles_version,
+        };
+      const roleIds = new Map<string, string>();
+      for (const key of roles)
+        roleIds.set(key, await this.roleId(c, p.companyId!, key));
       await c.query(
-        "UPDATE tenant.users SET role_id=$3,updated_at=now(),updated_by=$4 WHERE company_id=$1 AND id=$2",
-        [p.companyId, user.id, roleId, p.id],
+        "DELETE FROM tenant.user_additional_roles WHERE company_id=$1 AND user_id=$2",
+        [p.companyId, user.id],
       );
+      await c.query(
+        `UPDATE tenant.users SET role_id=$3,roles_version=roles_version+1,team_id=CASE WHEN $5 THEN team_id ELSE NULL END,updated_at=now(),updated_by=$4 WHERE company_id=$1 AND id=$2`,
+        [
+          p.companyId,
+          user.id,
+          roleIds.get(primary),
+          p.id,
+          primary !== "employee",
+        ],
+      );
+      for (const key of roles.filter((r) => r !== primary))
+        await c.query(
+          "INSERT INTO tenant.user_additional_roles(company_id,user_id,role_id) VALUES($1,$2,$3)",
+          [p.companyId, user.id, roleIds.get(key)],
+        );
       await recordTenantEvent(c, {
         companyId: p.companyId!,
         actorId: p.id,
         action: "employee.role_changed",
         resourceType: "user",
         resourceId: user.id,
-        before: { role: user.role },
-        after: { role },
-        payload: { role },
+        before: { role: user.role, roles: user.roles },
+        after: { role: primary, roles },
+        payload: { role: primary, roles },
       });
-      return { status: "updated", role };
+      return {
+        status: "updated",
+        role: primary,
+        roles,
+        rolesVersion: user.roles_version + 1,
+      };
     });
   }
   private async readGroups(c: PoolClient, companyId: string, leadId?: string) {
@@ -321,8 +395,17 @@ export class TeamService {
       );
       const leadRole = await this.roleId(c, p.companyId!, "team_lead");
       const previousRole = members.find((m) => m.id === input.leadUserId)!.role;
+      if (previousRole !== "team_lead")
+        await c.query(
+          "INSERT INTO tenant.user_additional_roles(company_id,user_id,role_id) SELECT company_id,id,role_id FROM tenant.users WHERE company_id=$1 AND id=$2 ON CONFLICT DO NOTHING",
+          [p.companyId, input.leadUserId],
+        );
       await c.query(
-        "UPDATE tenant.users SET role_id=$3 WHERE company_id=$1 AND id=$2",
+        "DELETE FROM tenant.user_additional_roles WHERE company_id=$1 AND user_id=$2 AND role_id=$3",
+        [p.companyId, input.leadUserId, leadRole],
+      );
+      await c.query(
+        "UPDATE tenant.users SET role_id=$3,roles_version=roles_version+CASE WHEN role_id IS DISTINCT FROM $3 THEN 1 ELSE 0 END WHERE company_id=$1 AND id=$2",
         [p.companyId, input.leadUserId, leadRole],
       );
       if (previousRole !== "team_lead")
@@ -356,6 +439,10 @@ export class TeamService {
     });
   }
   async invite(p: Principal, input: TeamInvite) {
+    this.owner(p);
+    if ((input.role && input.roles) || (!input.role && !input.roles))
+      throw new BadRequestException("Provide either role or roles");
+    const roles = input.roles ?? [input.role!];
     await this.sales.access(p, "team.manage");
     return this.db
       .platform(async (c) => {
@@ -376,8 +463,8 @@ export class TeamService {
           );
         const accountId = (
           await c.query(
-            "SELECT platform.provision_company_employee($1,$2,$3,$4) AS id",
-            [p.companyId, input.name, input.email.toLowerCase(), input.role],
+            "SELECT platform.provision_company_employee_roles($1,$2,$3,$4::text[],$5) AS id",
+            [p.companyId, input.name, input.email.toLowerCase(), roles, p.id],
           )
         ).rows[0].id;
         const token = randomBytes(32).toString("hex"),

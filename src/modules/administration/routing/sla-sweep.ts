@@ -37,7 +37,9 @@ export async function runSlaSweep(
         return 0;
       const leads = (
         await c.query(
-          "SELECT l.*,l.budget_minor::text AS budget_minor,u.name AS old_owner FROM tenant.leads l JOIN tenant.routing_rules r ON r.company_id=l.company_id AND r.id=l.routing_rule_id LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id WHERE l.company_id=$1 AND " + NOT_CONTACTED_SQL + " AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost','unqualified') AND l.routing_attempts<3 AND r.active AND r.archived_at IS NULL AND r.sla_minutes>0 AND l.assigned_at+make_interval(mins=>r.sla_minutes)<=now() AND EXISTS(SELECT 1 FROM tenant.routing_targets t JOIN tenant.users a ON a.company_id=t.company_id AND a.id=t.user_id WHERE t.company_id=l.company_id AND t.rule_id=r.id AND a.status='active' AND a.deleted_at IS NULL AND a.id IS DISTINCT FROM l.owner_user_id) ORDER BY l.assigned_at,l.id LIMIT 100 FOR UPDATE OF l",
+          "SELECT l.*,l.budget_minor::text AS budget_minor,u.name AS old_owner FROM tenant.leads l JOIN tenant.routing_rules r ON r.company_id=l.company_id AND r.id=l.routing_rule_id LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id WHERE l.company_id=$1 AND " +
+            NOT_CONTACTED_SQL +
+            " AND l.archived_at IS NULL AND l.stage NOT IN ('won','lost','unqualified') AND l.routing_attempts<3 AND r.active AND r.archived_at IS NULL AND r.sla_minutes>0 AND l.assigned_at+make_interval(mins=>r.sla_minutes)<=now() AND EXISTS(SELECT 1 FROM tenant.routing_targets t JOIN tenant.users a ON a.company_id=t.company_id AND a.id=t.user_id WHERE t.company_id=l.company_id AND t.rule_id=r.id AND a.status='active' AND a.deleted_at IS NULL AND a.role_id IN(SELECT id FROM tenant.roles WHERE company_id=a.company_id AND key<>'employee') AND a.id IS DISTINCT FROM l.owner_user_id) ORDER BY l.assigned_at,l.id LIMIT 100 FOR UPDATE OF l",
           [company.company_id],
         )
       ).rows;

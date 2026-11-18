@@ -7,6 +7,8 @@ export class ProfileDto {
   @ApiProperty() declare name: string;
   @ApiProperty({ format: "email" }) declare email: string;
   @ApiProperty() declare role: string;
+  @ApiPropertyOptional({ type: [String] }) declare roles?: string[];
+  @ApiPropertyOptional({ type: Number }) declare rolesVersion?: number;
   @ApiProperty({ enum: ["own", "team", "company", "platform"] })
   declare scope: string;
   @ApiPropertyOptional({ format: "uuid", nullable: true })

@@ -14,6 +14,9 @@ export interface Principal {
   name: string;
   email: string;
   role: string;
+  /** All assigned roles; role is the backwards-compatible primary role. */
+  roles?: string[];
+  rolesVersion?: number;
   permissions: string[];
   scope: "own" | "team" | "company" | "platform";
   teamId?: string;

@@ -1,3 +1,4 @@
+import { COMPANY_ROLE_FIELDS } from "./company-roles.js";
 import { Optional } from "@nestjs/common";
 import { SettingsService } from "../../modules/platform/settings/settings.service.js";
 import { DEFAULT_SETTINGS } from "../../modules/platform/settings/settings.model.js";
@@ -269,7 +270,7 @@ export class SessionService {
       async (c) =>
         (
           await c.query(
-            `SELECT u.id,u.name,u.email,u.team_id,r.key AS role,r.name AS role_name,r.permissions,r.scope FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=$2 AND u.status='active' AND u.deleted_at IS NULL AND u.identity_pool='company_user'`,
+            `SELECT u.id,u.name,u.email,u.team_id,r.key AS role,r.name AS role_name,r.permissions,r.scope,${COMPANY_ROLE_FIELDS} FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=$2 AND u.status='active' AND u.deleted_at IS NULL AND u.identity_pool='company_user'`,
             [a.company_id, a.user_id],
           )
         ).rows[0],
@@ -285,7 +286,9 @@ export class SessionService {
       email: user.email,
       role: user.role,
       roleName: user.role_name,
-      permissions: user.permissions,
+      roles: user.roles,
+      rolesVersion: user.roles_version,
+      permissions: user.effective_permissions,
       teamId: user.team_id ?? undefined,
     };
   }
@@ -372,6 +375,7 @@ export class SessionService {
       email: user.email,
       role: user.role,
       roleName: user.role_name,
+      roles: [user.role],
       permissions: user.permissions,
       teamId: user.team_id ?? undefined,
     };

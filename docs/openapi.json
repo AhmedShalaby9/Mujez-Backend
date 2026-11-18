@@ -629,92 +629,141 @@
         "tags": ["DemoRequests"]
       }
     },
-    "/admin/api/v1/overview": {
+    "/api/v1/hr/overview": {
       "get": {
-        "operationId": "OverviewController_snapshot",
-        "parameters": [
-          {
-            "name": "range",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": ["30d", "90d", "12m", "custom"]
-            }
-          },
-          {
-            "name": "from",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "to",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": { "200": { "description": "" } },
-        "tags": ["Overview"]
-      }
-    },
-    "/admin/api/v1/overview/alerts": {
-      "get": {
-        "operationId": "OverviewController_alerts",
+        "operationId": "HrController_overview",
         "parameters": [],
         "responses": { "200": { "description": "" } },
-        "tags": ["Overview"]
+        "tags": ["Hr"]
       }
     },
-    "/admin/api/v1/audit-logs": {
+    "/api/v1/hr/options": {
       "get": {
-        "operationId": "PlatformAuditController_list",
+        "operationId": "HrController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Hr"]
+      }
+    },
+    "/api/v1/hr/employees": {
+      "get": {
+        "operationId": "HrController_employees",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Hr"]
+      },
+      "post": {
+        "operationId": "HrController_employeeCreate",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Hr"]
+      }
+    },
+    "/api/v1/hr/employees/{id}": {
+      "post": {
+        "operationId": "HrController_employeeUpdate",
         "parameters": [
           {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "filter",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "number" }
-          },
-          {
-            "name": "cursor",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "from",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "until",
-            "required": false,
-            "in": "query",
+            "name": "id",
+            "required": true,
+            "in": "path",
             "schema": { "type": "string" }
           }
         ],
-        "responses": { "200": { "description": "" } },
-        "tags": ["PlatformAudit"]
+        "responses": { "201": { "description": "" } },
+        "tags": ["Hr"]
       }
     },
-    "/admin/api/v1/audit-logs/{id}": {
+    "/api/v1/hr/departments": {
       "get": {
-        "operationId": "PlatformAuditController_detail",
+        "operationId": "HrController_departments",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Hr"]
+      },
+      "post": {
+        "operationId": "HrController_departmentCreate",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Hr"]
+      }
+    },
+    "/api/v1/hr/departments/{id}": {
+      "post": {
+        "operationId": "HrController_departmentUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Hr"]
+      }
+    },
+    "/api/v1/hr/onboarding": {
+      "get": {
+        "operationId": "HrController_tasks",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Hr"]
+      },
+      "post": {
+        "operationId": "HrController_taskCreate",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Hr"]
+      }
+    },
+    "/api/v1/hr/onboarding/{id}": {
+      "post": {
+        "operationId": "HrController_taskUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Hr"]
+      }
+    },
+    "/api/v1/hr/documents": {
+      "get": {
+        "operationId": "HrController_documents",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Hr"]
+      },
+      "post": {
+        "operationId": "HrController_upload",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Hr"]
+      }
+    },
+    "/api/v1/hr/documents/{id}/archive": {
+      "post": {
+        "operationId": "HrController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Hr"]
+      }
+    },
+    "/api/v1/hr/documents/{id}/download": {
+      "get": {
+        "operationId": "HrController_download",
         "parameters": [
           {
             "name": "id",
@@ -724,23 +773,7 @@
           }
         ],
         "responses": { "200": { "description": "" } },
-        "tags": ["PlatformAudit"]
-      }
-    },
-    "/admin/api/v1/audit-logs/export": {
-      "post": {
-        "operationId": "PlatformAuditController_export",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/AuditExport" }
-            }
-          }
-        },
-        "responses": { "201": { "description": "" } },
-        "tags": ["PlatformAudit"]
+        "tags": ["Hr"]
       }
     },
     "/api/v1/leads": {
@@ -803,12 +836,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -956,29 +994,6 @@
         "tags": ["Leads"]
       }
     },
-    "/api/v1/leads/{id}/contact": {
-      "post": {
-        "operationId": "LeadsController_contact",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/LeadContact" }
-            }
-          }
-        },
-        "responses": { "201": { "description": "" } },
-        "tags": ["Leads"]
-      }
-    },
     "/api/v1/leads/{id}/notes": {
       "post": {
         "operationId": "LeadsController_note",
@@ -1000,6 +1015,296 @@
         },
         "responses": { "201": { "description": "" } },
         "tags": ["Leads"]
+      }
+    },
+    "/api/v1/leads/{leadId}/unit-recommendations": {
+      "get": {
+        "operationId": "UnitRecommendationsController_latest",
+        "parameters": [
+          {
+            "name": "leadId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["UnitRecommendations"]
+      },
+      "post": {
+        "operationId": "UnitRecommendationsController_start",
+        "parameters": [
+          {
+            "name": "leadId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["UnitRecommendations"]
+      }
+    },
+    "/api/v1/leads/{leadId}/unit-recommendations/options": {
+      "get": {
+        "operationId": "UnitRecommendationsController_options",
+        "parameters": [
+          {
+            "name": "leadId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["UnitRecommendations"]
+      }
+    },
+    "/api/v1/leads/{leadId}/unit-recommendations/{runId}": {
+      "get": {
+        "operationId": "UnitRecommendationsController_get",
+        "parameters": [
+          {
+            "name": "leadId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "runId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["UnitRecommendations"]
+      }
+    },
+    "/api/v1/catalog/{kind}": {
+      "get": {
+        "operationId": "CatalogController_list",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Catalog"]
+      },
+      "post": {
+        "operationId": "CatalogController_create",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Catalog"]
+      }
+    },
+    "/api/v1/catalog/{kind}/{id}": {
+      "get": {
+        "operationId": "CatalogController_detail",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Catalog"]
+      }
+    },
+    "/api/v1/catalog/{kind}/{id}/update": {
+      "post": {
+        "operationId": "CatalogController_update",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Catalog"]
+      }
+    },
+    "/api/v1/catalog/{kind}/{id}/archive": {
+      "post": {
+        "operationId": "CatalogController_archive",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Catalog"]
+      }
+    },
+    "/api/v1/catalog/{kind}/{id}/preference": {
+      "post": {
+        "operationId": "CatalogController_preference",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Catalog"]
+      }
+    },
+    "/admin/api/v1/overview": {
+      "get": {
+        "operationId": "OverviewController_snapshot",
+        "parameters": [
+          {
+            "name": "range",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["30d", "90d", "12m", "custom"]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Overview"]
+      }
+    },
+    "/admin/api/v1/overview/alerts": {
+      "get": {
+        "operationId": "OverviewController_alerts",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Overview"]
+      }
+    },
+    "/admin/api/v1/audit-logs": {
+      "get": {
+        "operationId": "PlatformAuditController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "filter",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "until",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["PlatformAudit"]
+      }
+    },
+    "/admin/api/v1/audit-logs/{id}": {
+      "get": {
+        "operationId": "PlatformAuditController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["PlatformAudit"]
+      }
+    },
+    "/admin/api/v1/audit-logs/export": {
+      "post": {
+        "operationId": "PlatformAuditController_export",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AuditExport" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["PlatformAudit"]
       }
     },
     "/api/v1/contacts": {
@@ -1250,12 +1555,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -1344,12 +1654,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -1555,12 +1870,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -1842,12 +2162,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -2101,12 +2426,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -2286,12 +2616,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -2442,12 +2777,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -2644,12 +2984,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -2813,12 +3158,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -3034,12 +3384,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           },
@@ -3387,6 +3742,94 @@
         "tags": ["CompanyAudit"]
       }
     },
+    "/api/v1/company-ai-insights/snapshot": {
+      "get": {
+        "operationId": "CompanyInsightsController_snapshot",
+        "parameters": [
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 30, "type": "number", "enum": [7, 30, 90] }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CompanyInsights"]
+      }
+    },
+    "/api/v1/company-ai-insights": {
+      "get": {
+        "operationId": "CompanyInsightsController_latest",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CompanyInsights"]
+      },
+      "post": {
+        "operationId": "CompanyInsightsController_start",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["CompanyInsights"]
+      }
+    },
+    "/api/v1/company-ai-insights/{id}": {
+      "get": {
+        "operationId": "CompanyInsightsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CompanyInsights"]
+      }
+    },
+    "/api/v1/team/my-team/ai-insights/snapshot": {
+      "get": {
+        "operationId": "TeamInsightsController_snapshot",
+        "parameters": [
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": { "default": 30, "type": "number", "enum": [7, 30, 90] }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["TeamInsights"]
+      }
+    },
+    "/api/v1/team/my-team/ai-insights": {
+      "get": {
+        "operationId": "TeamInsightsController_latest",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["TeamInsights"]
+      },
+      "post": {
+        "operationId": "TeamInsightsController_start",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["TeamInsights"]
+      }
+    },
+    "/api/v1/team/my-team/ai-insights/{id}": {
+      "get": {
+        "operationId": "TeamInsightsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["TeamInsights"]
+      }
+    },
     "/api/v1/team/my-team/tasks": {
       "post": {
         "operationId": "TeamController_createTask",
@@ -3537,12 +3980,17 @@
               "type": "string",
               "enum": [
                 "new",
+                "attempting",
+                "contacted",
                 "qualified",
+                "nurturing",
+                "unresponsive",
                 "viewing",
                 "offer",
                 "contract",
                 "won",
-                "lost"
+                "lost",
+                "unqualified"
               ]
             }
           }
@@ -3658,6 +4106,29 @@
           "content": {
             "application/json": {
               "schema": { "$ref": "#/components/schemas/EmployeeRole" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Team"]
+      }
+    },
+    "/api/v1/team/{id}/roles": {
+      "post": {
+        "operationId": "TeamController_roles",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EmployeeRoles" }
             }
           }
         },
@@ -5255,6 +5726,8 @@
           "name": { "type": "string" },
           "email": { "type": "string", "format": "email" },
           "role": { "type": "string" },
+          "roles": { "type": "array", "items": { "type": "string" } },
+          "rolesVersion": { "type": "number" },
           "scope": {
             "type": "string",
             "enum": ["own", "team", "company", "platform"]
@@ -5304,26 +5777,6 @@
           "status": { "type": "string" }
         },
         "required": ["version", "status"]
-      },
-      "AuditQuery": {
-        "type": "object",
-        "properties": {
-          "q": { "type": "string" },
-          "filter": { "type": "string" },
-          "limit": { "type": "number" },
-          "cursor": { "type": "string" },
-          "from": { "type": "string" },
-          "until": { "type": "string" }
-        }
-      },
-      "AuditExport": {
-        "type": "object",
-        "properties": {
-          "password": { "type": "string" },
-          "reason": { "type": "string" },
-          "filters": { "$ref": "#/components/schemas/AuditQuery" }
-        },
-        "required": ["password", "reason", "filters"]
       },
       "LeadInput": {
         "type": "object",
@@ -5393,12 +5846,17 @@
             "type": "string",
             "enum": [
               "new",
+              "attempting",
+              "contacted",
               "qualified",
+              "nurturing",
+              "unresponsive",
               "viewing",
               "offer",
               "contract",
               "won",
               "lost",
+              "unqualified",
               "reopen"
             ]
           },
@@ -5416,16 +5874,6 @@
         },
         "required": ["requestId", "version", "action", "reason"]
       },
-      "LeadContact": {
-        "type": "object",
-        "properties": {
-          "requestId": { "type": "string", "format": "uuid" },
-          "version": { "type": "number" },
-          "channel": { "type": "string" },
-          "note": { "type": "string" }
-        },
-        "required": ["requestId", "version", "channel", "note"]
-      },
       "LeadNote": {
         "type": "object",
         "properties": {
@@ -5436,6 +5884,26 @@
           "note": { "type": "string" }
         },
         "required": ["requestId", "version", "note"]
+      },
+      "AuditQuery": {
+        "type": "object",
+        "properties": {
+          "q": { "type": "string" },
+          "filter": { "type": "string" },
+          "limit": { "type": "number" },
+          "cursor": { "type": "string" },
+          "from": { "type": "string" },
+          "until": { "type": "string" }
+        }
+      },
+      "AuditExport": {
+        "type": "object",
+        "properties": {
+          "password": { "type": "string" },
+          "reason": { "type": "string" },
+          "filters": { "$ref": "#/components/schemas/AuditQuery" }
+        },
+        "required": ["password", "reason", "filters"]
       },
       "ContactInput": {
         "type": "object",
@@ -6249,16 +6717,42 @@
       "EmployeeRole": {
         "type": "object",
         "properties": {
-          "role": { "type": "string", "enum": ["agent", "team_lead"] }
+          "role": {
+            "type": "string",
+            "enum": ["agent", "team_lead", "employee"]
+          }
         },
         "required": ["role"]
+      },
+      "EmployeeRoles": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["agent", "team_lead", "employee"]
+            }
+          },
+          "version": { "type": "number", "minimum": 0 }
+        },
+        "required": ["roles", "version"]
       },
       "TeamInvite": {
         "type": "object",
         "properties": {
-          "role": { "type": "string", "enum": ["agent", "team_lead"] }
-        },
-        "required": ["role"]
+          "role": {
+            "type": "string",
+            "enum": ["agent", "team_lead", "employee"]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["agent", "team_lead", "employee"]
+            }
+          }
+        }
       },
       "TeamStatus": {
         "type": "object",

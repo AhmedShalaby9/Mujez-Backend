@@ -170,7 +170,7 @@ export class SalesService {
     return this.db.tenant(p.companyId!, async (c) => ({
       owners: (
         await c.query(
-          "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL ORDER BY name,id LIMIT 1000",
+          "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL AND role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND key<>'employee') ORDER BY name,id LIMIT 1000",
           [p.companyId],
         )
       ).rows,
@@ -357,7 +357,7 @@ export class SalesService {
       id &&
       !(
         await c.query(
-          "SELECT id FROM tenant.users WHERE company_id=$1 AND id=$2 AND status='active' AND deleted_at IS NULL",
+          "SELECT id FROM tenant.users WHERE company_id=$1 AND id=$2 AND status='active' AND deleted_at IS NULL AND role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND key<>'employee')",
           [p.companyId, id],
         )
       ).rowCount

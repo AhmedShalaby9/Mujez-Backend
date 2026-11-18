@@ -1,0 +1,4 @@
+/** u and r are the current company user and primary role aliases. The primary
+ * role remains canonical for existing CRM ownership/team queries. */
+export const COMPANY_ROLE_FIELDS = `ARRAY(SELECT ar.key FROM tenant.roles ar WHERE ar.company_id=u.company_id AND (ar.id=u.role_id OR EXISTS(SELECT 1 FROM tenant.user_additional_roles ur WHERE ur.company_id=u.company_id AND ur.user_id=u.id AND ur.role_id=ar.id)) ORDER BY CASE WHEN ar.id=u.role_id THEN 0 ELSE 1 END,ar.key) AS roles,
+ ARRAY(SELECT DISTINCT permission FROM tenant.roles ar CROSS JOIN LATERAL unnest(ar.permissions) permission WHERE ar.company_id=u.company_id AND (ar.id=u.role_id OR EXISTS(SELECT 1 FROM tenant.user_additional_roles ur WHERE ur.company_id=u.company_id AND ur.user_id=u.id AND ur.role_id=ar.id)) ORDER BY permission) AS effective_permissions,u.roles_version`;

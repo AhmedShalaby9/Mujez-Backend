@@ -18,6 +18,7 @@ import {
   TeamStatus,
   TeamActivate,
   EmployeeRole,
+  EmployeeRoles,
   SalesTeamInput,
   SalesTeamUpdate,
 } from "./team.dto.js";
@@ -115,6 +116,18 @@ export class TeamController {
     @Req() req: AuthRequest,
   ) {
     return this.service.changeRole(req.principal, id, input.role);
+  }
+  @Post(":id/roles") @RequireAccess(["company_admin"], "team.manage") roles(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: EmployeeRoles,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.changeRoles(
+      req.principal,
+      id,
+      input.roles,
+      input.version,
+    );
   }
   @Get() @RequireAccess(["company_admin"]) list(@Req() req: AuthRequest) {
     return this.service.list(req.principal);
