@@ -828,7 +828,7 @@ export class LeaveService {
         : "";
       const rows = (
         await c.query(
-          `SELECT r.id,e.name AS employee,r.start_date::text AS "startDate",r.end_date::text AS "endDate",r.half,r.units/2.0 AS days FROM tenant.leave_requests r JOIN tenant.hr_employees e ON e.company_id=r.company_id AND e.id=r.employee_id WHERE r.company_id=$1 AND r.status IN ('approved','cancellation_pending') AND r.start_date<($2::date+interval '1 month') AND r.end_date>=$2::date AND (${scope})${employeeFilter} ORDER BY r.start_date,e.name,r.id LIMIT 1000`,
+          `SELECT r.id,e.name AS employee,r.start_date::text AS "startDate",r.end_date::text AS "endDate",r.half,(r.units/2.0)::float8 AS days FROM tenant.leave_requests r JOIN tenant.hr_employees e ON e.company_id=r.company_id AND e.id=r.employee_id WHERE r.company_id=$1 AND r.status IN ('approved','cancellation_pending') AND r.start_date<($2::date+interval '1 month') AND r.end_date>=$2::date AND (${scope})${employeeFilter} ORDER BY r.start_date,e.name,r.id LIMIT 1000`,
           args,
         )
       ).rows;

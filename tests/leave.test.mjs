@@ -349,6 +349,7 @@ test("audit failure rolls back request, slots and idempotency; calendars expose 
     await h.get("leave/calendar?view=my&month=" + date(10).slice(0, 7))
   ).body;
   assert.ok(calendar.items.length);
+  assert.equal(typeof calendar.items[0].days, "number");
   assert.equal(calendar.items[0].reason, undefined);
   assert.equal(calendar.items[0].hasAttachment, undefined);
   assert.deepEqual(
