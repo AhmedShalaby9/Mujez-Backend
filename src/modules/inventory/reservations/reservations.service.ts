@@ -235,7 +235,7 @@ export class ReservationsService {
           assignee &&
           !(
             await c.query(
-              "SELECT 1 FROM tenant.users WHERE company_id=$1 AND id=$2 AND status='active' AND deleted_at IS NULL AND role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND key<>'employee')",
+              "SELECT 1 FROM tenant.users WHERE company_id=$1 AND id=$2 AND status='active' AND deleted_at IS NULL AND role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND 'leads.read'=ANY(permissions))",
               [p.companyId, assignee],
             )
           ).rowCount

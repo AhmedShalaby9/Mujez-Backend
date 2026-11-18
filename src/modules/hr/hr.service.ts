@@ -33,16 +33,31 @@ export class HrService {
     private readonly db: DatabaseService,
     private readonly sales: SalesService,
   ) {}
-  async access(p: Principal) {
-    if (
-      p.pool !== "company_admin" ||
-      p.role !== "company_owner" ||
-      p.scope !== "company" ||
-      p.workspace ||
-      !p.companyId
-    )
-      throw new ForbiddenException("HR is private to the company owner");
-    await this.sales.access(p, "workspace.view");
+  private isOwner(p: Principal) {
+    return (
+      p.pool === "company_admin" &&
+      p.role === "company_owner" &&
+      p.scope === "company"
+    );
+  }
+  private permission(p: Principal, manage = false) {
+    return this.isOwner(p)
+      ? "workspace.view"
+      : manage
+        ? "hr.manage"
+        : "hr.read";
+  }
+  async access(p: Principal, manage = false) {
+    const hrUser =
+      p.pool === "company_user" &&
+      (p.roles ?? [p.role]).some(
+        (r) => r === "hr_officer" || r === "hr_manager",
+      );
+    if (p.workspace || !p.companyId || (!this.isOwner(p) && !hrUser))
+      throw new ForbiddenException(
+        "HR access requires the company owner or an authorized HR role",
+      );
+    await this.sales.access(p, this.permission(p, manage));
   }
   parse<T extends z.ZodType>(schema: T, b: unknown): z.infer<T> {
     const r = schema.safeParse(b);
@@ -71,9 +86,15 @@ export class HrService {
     b: any,
     fn: (c: PoolClient) => Promise<any>,
   ) {
-    await this.access(p);
+    await this.access(p, true);
     try {
-      return await this.sales.write(p, "workspace.view", "hr." + op, b, fn);
+      return await this.sales.write(
+        p,
+        this.permission(p, true),
+        "hr." + op,
+        b,
+        fn,
+      );
     } catch (e: any) {
       if (e.code === "23505")
         throw new ConflictException(

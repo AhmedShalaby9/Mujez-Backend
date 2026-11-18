@@ -19,7 +19,7 @@ import type { AuthRequest } from "../../common/auth/access.guard.js";
 import type { UploadFile } from "../finance/documents/documents.service.js";
 import { HrService } from "./hr.service.js";
 @Controller("api/v1/hr")
-@RequireAccess(["company_admin"], "workspace.view")
+@RequireAccess(["company_admin", "company_user"])
 export class HrController {
   constructor(private readonly s: HrService) {}
   @Get("overview") overview(@Req() r: AuthRequest) {

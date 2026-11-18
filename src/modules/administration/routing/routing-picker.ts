@@ -43,7 +43,7 @@ export async function pickRoute(
       continue;
     const targets = (
       await c.query(
-        "SELECT t.*,u.name FROM tenant.routing_targets t JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.user_id WHERE t.company_id=$1 AND t.rule_id=$2 AND u.status='active' AND u.deleted_at IS NULL AND u.role_id IN(SELECT id FROM tenant.roles WHERE company_id=u.company_id AND key<>'employee') AND ($3::uuid IS NULL OR t.user_id<>$3::uuid) ORDER BY t.position,t.user_id",
+        "SELECT t.*,u.name FROM tenant.routing_targets t JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.user_id WHERE t.company_id=$1 AND t.rule_id=$2 AND u.status='active' AND u.deleted_at IS NULL AND u.role_id IN(SELECT id FROM tenant.roles WHERE company_id=u.company_id AND 'leads.read'=ANY(permissions)) AND ($3::uuid IS NULL OR t.user_id<>$3::uuid) ORDER BY t.position,t.user_id",
         [companyId, r.id, options.excludeUserId ?? null],
       )
     ).rows;

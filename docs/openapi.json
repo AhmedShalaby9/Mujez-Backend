@@ -6719,7 +6719,14 @@
         "properties": {
           "role": {
             "type": "string",
-            "enum": ["agent", "team_lead", "employee"]
+            "enum": [
+              "agent",
+              "team_lead",
+              "employee",
+              "hr_officer",
+              "hr_manager",
+              "payroll_officer"
+            ]
           }
         },
         "required": ["role"]
@@ -6731,7 +6738,14 @@
             "type": "array",
             "items": {
               "type": "string",
-              "enum": ["agent", "team_lead", "employee"]
+              "enum": [
+                "agent",
+                "team_lead",
+                "employee",
+                "hr_officer",
+                "hr_manager",
+                "payroll_officer"
+              ]
             }
           },
           "version": { "type": "number", "minimum": 0 }
@@ -6743,13 +6757,27 @@
         "properties": {
           "role": {
             "type": "string",
-            "enum": ["agent", "team_lead", "employee"]
+            "enum": [
+              "agent",
+              "team_lead",
+              "employee",
+              "hr_officer",
+              "hr_manager",
+              "payroll_officer"
+            ]
           },
           "roles": {
             "type": "array",
             "items": {
               "type": "string",
-              "enum": ["agent", "team_lead", "employee"]
+              "enum": [
+                "agent",
+                "team_lead",
+                "employee",
+                "hr_officer",
+                "hr_manager",
+                "payroll_officer"
+              ]
             }
           }
         }

@@ -1,3 +1,4 @@
+import { ASSIGNABLE_COMPANY_ROLES } from "../../../common/auth/company-roles.js";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import {
@@ -18,7 +19,7 @@ import {
 } from "class-validator";
 const trim = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim() : value;
-export const TEAM_ROLES = ["agent", "team_lead", "employee"] as const;
+export const TEAM_ROLES = ASSIGNABLE_COMPANY_ROLES;
 export type TeamRole = (typeof TEAM_ROLES)[number];
 export class TeamInvite {
   @IsString()
@@ -37,7 +38,7 @@ export class TeamInvite {
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(3)
+  @ArrayMaxSize(6)
   @ArrayUnique()
   @IsIn(TEAM_ROLES, { each: true })
   @ApiPropertyOptional({ type: [String], enum: TEAM_ROLES })
@@ -87,7 +88,7 @@ export class SalesTeamUpdate extends SalesTeamInput {
 export class EmployeeRoles {
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(3)
+  @ArrayMaxSize(6)
   @ArrayUnique()
   @IsIn(TEAM_ROLES, { each: true })
   @ApiProperty({ type: [String], enum: TEAM_ROLES })

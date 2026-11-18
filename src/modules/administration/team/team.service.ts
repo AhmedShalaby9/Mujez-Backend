@@ -1,4 +1,9 @@
-import { COMPANY_ROLE_FIELDS } from "../../../common/auth/company-roles.js";
+import {
+  COMPANY_ROLE_FIELDS,
+  COMPANY_ROLE_DEFINITIONS,
+  ASSIGNABLE_COMPANY_ROLES,
+  primaryCompanyRole,
+} from "../../../common/auth/company-roles.js";
 import {
   Injectable,
   BadRequestException,
@@ -87,41 +92,10 @@ export class TeamService {
     );
   }
   private async roleId(c: PoolClient, companyId: string, role: TeamRole) {
-    const permissions = [
-      "leads.read",
-      "leads.manage",
-      "pipeline.read",
-      "pipeline.manage",
-      "contacts.read",
-      "contacts.manage",
-      "calendar.read",
-      "calendar.manage",
-      "tasks.read",
-      "tasks.manage",
-      "projects.read",
-      "units.read",
-      "reservations.read",
-      "reservations.manage",
-      "contracts.read",
-      "contracts.manage",
-      "commissions.read",
-      "documents.read",
-      "documents.manage",
-    ];
-    if (role === "employee") permissions.splice(0);
-    if (role === "team_lead") permissions.push("team.self.read");
+    const definition = COMPANY_ROLE_DEFINITIONS[role];
     await c.query(
       `INSERT INTO tenant.roles(company_id,key,name,permissions,scope) VALUES($1,$2,$3,$4,'own') ON CONFLICT(company_id,key) DO NOTHING`,
-      [
-        companyId,
-        role,
-        role === "team_lead"
-          ? { en: "Team Lead", ar: "قائد الفريق" }
-          : role === "employee"
-            ? { en: "Employee", ar: "موظف" }
-            : { en: "Sales Agent", ar: "وكيل المبيعات" },
-        permissions,
-      ],
+      [companyId, role, definition.name, definition.permissions],
     );
     return (
       await c.query(
@@ -174,21 +148,19 @@ export class TeamService {
       const roles = [
         ...new Set([
           ...selected,
-          ...(legacy && user.roles.includes("employee")
-            ? ["employee" as TeamRole]
+          ...(legacy
+            ? user.roles.filter(
+                (r: string) => !["agent", "team_lead"].includes(r),
+              )
             : []),
         ]),
       ];
       if (
         !roles.length ||
-        roles.some((r) => !["agent", "team_lead", "employee"].includes(r))
+        roles.some((r) => !ASSIGNABLE_COMPANY_ROLES.includes(r))
       )
         throw new BadRequestException("Choose supported company roles");
-      const primary = roles.includes("team_lead")
-        ? "team_lead"
-        : roles.includes("agent")
-          ? "agent"
-          : "employee";
+      const primary = primaryCompanyRole(roles);
       if (
         !roles.includes("team_lead") &&
         (
@@ -222,7 +194,7 @@ export class TeamService {
           user.id,
           roleIds.get(primary),
           p.id,
-          primary !== "employee",
+          roles.some((r) => r === "agent" || r === "team_lead"),
         ],
       );
       for (const key of roles.filter((r) => r !== primary))
