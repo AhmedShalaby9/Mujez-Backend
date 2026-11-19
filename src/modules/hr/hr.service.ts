@@ -253,6 +253,14 @@ export class HrService {
         ? await this.existing(c, p, "hr_employees", id, b.version)
         : null;
       if (
+        old &&
+        b.employeeCode !== undefined &&
+        b.employeeCode !== old.employee_code
+      )
+        throw new BadRequestException(
+          "Employee codes are generated automatically and cannot be changed",
+        );
+      if (
         old?.reporting_team_id &&
         (b.managerId !== old.manager_id || b.userId !== old.user_id)
       )
@@ -315,7 +323,7 @@ export class HrService {
         "notes",
       ];
       const vals = [
-        b.employeeCode,
+        old?.employee_code ?? null,
         b.name,
         b.email,
         b.phone,

@@ -45,7 +45,7 @@ async function configureStaff(input) {
   assert.ok(row, "Invited staff must already have an HR profile");
   return h.post(
     "hr/employees/" + row.id,
-    body({ ...input, version: row.version }),
+    body({ ...input, employeeCode: row.employeeCode, version: row.version }),
   );
 }
 const YEAR = new Date().getUTCFullYear() + 1;
@@ -517,7 +517,7 @@ test("expired carryover is not counted as available and approved commitments can
   assert.equal(expired.expiredCarryDays, 5);
   const busy = (
     await h.db.query(
-      "SELECT id FROM tenant.hr_employees WHERE company_id=$1 AND employee_code='LC-1'",
+      "SELECT id FROM tenant.hr_employees WHERE company_id=$1 AND name='Concurrency employee'",
       [owner.companyId],
     )
   ).rows[0];

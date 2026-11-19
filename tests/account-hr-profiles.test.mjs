@@ -33,7 +33,7 @@ test("new company login atomically creates exactly one linked HR employee withou
   assert.ok(p);
   assert.equal(p.email, "automaticstaff@example.test");
   assert.equal(p.status, "active");
-  assert.match(p.employeeCode, /^EMP-[a-f0-9]{32}$/);
+  assert.match(p.employeeCode, /^EMP-[0-9]{4,}$/);
   assert.equal(p.managerId, null);
   assert.equal(p.joiningDate, null);
   assert.equal(

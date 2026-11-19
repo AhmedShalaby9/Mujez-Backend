@@ -33,7 +33,10 @@ test("HR directory creates non-CRM employees, departments and idempotent writes"
   assert.equal(employee.status, "active");
   assert.equal((await h.post("hr/employees", b)).body.id, employee.id);
   assert.equal((await h.get("hr/overview")).body.employees, 1);
-  assert.equal((await h.get("hr/employees?q=HR-001")).body.total, 1);
+  assert.equal(
+    (await h.get("hr/employees?q=" + employee.employeeCode)).body.total,
+    1,
+  );
   await h.get("hr/onboarding?employeeId=" + employee.id, 404);
   await h.post(
     "hr/onboarding",
@@ -48,7 +51,16 @@ test("HR directory creates non-CRM employees, departments and idempotent writes"
     ).rows[0].n,
     0,
   );
-  await h.post("hr/employees", body({ ...b, requestId: randomUUID() }), 409);
+  await h.post(
+    "hr/employees/" + employee.id,
+    body({
+      ...b,
+      requestId: randomUUID(),
+      version: employee.version,
+      employeeCode: "CHANGED",
+    }),
+    400,
+  );
   await h.post(
     "hr/departments/" + department.id,
     body({ version: 1, name: "Operations", archived: true }),

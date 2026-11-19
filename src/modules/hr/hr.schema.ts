@@ -9,7 +9,8 @@ export const employeeInput = z
     version: z.number().int().positive().optional(),
     employeeCode: text(40)
       .min(1)
-      .regex(/^[A-Za-z0-9_-]+$/),
+      .regex(/^[A-Za-z0-9_-]+$/)
+      .optional(),
     name: text(160).min(1),
     email: z
       .union([
