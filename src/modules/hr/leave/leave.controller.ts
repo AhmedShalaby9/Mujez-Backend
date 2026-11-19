@@ -25,8 +25,11 @@ export class LeaveController {
   @Get("context") context(@Req() r: AuthRequest) {
     return this.s.context(r.principal);
   }
-  @Get("policy") policy(@Req() r: AuthRequest) {
-    return this.s.policy(r.principal);
+  @Get("policy") policy(
+    @Req() r: AuthRequest,
+    @Query() q: Record<string, string>,
+  ) {
+    return this.s.policy(r.principal, q);
   }
   @Post("policy") policySave(
     @Req() r: AuthRequest,

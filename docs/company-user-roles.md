@@ -26,8 +26,10 @@ Real HTTP integration tests cover legacy invitations, multiple-role activation a
 
 ## HR-role boundaries
 
-HR Officer and HR Manager manage the current employee, department, private document and onboarding modules within their company. HR Officer can manage leave records; HR Manager additionally configures annual leave policy and balances and makes final leave decisions. Payroll remains unimplemented. Neither role can invite, enable/disable CRM accounts, assign roles, read company CRM analytics or manage subscriptions. Only the company owner assigns these roles. Payroll Officer alone has no HR or financial access. Employee alone still has no HR administration. Role assignment does not manufacture an HR employee record.
+HR Officer and HR Manager manage the current employee, department and private document modules within their company. HR Officer can manage leave records; HR Manager additionally configures annual leave policy and balances and makes final leave decisions. Payroll remains unimplemented. Neither role can invite, enable/disable CRM accounts, assign roles, read company CRM analytics or manage subscriptions. Only the company owner assigns these roles. Payroll Officer alone has no HR or financial access. Employee alone still has no HR administration. Role assignment does not manufacture an HR employee record.
 
 HR-only users land at /company/hr/employees. Mixed sales/HR users retain their sales dashboard and see the People section as additional navigation. Standalone HR/Payroll users are excluded from CRM assignee/routing lists. Removing a sales role clears sales-team membership when no sales role remains; all records stay retained. Legacy sales-role changes preserve all assigned non-sales roles.
 
 Annual leave policy, approvals and privacy rules are documented in [annual-leave.md](annual-leave.md).
+
+Migration053 adds Employee to every existing non-deleted company login (including owners), increments changed role versions and preserves original primary roles, team membership, scope and account state. Existing sessions resolve the additional grant immediately. Platform accounts remain separate. This does not automatically create HR profiles or reporting relationships.

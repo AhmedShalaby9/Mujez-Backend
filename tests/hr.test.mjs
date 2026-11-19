@@ -14,7 +14,7 @@ before(async () => {
   [owner, other] = h.principals;
 });
 after(async () => h?.close());
-test("HR directory creates non-CRM employees, checklist, departments and idempotent writes", async () => {
+test("HR directory creates non-CRM employees, departments and idempotent writes", async () => {
   department = (
     await h.post(
       "hr/departments",
@@ -29,13 +29,16 @@ test("HR directory creates non-CRM employees, checklist, departments and idempot
   });
   employee = (await h.post("hr/employees", b)).body;
   assert.equal(employee.userId, null);
-  assert.equal(employee.openTasks, 4);
+  assert.equal(employee.openTasks, undefined);
+  assert.equal(employee.status, "active");
   assert.equal((await h.post("hr/employees", b)).body.id, employee.id);
   assert.equal((await h.get("hr/overview")).body.employees, 1);
   assert.equal((await h.get("hr/employees?q=HR-001")).body.total, 1);
-  assert.equal(
-    (await h.get("hr/onboarding?employeeId=" + employee.id)).body.total,
-    4,
+  await h.get("hr/onboarding?employeeId=" + employee.id, 404);
+  await h.post(
+    "hr/onboarding",
+    body({ employeeId: employee.id, title: "Retired" }),
+    404,
   );
   assert.equal(
     (
@@ -155,39 +158,6 @@ test("HR validates employment dates, reporting cycles, optimistic locking and CR
     () => assert.fail("Expected duplicate rejection"),
     (e) => assert.match(e.message, /409/),
   );
-  const tasks = (await h.get("hr/onboarding?employeeId=" + employee.id)).body
-    .items;
-  const t = tasks[0];
-  await h.post(
-    "hr/onboarding/" + t.id,
-    body({
-      employeeId: employee.id,
-      title: t.title,
-      assigneeId: manager.id,
-      dueDate: "2026-01-01",
-      status: "done",
-      version: t.version,
-    }),
-  );
-  const done = (
-    await h.get("hr/onboarding?employeeId=" + employee.id + "&status=done")
-  ).body.items[0];
-  assert.ok(done.completedAt);
-  assert.equal(done.assigneeId, manager.id);
-  await h.post(
-    "hr/onboarding/" + t.id,
-    body({
-      employeeId: employee.id,
-      title: t.title,
-      version: done.version,
-      status: "open",
-    }),
-  );
-  assert.equal(
-    (await h.get("hr/onboarding?employeeId=" + employee.id + "&status=done"))
-      .body.total,
-    0,
-  );
 });
 function upload(p, b, file, name = "contract.txt", expected = 201) {
   h.state.principal = p;
@@ -264,7 +234,7 @@ test("private employee files upload/download, archive/restore, cross-company den
   );
   h.state.principal = owner;
 });
-test("HR audit failure rolls back employee and auto checklist creation", async () => {
+test("HR audit failure rolls back employee creation", async () => {
   const before = (await h.get("hr/overview")).body.employees;
   h.state.failAudit = true;
   await h.post(

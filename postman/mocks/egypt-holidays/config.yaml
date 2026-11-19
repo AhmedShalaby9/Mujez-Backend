@@ -1,0 +1,12 @@
+version: 1
+id: 6944f021-a5ed-4357-b607-ef320a58c056
+name: egypt-holidays
+slug: egypt-holidays
+protocol: http
+interceptRequests: true
+origin: https://date.nager.at
+port: 4500
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

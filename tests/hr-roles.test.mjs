@@ -79,7 +79,7 @@ test("HR Officer and HR Manager receive only current HR permissions, combined wi
     );
   }
 });
-test("authorized HR staff manage company records, files and onboarding without acquiring role administration", async () => {
+test("authorized HR staff manage company records and files without acquiring role administration", async () => {
   h.state.principal = await profile(officer);
   const d = (
     await h.post("hr/departments", body({ name: "People Operations" }))
@@ -95,7 +95,7 @@ test("authorized HR staff manage company records, files and onboarding without a
     )
   ).body;
   assert.equal(staff.userId, null);
-  assert.equal(staff.openTasks, 4);
+  assert.equal(staff.openTasks, undefined);
   h.state.principal = await profile(manager);
   const updated = (
     await h.post(
@@ -110,16 +110,7 @@ test("authorized HR staff manage company records, files and onboarding without a
     )
   ).body;
   assert.equal(updated.status, "active");
-  const t = (await h.get("hr/onboarding?employeeId=" + staff.id)).body.items[0];
-  await h.post(
-    "hr/onboarding/" + t.id,
-    body({
-      employeeId: staff.id,
-      title: t.title,
-      status: "done",
-      version: t.version,
-    }),
-  );
+  await h.get("hr/onboarding", 404);
   const f = await h
     .api()
     .post("/api/v1/hr/documents")

@@ -29,9 +29,7 @@ export const employeeInput = z
     employmentType: z
       .enum(["full_time", "part_time", "contract", "intern"])
       .default("full_time"),
-    status: z
-      .enum(["onboarding", "active", "on_leave", "offboarded"])
-      .default("onboarding"),
+    status: z.enum(["active", "on_leave", "offboarded"]).default("active"),
     joiningDate: date,
     endDate: date,
     notes: text(4000).default(""),
@@ -47,17 +45,6 @@ export const departmentInput = z
     name: text(120).min(1),
     description: text(1000).default(""),
     archived: z.boolean().default(false),
-  })
-  .strict();
-export const taskInput = z
-  .object({
-    ...request,
-    version: z.number().int().positive().optional(),
-    employeeId: z.uuid(),
-    title: text(200).min(1),
-    assigneeId: nullableId,
-    dueDate: date,
-    status: z.enum(["open", "done", "cancelled"]).default("open"),
   })
   .strict();
 export const documentInput = z
@@ -90,9 +77,3 @@ export const listInput = z
     archived: z.enum(["true", "false", "all"]).default("false"),
   })
   .strict();
-export const defaultChecklist = [
-  "Collect employment documents",
-  "Sign employment contract",
-  "Prepare equipment and workspace",
-  "Complete company orientation",
-];

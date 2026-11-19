@@ -1,3 +1,4 @@
+import { EgyptHolidaysService } from "./egypt-holidays.service.js";
 import {
   Injectable,
   ForbiddenException,
@@ -32,6 +33,7 @@ export class LeaveService {
   constructor(
     private readonly db: DatabaseService,
     private readonly hr: HrService,
+    private readonly holidays: EgyptHolidaysService,
   ) {}
   owner(p: Principal) {
     return (
@@ -156,7 +158,7 @@ export class LeaveService {
       configured: r.annual_units !== null,
       annualDays: r.annual_units === null ? null : r.annual_units / 2,
       weekends: r.weekends,
-      holidays: r.holidays,
+
       carryLimitDays: r.carry_limit_units / 2,
       carryExpiry: r.carry_expiry,
       version: r.version,
@@ -164,11 +166,17 @@ export class LeaveService {
       timeZone: "Africa/Cairo",
     };
   }
-  async policy(p: Principal) {
+  async policy(p: Principal, input: unknown = {}) {
     await this.access(p);
-    return this.db.tenant(p.companyId!, async (c) =>
-      this.policyDto(await this.policyRow(c, p)),
-    );
+    const q = this.parseQuery(input);
+    const policy = await this.db.tenant(p.companyId!, async (c) => ({
+      row: await this.policyRow(c, p),
+      year: q.year ?? Number((await this.today(c)).slice(0, 4)),
+    }));
+    return {
+      ...this.policyDto(policy.row),
+      ...(await this.holidays.get(policy.year, true)),
+    };
   }
   async write(
     p: Principal,
@@ -252,7 +260,7 @@ export class LeaveService {
           p.companyId,
           b.annualDays * 2,
           b.weekends,
-          JSON.stringify(b.holidays),
+          "[]",
           b.carryLimitDays * 2,
           b.carryExpiry,
         ],
@@ -574,7 +582,7 @@ export class LeaveService {
           b.endDate,
           b.half,
           policy.weekends,
-          policy.holidays,
+          (await this.holidays.get(year)).holidays,
         ),
         units = dates.reduce((n, d) => n + d.units, 0);
       if (!units)
@@ -676,7 +684,7 @@ export class LeaveService {
           r.finish,
           r.half,
           policy.weekends,
-          policy.holidays,
+          (await this.holidays.get(r.year)).holidays,
         );
         if (JSON.stringify(dates) !== JSON.stringify(r.days))
           throw new ConflictException(

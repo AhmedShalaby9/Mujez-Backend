@@ -1,0 +1,27 @@
+assumptions:
+  - id: egypt-holiday-public-contract
+    status: supported
+    claim: The v3 Egypt endpoint accepts a year and returns JSON holiday dates without credentials.
+    reason: Live requests for 2026 and 2027 returned Egypt public holiday arrays. Orbit did not locate Nager.Date; its search candidates covered other providers.
+    verification: On 2026-11-19 inspected the provider documentation and GET /api/v3/PublicHolidays/2026/EG and /2027/EG. Both returned 200. The schema and regional/public filtering were exercised by tests/egypt-holidays.test.mjs with real HTTP and PostgreSQL semantics.
+    source: https://date.nager.at/api/v3/PublicHolidays/2027/EG; https://github.com/nager/Nager.Date/blob/main/src/Nager.Date/HolidayProviders/EgyptHolidayProvider.cs; tests/egypt-holidays.test.mjs
+    updated_at: '2026-11-19'
+  - id: future-holiday-completeness
+    status: unknown
+    claim: All government-declared Egyptian holidays for a future year are present in the provider response.
+    reason: The observed 2027 array has ten dates and omits Eid periods. Automatic daily refresh does not establish completeness or announcement accuracy.
+    verification: On 2026-11-19 the 2027 live response had no Eid al-Fitr or Eid al-Adha rows. UI labels the provider data and cautions about unannounced future dates. Approved leave snapshots are retained; pending final approval checks the latest available calendar.
+    source: https://date.nager.at/api/v3/PublicHolidays/2027/EG; docs/annual-leave.md
+    updated_at: '2026-11-19'
+  - id: caller-refuses-bad-holiday-data
+    status: supported
+    claim: The caller rejects provider errors and wrong-country data without replacing its good cache.
+    reason: The actual service ran through local Postman HTTP stand-ins and the persisted-cache tests. These are caller guarantees, not provider uptime guarantees.
+    verification: On 2026-11-19 ran scripts/qa/holiday-simulation.mjs against Postman CLI 1.73.0 on port4518. Request events recorded success, 503 HTML error and malformed country responses. Service rejected both failures; tests/egypt-holidays.test.mjs also verified stale-read visibility and failed fresh calculations.
+    source: scripts/qa/holiday-simulation.mjs; tests/egypt-holidays.test.mjs; postman/mocks/egypt-holidays/default.js
+    updated_at: '2026-11-19'
+fingerprints:
+  - git_revision: e9ac4a17d55a63a93f8e7f77e7b02bd3e775d47f
+    dirty: true
+    postman_version: 1.73.0
+    date: '2026-11-19'

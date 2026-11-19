@@ -30,10 +30,12 @@ One optional attachment per request, PDF/PNG/JPEG/UTF-8 text up to5 MiB, uses th
 
 ## HTTP contract
 
-All routes under /api/v1/leave require a current company subscription, a company account and no inspection session. Every POST requires a UUID requestId and rejects unknown fields. Replays are actor/body bound.
+All routes under /api/v1/leave require a current company subscription, a company account and no inspection session. Egypt national public holidays are fetched server-side from `https://date.nager.at/api/v3/PublicHolidays/{year}/EG`, with no credentials or employee data sent. Results are validated and stored in a shared platform cache for24 hours. Read-only policy views may display the last good stale cache with a warning; submission and final approval require a fresh successful cache. Errors, invalid payloads and empty national holiday lists cannot replace good cached data. Approved snapshots never change. The community provider may omit unannounced future-year holidays, especially Eid dates; the list is not a government completeness guarantee.
+
+Every POST requires a UUID requestId and rejects unknown fields. Replays are actor/body bound.
 
 - GET context: linked employee, self/manager/HR/final capabilities and Cairo today.
-- GET/POST policy: configured annualDays, weekends (0Sunday–6Saturday), dated holidays, carryLimitDays, carryExpiry MM-DD and version. POST is final-approver only.
+- GET/POST policy: configured annualDays, weekends (0Sunday–6Saturday), carryLimitDays, carryExpiry MM-DD and version. POST is final-approver only.
 - GET options: minimal employee choices, current direct reports for managers, company employees for HR; chooser capped at1000.
 - GET balance?employeeId&year: own linked employee or HR. GET balances?year&page&limit: HR company balance directory. POST balances: employeeId,year,version,annualDays,carryDays,reason; final-approver only, current/previous/next year.
 - GET requests?view=my|approvals|manage&year&status&employeeId&page&limit: authorized scope applied before filtering/paging. POST requests: employeeId,startDate,endDate,half=null|am|pm,reason.
@@ -47,3 +49,5 @@ Frontend: /company/my-leave, /company/leave-approvals and /company/hr/leave. HR 
 ## Validation
 
 Real Nest HTTP/database tests cover manager→HR approval, forbidden self-approval, current-manager boundaries, missing links, offline staff, half-day slots, public holidays/weekends, carry transfer/expiry, concurrent approvals, cancellation reservations/refunds, policy/calendar changes, actor-bound replay, private attachments, foreign tenants and audit rollback. Frontend tests cover scoped loading, save/version payloads, link guidance, policy controls and attachment retry without duplicate requests.
+
+GET policy accepts `year` and includes provider holidays, `source`, `year`, `fetchedAt`, `available`, and `stale`. POST policy rejects a client-supplied `holidays` property. The dashboard displays a read-only provider list instead of a manual holiday editor, and loads request estimates for the selected start year.

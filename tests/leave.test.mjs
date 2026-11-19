@@ -117,7 +117,7 @@ test("allowance setup is explicit, employee self link is enforced, and HR Office
   h.state.principal = await profile(officerAccount);
   await h.post(
     "leave/policy",
-    body({ version: 0, annualDays: 20, weekends: [], holidays: [] }),
+    body({ version: 0, annualDays: 20, weekends: [] }),
     403,
   );
   await h.post(
@@ -140,7 +140,6 @@ test("allowance setup is explicit, employee self link is enforced, and HR Office
         version: 0,
         annualDays: 20,
         weekends: [],
-        holidays: [],
         carryLimitDays: 5,
         carryExpiry: "12-31",
       }),
@@ -431,35 +430,15 @@ test("calendar changes require a fresh request instead of silently changing appr
     )
   ).body;
   const r = (await create(e, date(23))).body;
-  const old = (await h.get("leave/policy")).body;
-  await h.post(
-    "leave/policy",
-    body({
-      version: old.version,
-      annualDays: 20,
-      weekends: [],
-      holidays: [{ date: date(23), name: "Company holiday" }],
-      carryLimitDays: 5,
-      carryExpiry: "12-31",
-    }),
-  );
+  h.state.holidays = [
+    { date: date(23), name: "Provider holiday", localName: "عطلة" },
+  ];
   await h.post(
     "leave/requests/" + r.id + "/action",
     body({ version: r.version, action: "hr_approve" }),
     409,
   );
-  const current = (await h.get("leave/policy")).body;
-  await h.post(
-    "leave/policy",
-    body({
-      version: current.version,
-      annualDays: 20,
-      weekends: [],
-      holidays: [],
-      carryLimitDays: 5,
-      carryExpiry: "12-31",
-    }),
-  );
+  h.state.holidays = [];
 });
 test("manager reassignment removes former manager access and unavailable managers require explicit HR review notes", async () => {
   const e = (
@@ -552,4 +531,55 @@ test("expired carryover is not counted as available and approved commitments can
     }),
     409,
   );
+});
+
+test("holiday API outage prevents requests and final approvals without deducting balances", async () => {
+  h.state.principal = owner;
+  const e = (
+    await h.post(
+      "hr/employees",
+      body({
+        employeeCode: "HOL-FAIL",
+        name: "Holiday failure staff",
+        status: "active",
+      }),
+    )
+  ).body;
+  const r = (await create(e, date(28))).body;
+  h.state.holidayFailure = true;
+  try {
+    await h.post(
+      "leave/requests",
+      body({ employeeId: e.id, startDate: date(29), endDate: date(29) }),
+      503,
+    );
+    await h.post(
+      "leave/requests/" + r.id + "/action",
+      body({ version: r.version, action: "hr_approve" }),
+      503,
+    );
+    const list = (
+      await h.get(
+        "leave/requests?view=manage&year=" + YEAR + "&employeeId=" + e.id,
+      )
+    ).body;
+    assert.equal(list.total, 1);
+    assert.equal(list.items[0].status, "pending_hr");
+    const bal = (
+      await h.get("leave/balance?employeeId=" + e.id + "&year=" + YEAR)
+    ).body;
+    assert.equal(bal.upcomingDays, 0);
+    await h.post(
+      "leave/policy",
+      body({
+        version: (await h.get("leave/policy")).body.version,
+        annualDays: 20,
+        weekends: [],
+        holidays: [{ date: date(29), name: "Forged" }],
+      }),
+      400,
+    );
+  } finally {
+    h.state.holidayFailure = false;
+  }
 });

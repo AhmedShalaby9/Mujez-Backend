@@ -1,3 +1,5 @@
+import { EgyptHolidaysService } from "../dist/modules/hr/leave/egypt-holidays.service.js";
+import { ServiceUnavailableException } from "@nestjs/common";
 import "reflect-metadata";
 import { PGlite } from "@electric-sql/pglite";
 import { readFile, readdir } from "node:fs/promises";
@@ -11,7 +13,12 @@ import { ENV, parseEnvironment } from "../dist/config/env.js";
 import { configureApp } from "../dist/common/http/configure-app.js";
 export async function tenantHarness() {
   const db = new PGlite(),
-    state = { principal: null, failAudit: false };
+    state = {
+      principal: null,
+      failAudit: false,
+      holidays: [],
+      holidayFailure: false,
+    };
   let queue = Promise.resolve();
   for (const f of (
     await readdir(new URL("../database/migrations/", import.meta.url))
@@ -133,6 +140,21 @@ export async function tenantHarness() {
   };
   const origin = "https://app.example.test";
   const mod = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(EgyptHolidaysService)
+    .useValue({
+      get: async (year, allowStale = false) => {
+        if (state.holidayFailure && !allowStale)
+          throw new ServiceUnavailableException("Holiday provider unavailable");
+        return {
+          holidays: state.holidays,
+          year,
+          source: "Nager.Date",
+          available: !state.holidayFailure,
+          stale: state.holidayFailure,
+          fetchedAt: "2026-11-19T00:00:00Z",
+        };
+      },
+    })
     .overrideProvider(ENV)
     .useValue(
       parseEnvironment({

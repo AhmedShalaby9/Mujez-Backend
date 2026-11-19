@@ -17,16 +17,14 @@ import { recordTenantEvent } from "../../infrastructure/outbox/domain-events.js"
 import {
   employeeInput,
   departmentInput,
-  taskInput,
   documentInput,
   archiveInput,
   listInput,
-  defaultChecklist,
 } from "./hr.schema.js";
 import type { z } from "zod";
-const employeeSelect = `SELECT e.id,e.employee_code AS "employeeCode",e.name,e.email,e.phone,e.job_title AS "jobTitle",e.department_id AS "departmentId",d.name AS department,e.manager_id AS "managerId",m.name AS manager,e.user_id AS "userId",u.name AS "crmName",u.status AS "crmStatus",e.work_location AS "workLocation",e.employment_type AS "employmentType",e.status,e.joining_date::text AS "joiningDate",e.end_date::text AS "endDate",e.notes,e.version,e.created_at AS "createdAt",(SELECT count(*)::int FROM tenant.hr_onboarding_tasks t WHERE t.company_id=e.company_id AND t.employee_id=e.id AND t.status='open') AS "openTasks" FROM tenant.hr_employees e LEFT JOIN tenant.hr_departments d ON d.company_id=e.company_id AND d.id=e.department_id LEFT JOIN tenant.hr_employees m ON m.company_id=e.company_id AND m.id=e.manager_id LEFT JOIN tenant.users u ON u.company_id=e.company_id AND u.id=e.user_id`;
+const employeeSelect = `SELECT e.id,e.employee_code AS "employeeCode",e.name,e.email,e.phone,e.job_title AS "jobTitle",e.department_id AS "departmentId",d.name AS department,e.manager_id AS "managerId",m.name AS manager,e.user_id AS "userId",u.name AS "crmName",u.status AS "crmStatus",e.work_location AS "workLocation",e.employment_type AS "employmentType",e.status,e.joining_date::text AS "joiningDate",e.end_date::text AS "endDate",e.notes,e.version,e.created_at AS "createdAt" FROM tenant.hr_employees e LEFT JOIN tenant.hr_departments d ON d.company_id=e.company_id AND d.id=e.department_id LEFT JOIN tenant.hr_employees m ON m.company_id=e.company_id AND m.id=e.manager_id LEFT JOIN tenant.users u ON u.company_id=e.company_id AND u.id=e.user_id`;
 const docSelect = `SELECT d.id,d.employee_id AS "employeeId",e.name AS employee,d.title,d.kind,d.file_name AS "fileName",d.mime_type AS "mimeType",d.size_bytes AS "sizeBytes",d.expires_date::text AS "expiresDate",d.archived,d.version,d.created_at AS "createdAt",(d.expires_date<(now() AT TIME ZONE 'Africa/Cairo')::date) AS expired,(d.expires_date BETWEEN (now() AT TIME ZONE 'Africa/Cairo')::date AND (now() AT TIME ZONE 'Africa/Cairo')::date+30) AS "expiringSoon" FROM tenant.hr_documents d JOIN tenant.hr_employees e ON e.company_id=d.company_id AND e.id=d.employee_id`;
-const taskSelect = `SELECT t.id,t.employee_id AS "employeeId",e.name AS employee,t.title,t.assignee_id AS "assigneeId",a.name AS assignee,t.due_date::text AS "dueDate",t.status,t.version,t.completed_at AS "completedAt",(t.status='open' AND t.due_date<(now() AT TIME ZONE 'Africa/Cairo')::date) AS overdue FROM tenant.hr_onboarding_tasks t JOIN tenant.hr_employees e ON e.company_id=t.company_id AND e.id=t.employee_id LEFT JOIN tenant.hr_employees a ON a.company_id=t.company_id AND a.id=t.assignee_id`;
+
 @Injectable()
 export class HrService {
   constructor(
@@ -165,7 +163,7 @@ export class HrService {
       async (c) =>
         (
           await c.query(
-            `SELECT (SELECT count(*)::int FROM tenant.hr_employees WHERE company_id=$1) AS employees,(SELECT count(*)::int FROM tenant.hr_employees WHERE company_id=$1 AND status='active') AS active,(SELECT count(*)::int FROM tenant.hr_employees WHERE company_id=$1 AND status='onboarding') AS onboarding,(SELECT count(*)::int FROM tenant.hr_employees WHERE company_id=$1 AND user_id IS NULL) AS "withoutCrm",(SELECT count(*)::int FROM tenant.hr_departments WHERE company_id=$1 AND NOT archived) AS departments,(SELECT count(*)::int FROM tenant.hr_onboarding_tasks WHERE company_id=$1 AND status='open' AND due_date<(now() AT TIME ZONE 'Africa/Cairo')::date) AS overdue,(SELECT count(*)::int FROM tenant.hr_documents WHERE company_id=$1 AND NOT archived AND expires_date<=(now() AT TIME ZONE 'Africa/Cairo')::date+30) AS "documentsDue"`,
+            `SELECT (SELECT count(*)::int FROM tenant.hr_employees WHERE company_id=$1) AS employees,(SELECT count(*)::int FROM tenant.hr_employees WHERE company_id=$1 AND status='active') AS active,(SELECT count(*)::int FROM tenant.hr_employees WHERE company_id=$1 AND user_id IS NULL) AS "withoutCrm",(SELECT count(*)::int FROM tenant.hr_departments WHERE company_id=$1 AND NOT archived) AS departments,(SELECT count(*)::int FROM tenant.hr_documents WHERE company_id=$1 AND NOT archived AND expires_date<=(now() AT TIME ZONE 'Africa/Cairo')::date+30) AS "documentsDue"`,
             [p.companyId],
           )
         ).rows[0],
@@ -220,22 +218,8 @@ export class HrService {
                 a.length +
                 ")",
             );
-        } else {
-          select = taskSelect;
-          alias = "t";
-          order =
-            "CASE t.status WHEN 'open' THEN 0 ELSE 1 END,t.due_date NULLS LAST,t.id";
-          if (q.employeeId) w.push("t.employee_id=" + arg(q.employeeId));
-          if (q.status) w.push("t.status=" + arg(q.status));
-          if (q.q)
-            w.push(
-              "(t.title ILIKE " +
-                arg("%" + q.q + "%") +
-                " OR e.name ILIKE $" +
-                a.length +
-                ")",
-            );
-        }
+        } else throw new NotFoundException();
+
         const sql =
           select +
           " WHERE " +
@@ -351,11 +335,6 @@ export class HrService {
             [p.companyId, ...vals],
           )
         ).rows[0];
-        for (const title of defaultChecklist)
-          await c.query(
-            "INSERT INTO tenant.hr_onboarding_tasks(company_id,employee_id,title) VALUES($1,$2,$3)",
-            [p.companyId, result.id, title],
-          );
       }
       await this.event(
         c,
@@ -402,57 +381,6 @@ export class HrService {
             )
           ).rows[0];
       await this.event(c, p, r.id, "department.saved");
-      return r;
-    });
-  }
-  async saveTask(p: Principal, input: unknown, id?: string) {
-    const b = this.parse(taskInput, input);
-    return this.write(p, "onboarding." + (id || "create"), b, async (c) => {
-      const old = id
-        ? await this.existing(c, p, "hr_onboarding_tasks", id, b.version)
-        : null;
-      if (old && old.employee_id !== b.employeeId)
-        throw new BadRequestException("Checklist employee cannot be changed");
-      if (
-        !(
-          await c.query(
-            "SELECT 1 FROM tenant.hr_employees WHERE company_id=$1 AND id=$2",
-            [p.companyId, b.employeeId],
-          )
-        ).rowCount
-      )
-        throw new NotFoundException("Employee not found");
-      await this.employeeRef(c, p, b.assigneeId);
-      const r = id
-        ? (
-            await c.query(
-              "UPDATE tenant.hr_onboarding_tasks SET title=$3,assignee_id=$4,due_date=$5,status=$6,completed_at=CASE WHEN $6='done' THEN coalesce(completed_at,now()) ELSE NULL END,completed_by=CASE WHEN $6='done' THEN $7::uuid ELSE NULL END,version=version+1 WHERE company_id=$1 AND id=$2 RETURNING id",
-              [
-                p.companyId,
-                id,
-                b.title,
-                b.assigneeId,
-                b.dueDate,
-                b.status,
-                p.id,
-              ],
-            )
-          ).rows[0]
-        : (
-            await c.query(
-              "INSERT INTO tenant.hr_onboarding_tasks(company_id,employee_id,title,assignee_id,due_date,status,completed_at,completed_by) VALUES($1,$2,$3,$4,$5,$6,CASE WHEN $6='done' THEN now() ELSE NULL END,CASE WHEN $6='done' THEN $7::uuid ELSE NULL END) RETURNING id",
-              [
-                p.companyId,
-                b.employeeId,
-                b.title,
-                b.assigneeId,
-                b.dueDate,
-                b.status,
-                p.id,
-              ],
-            )
-          ).rows[0];
-      await this.event(c, p, r.id, "onboarding.saved");
       return r;
     });
   }

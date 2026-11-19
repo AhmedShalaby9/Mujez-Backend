@@ -66,25 +66,6 @@ export class HrController {
   ) {
     return this.s.saveDepartment(r.principal, b, id);
   }
-  @Get("onboarding") tasks(
-    @Req() r: AuthRequest,
-    @Query() q: Record<string, string>,
-  ) {
-    return this.s.list(r.principal, "onboarding", q);
-  }
-  @Post("onboarding") taskCreate(
-    @Req() r: AuthRequest,
-    @Body() b: Record<string, unknown>,
-  ) {
-    return this.s.saveTask(r.principal, b);
-  }
-  @Post("onboarding/:id") taskUpdate(
-    @Req() r: AuthRequest,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body() b: Record<string, unknown>,
-  ) {
-    return this.s.saveTask(r.principal, b, id);
-  }
   @Get("documents") documents(
     @Req() r: AuthRequest,
     @Query() q: Record<string, string>,

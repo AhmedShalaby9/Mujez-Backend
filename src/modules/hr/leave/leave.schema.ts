@@ -15,10 +15,6 @@ export const policyInput = z
       .array(z.number().int().min(0).max(6))
       .max(6)
       .refine((a) => new Set(a).size === a.length),
-    holidays: z
-      .array(z.object({ date: z.iso.date(), name: text(120).min(1) }).strict())
-      .max(250)
-      .refine((a) => new Set(a.map((h) => h.date)).size === a.length),
     carryLimitDays: days.default(0),
     carryExpiry: z
       .string()

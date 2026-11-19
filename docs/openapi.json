@@ -703,35 +703,6 @@
         "tags": ["Hr"]
       }
     },
-    "/api/v1/hr/onboarding": {
-      "get": {
-        "operationId": "HrController_tasks",
-        "parameters": [],
-        "responses": { "200": { "description": "" } },
-        "tags": ["Hr"]
-      },
-      "post": {
-        "operationId": "HrController_taskCreate",
-        "parameters": [],
-        "responses": { "201": { "description": "" } },
-        "tags": ["Hr"]
-      }
-    },
-    "/api/v1/hr/onboarding/{id}": {
-      "post": {
-        "operationId": "HrController_taskUpdate",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": { "201": { "description": "" } },
-        "tags": ["Hr"]
-      }
-    },
     "/api/v1/hr/documents": {
       "get": {
         "operationId": "HrController_documents",

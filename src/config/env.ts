@@ -19,6 +19,10 @@ const schema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
+  EGYPT_HOLIDAYS_BASE_URL: z
+    .string()
+    .url()
+    .default("https://date.nager.at/api/v3"),
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.string().url(),
   PLATFORM_DATABASE_URL: z.string().url(),
@@ -35,6 +39,11 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
         result.error.issues.map((i) => i.path.join(".")).join(","),
     );
   const env = result.data;
+  if (
+    env.NODE_ENV !== "test" &&
+    env.EGYPT_HOLIDAYS_BASE_URL !== "https://date.nager.at/api/v3"
+  )
+    throw new Error("Invalid EGYPT_HOLIDAYS_BASE_URL");
   if (
     env.DASHBOARD_URL &&
     (new URL(env.DASHBOARD_URL).origin + "/" !== env.DASHBOARD_URL ||
