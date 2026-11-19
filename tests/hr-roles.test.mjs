@@ -206,7 +206,7 @@ test("Sales Agent plus HR Manager retains personal CRM scope while explicitly ac
   const leads = (await h.get("leads")).body;
   assert.equal(leads.total, 1);
   assert.equal(leads.items[0].id, own.id);
-  assert.equal((await h.get("hr/employees")).body.total, 1);
+  assert.equal((await h.get("hr/employees")).body.total, 5);
   await h.get("team/groups", 403);
   await h.get("company-ai-insights/snapshot", 403);
   h.state.principal = owner;
@@ -221,7 +221,7 @@ test("Sales Agent plus HR Manager retains personal CRM scope while explicitly ac
   assert.equal(p.scope, "own");
   h.state.principal = p;
   await h.get("leads", 403);
-  assert.equal((await h.get("hr/employees")).body.total, 1);
+  assert.equal((await h.get("hr/employees")).body.total, 5);
 });
 test("all six roles can be assigned, legacy sales changes preserve HR roles, and read-only HR permissions cannot write", async () => {
   const all = await invite("AllRoles", [

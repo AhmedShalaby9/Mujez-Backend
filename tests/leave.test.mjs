@@ -38,6 +38,16 @@ async function account(name, roles) {
   ).rows[0];
 }
 const profile = (a) => sessions.employeeProfile(a);
+async function configureStaff(input) {
+  const row = (await h.get("hr/employees?limit=100")).body.items.find(
+    (e) => e.userId === input.userId,
+  );
+  assert.ok(row, "Invited staff must already have an HR profile");
+  return h.post(
+    "hr/employees/" + row.id,
+    body({ ...input, version: row.version }),
+  );
+}
 const YEAR = new Date().getUTCFullYear() + 1;
 const date = (n) =>
   new Date(Date.UTC(YEAR, 0, 10 + n)).toISOString().slice(0, 10);
@@ -62,27 +72,21 @@ before(async () => {
   hrAccount = await account("LeaveHrManager", ["hr_manager", "employee"]);
   officerAccount = await account("LeaveOfficer", ["hr_officer", "employee"]);
   managerPerson = (
-    await h.post(
-      "hr/employees",
-      body({
-        employeeCode: "LM-1",
-        name: "Reporting manager",
-        status: "active",
-        userId: managerAccount.user_id,
-      }),
-    )
+    await configureStaff({
+      employeeCode: "LM-1",
+      name: "Reporting manager",
+      status: "active",
+      userId: managerAccount.user_id,
+    })
   ).body;
   person = (
-    await h.post(
-      "hr/employees",
-      body({
-        employeeCode: "LE-1",
-        name: "Leave employee",
-        status: "active",
-        userId: employeeAccount.user_id,
-        managerId: managerPerson.id,
-      }),
-    )
+    await configureStaff({
+      employeeCode: "LE-1",
+      name: "Leave employee",
+      status: "active",
+      userId: employeeAccount.user_id,
+      managerId: managerPerson.id,
+    })
   ).body;
 });
 after(async () => h?.close());
@@ -256,15 +260,12 @@ test("approved cancellation requires HR, retains reservation while pending, and 
 test("HR cannot approve their own request; managers only see current direct reports", async () => {
   h.state.principal = owner;
   const hrPerson = (
-    await h.post(
-      "hr/employees",
-      body({
-        employeeCode: "LHR-1",
-        name: "HR employee",
-        status: "active",
-        userId: hrAccount.user_id,
-      }),
-    )
+    await configureStaff({
+      employeeCode: "LHR-1",
+      name: "HR employee",
+      status: "active",
+      userId: hrAccount.user_id,
+    })
   ).body;
   h.state.principal = await profile(hrAccount);
   const r = (await create(hrPerson, date(7))).body;
@@ -477,6 +478,10 @@ test("manager reassignment removes former manager access and unavailable manager
 });
 test("unlinked Employee accounts receive no employee data, and foreign tenants cannot read reservations", async () => {
   const a = await account("UnlinkedEmployee", ["employee"]);
+  await h.db.query(
+    "UPDATE tenant.hr_employees SET user_id=NULL WHERE company_id=$1 AND user_id=$2",
+    [owner.companyId, a.user_id],
+  );
   h.state.principal = await profile(a);
   const ctx = (await h.get("leave/context")).body;
   assert.equal(ctx.self, null);
