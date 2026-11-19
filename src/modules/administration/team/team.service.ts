@@ -1,3 +1,4 @@
+import { syncTeamReporting } from "../../hr/team-reporting.js";
 import {
   COMPANY_ROLE_FIELDS,
   COMPANY_ROLE_DEFINITIONS,
@@ -202,6 +203,7 @@ export class TeamService {
           "INSERT INTO tenant.user_additional_roles(company_id,user_id,role_id) VALUES($1,$2,$3)",
           [p.companyId, user.id, roleIds.get(key)],
         );
+      await syncTeamReporting(c, p);
       await recordTenantEvent(c, {
         companyId: p.companyId!,
         actorId: p.id,
@@ -391,6 +393,7 @@ export class TeamService {
           after: { role: "team_lead" },
           payload: { role: "team_lead" },
         });
+      await syncTeamReporting(c, p);
       await recordTenantEvent(c, {
         companyId: p.companyId!,
         actorId: p.id,

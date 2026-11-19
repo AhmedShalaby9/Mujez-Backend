@@ -882,7 +882,7 @@ export class LeaveService {
       return {
         items: (
           await c.query(
-            "SELECT a.action,a.at,u.name AS actor,CASE WHEN $3 OR a.actor_id=$4 THEN a.note ELSE NULL END AS note FROM tenant.leave_actions a JOIN tenant.users u ON u.company_id=a.company_id AND u.id=a.actor_id WHERE a.company_id=$1 AND a.request_id=$2 ORDER BY a.at,a.id",
+            "SELECT a.action,a.at,coalesce(u.name,'System') AS actor,CASE WHEN $3 OR a.actor_id=$4 THEN a.note ELSE NULL END AS note FROM tenant.leave_actions a LEFT JOIN tenant.users u ON u.company_id=a.company_id AND u.id=a.actor_id WHERE a.company_id=$1 AND a.request_id=$2 ORDER BY a.at,a.id",
             [p.companyId, id, privateNotes, p.id],
           )
         ).rows,
