@@ -6897,6 +6897,11 @@
       "CompanyDraftInput": {
         "type": "object",
         "properties": {
+          "hrEnabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable the HR module for this company"
+          },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },
           "slug": { "type": "string" },
@@ -6912,6 +6917,11 @@
       "CompanyInput": {
         "type": "object",
         "properties": {
+          "hrEnabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable the HR module for this company"
+          },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },
           "slug": { "type": "string" },
@@ -6937,6 +6947,11 @@
       "CompanyUpdate": {
         "type": "object",
         "properties": {
+          "hrEnabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable the HR module for this company"
+          },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },
           "slug": { "type": "string" },

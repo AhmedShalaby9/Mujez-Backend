@@ -22,6 +22,14 @@ export class OwnerProfileInput {
   @IsOptional() @IsIn(["ar", "en"]) lang?: string;
 }
 export class CompanyInput {
+  @IsOptional()
+  @IsBoolean()
+  @ApiProperty({
+    required: false,
+    default: false,
+    description: "Enable the HR module for this company",
+  })
+  hrEnabled?: boolean;
   @IsOptional() @IsUUID() planVersionId?: string;
   @IsOptional() @IsISO31661Alpha2() country?: string;
   @IsOptional() @IsString() @MaxLength(500) address?: string;

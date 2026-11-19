@@ -1,3 +1,4 @@
+import { requireHrModule } from "../hr-module-access.js";
 import { EgyptHolidaysService } from "./egypt-holidays.service.js";
 import {
   Injectable,
@@ -79,6 +80,7 @@ export class LeaveService {
       !["company_admin", "company_user"].includes(p.pool)
     )
       throw new ForbiddenException();
+    await requireHrModule(this.db, p.companyId);
     const ok = await this.db.platform(
       async (c) =>
         (

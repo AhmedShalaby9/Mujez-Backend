@@ -1,3 +1,4 @@
+import { requireHrModule } from "./hr-module-access.js";
 import { syncTeamReporting } from "./team-reporting.js";
 import {
   Injectable,
@@ -56,6 +57,7 @@ export class HrService {
       throw new ForbiddenException(
         "HR access requires the company owner or an authorized HR role",
       );
+    await requireHrModule(this.db, p.companyId);
     await this.sales.access(p, this.permission(p, manage));
   }
   parse<T extends z.ZodType>(schema: T, b: unknown): z.infer<T> {

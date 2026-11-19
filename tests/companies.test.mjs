@@ -401,3 +401,87 @@ test("server quotes use immutable offered prices and configured tax; stale plan 
     0,
   );
 });
+
+test("company HR opt-in persists through create, drafts, versioned editing and audit", async () => {
+  const disabled = await service.create(
+    {
+      ...input,
+      slug: "crm-only-company",
+      adminEmail: "crm-only-owner@example.test",
+    },
+    actor,
+  );
+  assert.equal(disabled.hrEnabled, false);
+  assert.equal((await service.detail(disabled.id)).hrEnabled, false);
+  const enabled = await service.update(
+    disabled.id,
+    {
+      ...input,
+      slug: disabled.slug,
+      adminEmail: disabled.adminEmail,
+      hrEnabled: true,
+      version: disabled.version,
+    },
+    actor,
+  );
+  assert.equal(enabled.hrEnabled, true);
+  const unchanged = await service.update(
+    enabled.id,
+    {
+      ...input,
+      slug: enabled.slug,
+      adminEmail: enabled.adminEmail,
+      version: enabled.version,
+    },
+    actor,
+  );
+  assert.equal(unchanged.hrEnabled, true);
+  await assert.rejects(
+    service.update(
+      enabled.id,
+      { ...input, hrEnabled: false, version: disabled.version },
+      actor,
+    ),
+    (e) => e.getStatus() === 409,
+  );
+  const off = await service.update(
+    unchanged.id,
+    {
+      ...input,
+      slug: unchanged.slug,
+      adminEmail: unchanged.adminEmail,
+      hrEnabled: false,
+      version: unchanged.version,
+    },
+    actor,
+  );
+  assert.equal(off.hrEnabled, false);
+  const events = (
+    await db.query(
+      "SELECT before,after FROM platform.audit_logs WHERE resource_id=$1 AND action='company.updated'",
+      [disabled.uuid],
+    )
+  ).rows;
+  assert.ok(
+    events.some(
+      (e) => e.before.hr_enabled === false && e.after.hr_enabled === true,
+    ),
+  );
+  const draft = await service.saveDraft(
+    { nameEn: "HR enabled", hrEnabled: true },
+    actor,
+  );
+  assert.equal((await service.draft(draft.id)).payload.hrEnabled, true);
+  const withHr = await service.create(
+    {
+      ...input,
+      slug: "hr-company",
+      adminEmail: "hr-owner@example.test",
+      hrEnabled: true,
+      draftId: draft.id,
+      draftVersion: draft.version,
+    },
+    actor,
+  );
+  assert.equal(withHr.hrEnabled, true);
+});
