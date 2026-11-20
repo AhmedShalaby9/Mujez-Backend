@@ -290,6 +290,12 @@ test("corrections require review, cannot be self approved, preserve original eve
     b({ version: 1, action: "reject", note: "Repeated decision" }),
     409,
   );
+  assert.equal(
+    (
+      await h.get("attendance/corrections?view=team&status=approved")
+    ).body.items.find((x) => x.id === correction.id).stale,
+    false,
+  );
   h.state.principal = staffP;
   const r = (await report()).body;
   assert.equal(r.items[0].status, "present");

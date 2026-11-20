@@ -878,7 +878,9 @@ export class AttendanceService {
           checkOut: iso(r.requested_out),
           currentCheckIn: iso(r.current_in),
           currentCheckOut: iso(r.current_out),
-          stale: (r.current_version ?? 0) !== r.base_version,
+          stale:
+            r.status === "pending" &&
+            (r.current_version ?? 0) !== r.base_version,
           reason: r.reason,
           status: r.status,
           note: r.review_note,

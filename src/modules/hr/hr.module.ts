@@ -1,3 +1,5 @@
+import { HrResourcesService } from "./resources/resources.service.js";
+import { HrResourcesController } from "./resources/resources.controller.js";
 import {
   AttendanceService,
   AttendanceClock,
@@ -15,6 +17,7 @@ import { HrController } from "./hr.controller.js";
 @Module({
   imports: [SalesLeadsModule],
   providers: [
+    HrResourcesService,
     AttendanceService,
     AttendanceClock,
     EmployeeAccessService,
@@ -23,6 +26,7 @@ import { HrController } from "./hr.controller.js";
     EgyptHolidaysService,
   ],
   controllers: [
+    HrResourcesController,
     AttendanceController,
     EmployeeController,
     HrController,

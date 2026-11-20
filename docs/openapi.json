@@ -629,6 +629,123 @@
         "tags": ["DemoRequests"]
       }
     },
+    "/api/v1/hr-resources/context": {
+      "get": {
+        "operationId": "HrResourcesController_context",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["HrResources"]
+      }
+    },
+    "/api/v1/hr-resources/options": {
+      "get": {
+        "operationId": "HrResourcesController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["HrResources"]
+      }
+    },
+    "/api/v1/hr-resources/assets": {
+      "get": {
+        "operationId": "HrResourcesController_assets",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["HrResources"]
+      },
+      "post": {
+        "operationId": "HrResourcesController_createAsset",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["HrResources"]
+      }
+    },
+    "/api/v1/hr-resources/assets/{id}": {
+      "get": {
+        "operationId": "HrResourcesController_asset",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["HrResources"]
+      },
+      "post": {
+        "operationId": "HrResourcesController_saveAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["HrResources"]
+      }
+    },
+    "/api/v1/hr-resources/assets/{id}/action": {
+      "post": {
+        "operationId": "HrResourcesController_actAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["HrResources"]
+      }
+    },
+    "/api/v1/hr-resources/advances": {
+      "get": {
+        "operationId": "HrResourcesController_advances",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["HrResources"]
+      },
+      "post": {
+        "operationId": "HrResourcesController_request",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["HrResources"]
+      }
+    },
+    "/api/v1/hr-resources/advances/{id}": {
+      "get": {
+        "operationId": "HrResourcesController_advance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["HrResources"]
+      }
+    },
+    "/api/v1/hr-resources/advances/{id}/action": {
+      "post": {
+        "operationId": "HrResourcesController_actAdvance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["HrResources"]
+      }
+    },
     "/api/v1/attendance/context": {
       "get": {
         "operationId": "AttendanceController_context",
