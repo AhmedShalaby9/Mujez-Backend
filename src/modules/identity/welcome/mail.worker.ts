@@ -1,3 +1,4 @@
+import { deliverEmployeeActivation } from "./employee-delivery.js";
 import "reflect-metadata";
 import { writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
@@ -29,6 +30,7 @@ async function main() {
     while (!stopping) {
       try {
         const result = await deliverWelcome(db, env, transport);
+        await deliverEmployeeActivation(db, env, transport);
         await db.platform((c) =>
           c.query(
             "INSERT INTO platform.worker_heartbeats(key,seen_at,details) VALUES('owner-email',now(),$1) ON CONFLICT(key) DO UPDATE SET seen_at=excluded.seen_at,details=excluded.details",

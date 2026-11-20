@@ -47,6 +47,13 @@ export class HrController {
   ) {
     return this.s.saveEmployee(r.principal, b, id);
   }
+  @Post("employees/:id/login-invitation") inviteEmployee(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: Record<string, unknown>,
+  ) {
+    return this.s.inviteEmployee(r.principal, id, b);
+  }
   @Get("departments") departments(
     @Req() r: AuthRequest,
     @Query() q: Record<string, string>,

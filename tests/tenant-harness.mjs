@@ -159,6 +159,12 @@ export async function tenantHarness() {
     .useValue(
       parseEnvironment({
         NODE_ENV: "production",
+        MAIL_ENABLED: "true",
+        SMTP_HOST: "localhost",
+        SMTP_USER: "info@mujez.net",
+        SMTP_PASSWORD: "test-only",
+        WELCOME_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
+        DASHBOARD_URL: "https://app.example.test/",
         DATABASE_URL: "postgres://tenant:p@localhost/db",
         PLATFORM_DATABASE_URL: "postgres://platform:p@localhost/db",
         REDIS_URL: "redis://localhost",
@@ -193,7 +199,14 @@ export async function tenantHarness() {
       auth(api().get("/api/v1/" + path)).expect(status),
     post: (path, body, status = 201) =>
       auth(api().post("/api/v1/" + path))
-        .send(body)
+        .send(
+          path === "hr/employees" &&
+            body.name &&
+            body.email === undefined &&
+            !body.userId
+            ? { ...body, email: "fixture-" + body.requestId + "@example.test" }
+            : body,
+        )
         .expect(status),
     close: async () => {
       await app.close();

@@ -94,7 +94,7 @@ test("authorized HR staff manage company records and files without acquiring rol
       }),
     )
   ).body;
-  assert.equal(staff.userId, null);
+  assert.ok(staff.userId);
   assert.equal(staff.openTasks, undefined);
   h.state.principal = await profile(manager);
   const updated = (

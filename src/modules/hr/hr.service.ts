@@ -1,3 +1,4 @@
+import { EmployeeAccessService } from "./employee-access.service.js";
 import { requireHrModule } from "./hr-module-access.js";
 import { syncTeamReporting } from "./team-reporting.js";
 import {
@@ -24,7 +25,7 @@ import {
   listInput,
 } from "./hr.schema.js";
 import type { z } from "zod";
-const employeeSelect = `SELECT e.id,e.employee_code AS "employeeCode",e.name,e.email,e.phone,e.job_title AS "jobTitle",e.department_id AS "departmentId",d.name AS department,e.manager_id AS "managerId",e.reporting_team_id AS "reportingTeamId",(SELECT rt.name FROM tenant.teams rt WHERE rt.company_id=e.company_id AND rt.id=e.reporting_team_id) AS "reportingTeam",m.name AS manager,e.user_id AS "userId",u.name AS "crmName",u.status AS "crmStatus",e.work_location AS "workLocation",e.employment_type AS "employmentType",e.status,e.joining_date::text AS "joiningDate",e.end_date::text AS "endDate",e.notes,e.version,e.created_at AS "createdAt" FROM tenant.hr_employees e LEFT JOIN tenant.hr_departments d ON d.company_id=e.company_id AND d.id=e.department_id LEFT JOIN tenant.hr_employees m ON m.company_id=e.company_id AND m.id=e.manager_id LEFT JOIN tenant.users u ON u.company_id=e.company_id AND u.id=e.user_id`;
+const employeeSelect = `SELECT e.id,e.employee_code AS "employeeCode",e.name,e.email,e.phone,e.job_title AS "jobTitle",e.department_id AS "departmentId",d.name AS department,e.manager_id AS "managerId",e.reporting_team_id AS "reportingTeamId",(SELECT rt.name FROM tenant.teams rt WHERE rt.company_id=e.company_id AND rt.id=e.reporting_team_id) AS "reportingTeam",m.name AS manager,e.user_id AS "userId",u.name AS "crmName",u.status AS "crmStatus",u.email AS "loginEmail",tenant.employee_login_delivery(e.company_id,e.user_id) AS "loginDelivery",e.work_location AS "workLocation",e.employment_type AS "employmentType",e.status,e.joining_date::text AS "joiningDate",e.end_date::text AS "endDate",e.notes,e.version,e.created_at AS "createdAt" FROM tenant.hr_employees e LEFT JOIN tenant.hr_departments d ON d.company_id=e.company_id AND d.id=e.department_id LEFT JOIN tenant.hr_employees m ON m.company_id=e.company_id AND m.id=e.manager_id LEFT JOIN tenant.users u ON u.company_id=e.company_id AND u.id=e.user_id`;
 const docSelect = `SELECT d.id,d.employee_id AS "employeeId",e.name AS employee,d.title,d.kind,d.file_name AS "fileName",d.mime_type AS "mimeType",d.size_bytes AS "sizeBytes",d.expires_date::text AS "expiresDate",d.archived,d.version,d.created_at AS "createdAt",(d.expires_date<(now() AT TIME ZONE 'Africa/Cairo')::date) AS expired,(d.expires_date BETWEEN (now() AT TIME ZONE 'Africa/Cairo')::date AND (now() AT TIME ZONE 'Africa/Cairo')::date+30) AS "expiringSoon" FROM tenant.hr_documents d JOIN tenant.hr_employees e ON e.company_id=d.company_id AND e.id=d.employee_id`;
 
 @Injectable()
@@ -32,6 +33,7 @@ export class HrService {
   constructor(
     private readonly db: DatabaseService,
     private readonly sales: SalesService,
+    private readonly employeeAccess: EmployeeAccessService,
   ) {}
   private isOwner(p: Principal) {
     return (
@@ -101,6 +103,8 @@ export class HrService {
         throw new ConflictException(
           "Employee code, CRM account or department name already used",
         );
+      if (e.code === "22023") throw new BadRequestException(e.message);
+      if (e.code === "42501") throw new ForbiddenException();
       if (e.code === "23503")
         throw new BadRequestException("Choose a record from this company");
       throw e;
@@ -254,6 +258,20 @@ export class HrService {
       const old = id
         ? await this.existing(c, p, "hr_employees", id, b.version)
         : null;
+      if (old?.user_id) {
+        if (
+          (input as Record<string, unknown>).userId !== undefined &&
+          b.userId !== old.user_id
+        )
+          throw new BadRequestException(
+            "A linked employee login cannot be replaced",
+          );
+        b.userId = old.user_id;
+      }
+      if (!b.userId && !b.email && b.status !== "offboarded")
+        throw new BadRequestException(
+          "Email is required to create employee login access",
+        );
       if (
         old &&
         b.employeeCode !== undefined &&
@@ -356,6 +374,8 @@ export class HrService {
           )
         ).rows[0];
       }
+      if (!b.userId && b.email && b.status !== "offboarded")
+        await this.employeeAccess.provision(c, p, result.id);
       await syncTeamReporting(c, p);
       await this.event(
         c,
@@ -367,6 +387,22 @@ export class HrService {
         await c.query(employeeSelect + " WHERE e.company_id=$1 AND e.id=$2", [
           p.companyId,
           result.id,
+        ])
+      ).rows[0];
+    });
+  }
+  async inviteEmployee(p: Principal, id: string, input: unknown) {
+    const b = this.parse(
+      archiveInput.pick({ requestId: true, version: true }),
+      input,
+    );
+    return this.write(p, "employee.login." + id, b, async (c) => {
+      await this.existing(c, p, "hr_employees", id, b.version);
+      await this.employeeAccess.provision(c, p, id, true);
+      return (
+        await c.query(employeeSelect + " WHERE e.company_id=$1 AND e.id=$2", [
+          p.companyId,
+          id,
         ])
       ).rows[0];
     });

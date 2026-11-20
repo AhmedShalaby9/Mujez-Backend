@@ -1,3 +1,5 @@
+import { EmployeeController } from "./employee.controller.js";
+import { EmployeeAccessService } from "./employee-access.service.js";
 import { EgyptHolidaysService } from "./leave/egypt-holidays.service.js";
 import { LeaveService } from "./leave/leave.service.js";
 import { LeaveController } from "./leave/leave.controller.js";
@@ -7,7 +9,12 @@ import { HrService } from "./hr.service.js";
 import { HrController } from "./hr.controller.js";
 @Module({
   imports: [SalesLeadsModule],
-  providers: [HrService, LeaveService, EgyptHolidaysService],
-  controllers: [HrController, LeaveController],
+  providers: [
+    EmployeeAccessService,
+    HrService,
+    LeaveService,
+    EgyptHolidaysService,
+  ],
+  controllers: [EmployeeController, HrController, LeaveController],
 })
 export class HrModule {}

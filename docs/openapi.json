@@ -629,6 +629,14 @@
         "tags": ["DemoRequests"]
       }
     },
+    "/api/v1/employee/me": {
+      "get": {
+        "operationId": "EmployeeController_me",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Employee"]
+      }
+    },
     "/api/v1/hr/overview": {
       "get": {
         "operationId": "HrController_overview",
@@ -662,6 +670,21 @@
     "/api/v1/hr/employees/{id}": {
       "post": {
         "operationId": "HrController_employeeUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Hr"]
+      }
+    },
+    "/api/v1/hr/employees/{id}/login-invitation": {
+      "post": {
+        "operationId": "HrController_inviteEmployee",
         "parameters": [
           {
             "name": "id",

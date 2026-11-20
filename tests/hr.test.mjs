@@ -14,7 +14,7 @@ before(async () => {
   [owner, other] = h.principals;
 });
 after(async () => h?.close());
-test("HR directory creates non-CRM employees, departments and idempotent writes", async () => {
+test("HR directory creates Employee login accounts, departments and idempotent writes", async () => {
   department = (
     await h.post(
       "hr/departments",
@@ -28,7 +28,8 @@ test("HR directory creates non-CRM employees, departments and idempotent writes"
     joiningDate: "2026-11-18",
   });
   employee = (await h.post("hr/employees", b)).body;
-  assert.equal(employee.userId, null);
+  assert.ok(employee.userId);
+  assert.equal(employee.crmStatus, "invited");
   assert.equal(employee.openTasks, undefined);
   assert.equal(employee.status, "active");
   assert.equal((await h.post("hr/employees", b)).body.id, employee.id);
@@ -49,7 +50,7 @@ test("HR directory creates non-CRM employees, departments and idempotent writes"
         "SELECT count(*)::int AS n FROM platform.company_employee_accounts",
       )
     ).rows[0].n,
-    0,
+    1,
   );
   await h.post(
     "hr/employees/" + employee.id,

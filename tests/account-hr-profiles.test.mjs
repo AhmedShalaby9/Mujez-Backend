@@ -132,14 +132,13 @@ test("backfill repairs pre-existing accounts once and leaves existing HR records
   assert.deepEqual(after, before);
 });
 test("ambiguous email matches are never silently merged or duplicated", async () => {
+  // Legacy pre-login HR records may still contain ambiguous contact emails.
   for (let n = 0; n < 2; n++)
-    await h.post(
-      "hr/employees",
-      b({
-        employeeCode: "AMB-" + n,
-        name: "Ambiguous " + n,
-        email: "ambiguous@example.test",
-      }),
+    await h.database.tenant(owner.companyId, (c) =>
+      c.query(
+        "INSERT INTO tenant.hr_employees(company_id,name,email) VALUES($1,$2,$3)",
+        [owner.companyId, "Ambiguous " + n, "ambiguous@example.test"],
+      ),
     );
   const a = await invite("AmbiguousStaff", "ambiguous@example.test"),
     id = await user(a);
