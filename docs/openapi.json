@@ -629,6 +629,110 @@
         "tags": ["DemoRequests"]
       }
     },
+    "/api/v1/attendance/context": {
+      "get": {
+        "operationId": "AttendanceController_context",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Attendance"]
+      }
+    },
+    "/api/v1/attendance/schedules": {
+      "get": {
+        "operationId": "AttendanceController_schedules",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Attendance"]
+      },
+      "post": {
+        "operationId": "AttendanceController_createSchedule",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Attendance"]
+      }
+    },
+    "/api/v1/attendance/schedules/{id}": {
+      "post": {
+        "operationId": "AttendanceController_updateSchedule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Attendance"]
+      }
+    },
+    "/api/v1/attendance/options": {
+      "get": {
+        "operationId": "AttendanceController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Attendance"]
+      }
+    },
+    "/api/v1/attendance/assignments": {
+      "get": {
+        "operationId": "AttendanceController_assignments",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Attendance"]
+      },
+      "post": {
+        "operationId": "AttendanceController_assign",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Attendance"]
+      }
+    },
+    "/api/v1/attendance/punch": {
+      "post": {
+        "operationId": "AttendanceController_punch",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Attendance"]
+      }
+    },
+    "/api/v1/attendance/report": {
+      "get": {
+        "operationId": "AttendanceController_report",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Attendance"]
+      }
+    },
+    "/api/v1/attendance/corrections": {
+      "get": {
+        "operationId": "AttendanceController_corrections",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Attendance"]
+      },
+      "post": {
+        "operationId": "AttendanceController_correct",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Attendance"]
+      }
+    },
+    "/api/v1/attendance/corrections/{id}/action": {
+      "post": {
+        "operationId": "AttendanceController_review",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Attendance"]
+      }
+    },
     "/api/v1/employee/me": {
       "get": {
         "operationId": "EmployeeController_me",
