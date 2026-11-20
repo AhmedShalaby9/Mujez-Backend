@@ -52,7 +52,7 @@ export function commissionAmounts(
     amounts: rows.map((r) => String(r.amount)),
   };
 }
-const SELECT = `SELECT m.*,m.agreed_value_minor::text AS agreed_value_minor,m.gross_minor::text AS gross_minor,m.paid_date::text AS paid_date,c.public_id AS contract_ref,c.status AS contract_status,c.value_minor::text AS current_value,c.owner_id AS contract_owner_id,l.name AS lead_name,c.lead_id,u.code AS unit_code,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today FROM tenant.commissions m JOIN tenant.contracts c ON c.company_id=m.company_id AND c.id=m.contract_id JOIN tenant.leads l ON l.company_id=c.company_id AND l.id=c.lead_id LEFT JOIN tenant.units u ON u.company_id=c.company_id AND u.id=c.unit_id`;
+const SELECT = `SELECT m.*,m.agreed_value_minor::text AS agreed_value_minor,m.gross_minor::text AS gross_minor,EXISTS(SELECT 1 FROM tenant.fin_deals fd WHERE fd.company_id=m.company_id AND fd.contract_id=m.contract_id AND fd.booked_version IS NOT NULL) AS accounting_managed,m.paid_date::text AS paid_date,c.public_id AS contract_ref,c.status AS contract_status,c.value_minor::text AS current_value,c.owner_id AS contract_owner_id,l.name AS lead_name,c.lead_id,u.code AS unit_code,(now() AT TIME ZONE 'Africa/Cairo')::date::text AS today FROM tenant.commissions m JOIN tenant.contracts c ON c.company_id=m.company_id AND c.id=m.contract_id JOIN tenant.leads l ON l.company_id=c.company_id AND l.id=c.lead_id LEFT JOIN tenant.units u ON u.company_id=c.company_id AND u.id=c.unit_id`;
 export function commissionDto(m: any) {
   return {
     id: m.id,
@@ -68,6 +68,7 @@ export function commissionDto(m: any) {
     lines: m.lines,
     status: m.status,
     forecast: m.contract_status !== "signed",
+    accountingManaged: !!m.accounting_managed,
     needsRecalculation: m.agreed_value_minor !== m.current_value,
     approvedAt: m.approved_at ? new Date(m.approved_at).toISOString() : null,
     payableDocumentId: m.payable_document_id,
@@ -222,6 +223,17 @@ export class CommissionsService {
       b,
       async (c) => {
         await requireTenantFeature(c, p.companyId!, "commissions");
+        if (
+          (
+            await c.query(
+              "SELECT 1 FROM tenant.fin_deals WHERE company_id=$1 AND contract_id=$2 AND booked_version IS NOT NULL",
+              [p.companyId, b.contractId],
+            )
+          ).rowCount
+        )
+          throw new ConflictException(
+            "This deal is managed in Finance accounting; adjust its financial documents there",
+          );
         let old: any;
         if (id) {
           old = await this.row(c, p, id, true);
@@ -338,6 +350,10 @@ export class CommissionsService {
       async (c) => {
         await requireTenantFeature(c, p.companyId!, "commissions");
         const m = await this.row(c, p, id, true);
+        if (m.accounting_managed)
+          throw new ConflictException(
+            "This deal is managed in Finance accounting; record settlements there",
+          );
         if (m.version !== b.version)
           throw new ConflictException("Commission changed. Refresh first");
         if (b.action === "cancel") {

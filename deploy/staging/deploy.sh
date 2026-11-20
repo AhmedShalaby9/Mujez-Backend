@@ -42,10 +42,13 @@ old_dc exec -T postgres pg_dump -U mujez_owner -d mujez -Fc > "$backup_dir/$rele
 test -s "$backup_dir/$release_id.dump"
 dc run --rm -T --interactive=false maintenance node scripts/migrate.mjs
 
-if ! dc up -d --no-build --wait --wait-timeout 120 api routing-worker mail-worker; then
+if ! dc up -d --no-build --wait --wait-timeout 120 api routing-worker mail-worker finance-worker; then
   echo 'New API or background worker failed readiness; restoring previous services.' >&2
+  dc stop finance-worker || true
   dc stop mail-worker || true
-  if old_dc config --services | grep -qx 'mail-worker'; then
+  if old_dc config --services | grep -qx 'finance-worker'; then
+    old_dc up -d --no-build --force-recreate --wait --wait-timeout 120 api routing-worker mail-worker finance-worker
+  elif old_dc config --services | grep -qx 'mail-worker'; then
     old_dc up -d --no-build --force-recreate --wait --wait-timeout 120 api routing-worker mail-worker
   elif old_dc config --services | grep -qx 'routing-worker'; then
     old_dc up -d --no-build --force-recreate --wait --wait-timeout 120 api routing-worker

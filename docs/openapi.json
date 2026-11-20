@@ -629,6 +629,695 @@
         "tags": ["DemoRequests"]
       }
     },
+    "/api/v1/accounting/context": {
+      "get": {
+        "operationId": "AccountingController_context",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/setup": {
+      "post": {
+        "operationId": "AccountingController_setup",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/options": {
+      "get": {
+        "operationId": "AccountingController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/settings": {
+      "post": {
+        "operationId": "AccountingController_settings",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/accounts": {
+      "post": {
+        "operationId": "AccountingController_account",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/accounts/{id}": {
+      "post": {
+        "operationId": "AccountingController_editAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/dimensions": {
+      "post": {
+        "operationId": "AccountingController_dimension",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/dimensions/{id}": {
+      "post": {
+        "operationId": "AccountingController_editDimension",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/parties": {
+      "post": {
+        "operationId": "AccountingController_party",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/parties/{id}": {
+      "post": {
+        "operationId": "AccountingController_editParty",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/periods": {
+      "get": {
+        "operationId": "AccountingController_periods",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_period",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/periods/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_periodAction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/journals": {
+      "get": {
+        "operationId": "AccountingController_journals",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_saveJournal",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/journals/{id}": {
+      "get": {
+        "operationId": "AccountingController_journal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_editJournal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/journals/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_journalAction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/treasuries": {
+      "get": {
+        "operationId": "AccountingController_treasuries",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_treasury",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/treasuries/{id}": {
+      "post": {
+        "operationId": "AccountingController_editTreasury",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/transactions": {
+      "get": {
+        "operationId": "AccountingController_transactions",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_transaction",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/transactions/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_reverseTransaction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/obligations": {
+      "get": {
+        "operationId": "AccountingController_obligations",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_createObligation",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/obligations/{id}": {
+      "get": {
+        "operationId": "AccountingController_obligation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/obligations/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_obligationAction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/cheques": {
+      "get": {
+        "operationId": "AccountingController_cheques",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_cheque",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/cheques/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_chequeAction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/reconciliations": {
+      "get": {
+        "operationId": "AccountingController_reconciliations",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_reconcile",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/reconciliation-lines": {
+      "get": {
+        "operationId": "AccountingController_reconciliationLines",
+        "parameters": [
+          {
+            "name": "treasuryId",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/overview": {
+      "get": {
+        "operationId": "AccountingController_overview",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/reports": {
+      "get": {
+        "operationId": "AccountingController_report",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/reminders": {
+      "get": {
+        "operationId": "AccountingController_reminders",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/self": {
+      "get": {
+        "operationId": "AccountingController_self",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/agreements": {
+      "get": {
+        "operationId": "AccountingController_agreements",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_createAgreement",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/agreements/{id}": {
+      "post": {
+        "operationId": "AccountingController_editAgreement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/deals": {
+      "get": {
+        "operationId": "AccountingController_dealsList",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/deals/{id}/book": {
+      "post": {
+        "operationId": "AccountingController_bookDeal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/deals/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_adjustDeal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/custodies": {
+      "get": {
+        "operationId": "AccountingController_custodies",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_custody",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/custodies/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_custodyAction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/hr-advances": {
+      "get": {
+        "operationId": "AccountingController_hrAdvances",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/hr-advances/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_advanceAction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/obligations/{id}/settle-advance": {
+      "post": {
+        "operationId": "AccountingController_settleAdvance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/reconciliations/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_reconciliationAction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/installment-plans": {
+      "get": {
+        "operationId": "AccountingController_installmentPlans",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_createPlan",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/installment-plans/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_planAction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/collection-targets": {
+      "get": {
+        "operationId": "AccountingController_targets",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_target",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/collection-targets/{id}": {
+      "post": {
+        "operationId": "AccountingController_editTarget",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/history/{kind}/{id}": {
+      "get": {
+        "operationId": "AccountingController_history",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/files/{kind}/{id}": {
+      "get": {
+        "operationId": "AccountingFilesController_list",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["AccountingFiles"]
+      },
+      "post": {
+        "operationId": "AccountingFilesController_upload",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["AccountingFiles"]
+      }
+    },
+    "/api/v1/accounting/attachments/{id}/download": {
+      "get": {
+        "operationId": "AccountingFilesController_download",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["AccountingFiles"]
+      }
+    },
+    "/api/v1/accounting/print/{kind}/{id}": {
+      "get": {
+        "operationId": "AccountingFilesController_print",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["AccountingFiles"]
+      }
+    },
     "/api/v1/hr-resources/context": {
       "get": {
         "operationId": "HrResourcesController_context",
@@ -7072,7 +7761,9 @@
               "employee",
               "hr_officer",
               "hr_manager",
-              "payroll_officer"
+              "payroll_officer",
+              "accountant",
+              "finance_manager"
             ]
           }
         },
@@ -7091,7 +7782,9 @@
                 "employee",
                 "hr_officer",
                 "hr_manager",
-                "payroll_officer"
+                "payroll_officer",
+                "accountant",
+                "finance_manager"
               ]
             }
           },
@@ -7110,7 +7803,9 @@
               "employee",
               "hr_officer",
               "hr_manager",
-              "payroll_officer"
+              "payroll_officer",
+              "accountant",
+              "finance_manager"
             ]
           },
           "roles": {
@@ -7123,7 +7818,9 @@
                 "employee",
                 "hr_officer",
                 "hr_manager",
-                "payroll_officer"
+                "payroll_officer",
+                "accountant",
+                "finance_manager"
               ]
             }
           }

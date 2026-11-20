@@ -117,6 +117,29 @@ services:
       retries: 3
       start_period: 20s
     logging: *logging
+  finance-worker:
+    image: ${API_IMAGE:-mujez-staging-api:current}
+    command: [node, dist/modules/finance/accounting/finance.worker.js]
+    restart: unless-stopped
+    env_file:
+      - path: ./api.env
+        format: raw
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "try{process.exit(Date.now()-require('fs').statSync('/tmp/mujez-finance-heartbeat').mtimeMs<120000?0:1)}catch{process.exit(1)}",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *logging
   maintenance:
     image: ${API_IMAGE:-mujez-staging-api:current}
     profiles: [maintenance]

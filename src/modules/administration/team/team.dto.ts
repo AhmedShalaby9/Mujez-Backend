@@ -38,7 +38,7 @@ export class TeamInvite {
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(6)
+  @ArrayMaxSize(8)
   @ArrayUnique()
   @IsIn(TEAM_ROLES, { each: true })
   @ApiPropertyOptional({ type: [String], enum: TEAM_ROLES })
@@ -88,7 +88,7 @@ export class SalesTeamUpdate extends SalesTeamInput {
 export class EmployeeRoles {
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(6)
+  @ArrayMaxSize(8)
   @ArrayUnique()
   @IsIn(TEAM_ROLES, { each: true })
   @ApiProperty({ type: [String], enum: TEAM_ROLES })

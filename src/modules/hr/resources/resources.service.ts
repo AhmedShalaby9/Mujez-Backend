@@ -631,6 +631,18 @@ export class HrResourcesService {
             [p.companyId, id, b.paymentId],
           )
         ).rows[0];
+        if (
+          payment &&
+          (
+            await c.query(
+              "SELECT 1 FROM tenant.fin_source_links WHERE company_id=$1 AND source_kind='hr_repayment' AND source_id=$2 AND active",
+              [p.companyId, b.paymentId],
+            )
+          ).rowCount
+        )
+          throw new ConflictException(
+            "This repayment is linked to accounting. Reverse the accounting link or commission offset in Finance first",
+          );
         if (!payment)
           throw new ConflictException(
             "Choose an unreversed payment on this advance",

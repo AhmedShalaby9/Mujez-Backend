@@ -10,6 +10,8 @@ export const ASSIGNABLE_COMPANY_ROLES = [
   "hr_officer",
   "hr_manager",
   "payroll_officer",
+  "accountant",
+  "finance_manager",
 ] as const;
 export type CompanyRoleKey = (typeof ASSIGNABLE_COMPANY_ROLES)[number];
 const salesPermissions = [
@@ -57,6 +59,20 @@ export const COMPANY_ROLE_DEFINITIONS: Record<
     name: { en: "HR Manager", ar: "مدير الموارد البشرية" },
     permissions: ["hr.read", "hr.manage", "leave.manage", "leave.approve"],
   },
+  accountant: {
+    name: { en: "Accountant", ar: "محاسب" },
+    permissions: ["finance.read", "finance.write", "finance.post"],
+  },
+  finance_manager: {
+    name: { en: "Finance Manager", ar: "مدير مالي" },
+    permissions: [
+      "finance.read",
+      "finance.write",
+      "finance.post",
+      "finance.approve",
+      "finance.settings",
+    ],
+  },
   payroll_officer: {
     name: { en: "Payroll Officer", ar: "مسؤول الرواتب" },
     permissions: [],
@@ -68,6 +84,8 @@ export function primaryCompanyRole(roles: readonly string[]): CompanyRoleKey {
       [
         "team_lead",
         "agent",
+        "finance_manager",
+        "accountant",
         "hr_manager",
         "hr_officer",
         "payroll_officer",
