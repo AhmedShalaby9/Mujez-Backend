@@ -878,6 +878,11 @@ test("collection targets, performance and reminder deliveries use real data and 
           .body.items,
       ),
     );
+  await h.database.platform((c) =>
+    c.query(
+      "INSERT INTO platform.worker_heartbeats(key,seen_at,details) VALUES('company-finance',now(),'{}') ON CONFLICT(key) DO UPDATE SET seen_at=excluded.seen_at",
+    ),
+  );
   const first = await runFinanceSweep(h.database);
   assert.ok(first.notifications > 0);
   assert.equal((await runFinanceSweep(h.database)).notifications, 0);
