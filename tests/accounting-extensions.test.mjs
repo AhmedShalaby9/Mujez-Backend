@@ -483,6 +483,15 @@ test("complete employee statements include posted balances and enforce personal/
   h.state.principal = lead;
   const team = (await get("self?kind=team")).body.staff;
   assert.ok(team.items.some((x) => x.id === agent.id));
+  const subordinate = team.items.find((x) => x.id === agent.id);
+  assert.equal(subordinate.salaryOutstandingMinor, null);
+  assert.equal(subordinate.advanceBalanceMinor, null);
+  assert.equal(subordinate.payrollRestricted, true);
+  assert.ok(
+    subordinate.activity.every(
+      (x) => !["salary_ap", "salary_advance"].includes(x.system_key),
+    ),
+  );
   h.state.principal = other;
   assert.equal(
     (await get("staff-statements")).body.items.some((x) => x.id === agent.id),

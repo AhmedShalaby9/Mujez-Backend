@@ -19,10 +19,11 @@ export async function staffStatements(
   ).rows;
   const items: any[] = [];
   for (const user of all) {
+    const payrollVisible = core.can(p, "finance.read") || p.id === user.id;
     const lines = (
       await c.query(
-        `SELECT l.*,l.debit_minor::text,l.credit_minor::text,j.entry_date::text,j.code,j.memo AS description,coalesce(original.source_kind,j.source_kind) AS source_kind,a.system_key,a.name AS account FROM tenant.fin_journal_lines l JOIN tenant.fin_journals j ON j.company_id=l.company_id AND j.id=l.journal_id LEFT JOIN tenant.fin_journals original ON original.company_id=j.company_id AND original.id=j.reversal_of JOIN tenant.fin_accounts a ON a.company_id=l.company_id AND a.id=l.account_id JOIN tenant.fin_parties party ON party.company_id=l.company_id AND party.id=l.party_id WHERE l.company_id=$1 AND party.kind='employee' AND party.reference_id=$2 AND j.status='posted' AND j.entry_date<=$3::date AND a.system_key IN ('commission_ap','salary_ap','salary_advance','commission_recovery') ORDER BY j.entry_date,j.created_at,l.id`,
-        [p.companyId, user.id, to],
+        `SELECT l.*,l.debit_minor::text,l.credit_minor::text,j.entry_date::text,j.code,j.memo AS description,coalesce(original.source_kind,j.source_kind) AS source_kind,a.system_key,a.name AS account FROM tenant.fin_journal_lines l JOIN tenant.fin_journals j ON j.company_id=l.company_id AND j.id=l.journal_id LEFT JOIN tenant.fin_journals original ON original.company_id=j.company_id AND original.id=j.reversal_of JOIN tenant.fin_accounts a ON a.company_id=l.company_id AND a.id=l.account_id JOIN tenant.fin_parties party ON party.company_id=l.company_id AND party.id=l.party_id WHERE l.company_id=$1 AND party.kind='employee' AND party.reference_id=$2 AND j.status='posted' AND j.entry_date<=$3::date AND a.system_key IN ('commission_ap','salary_ap','salary_advance','commission_recovery') AND ($4::boolean OR a.system_key NOT IN ('salary_ap','salary_advance')) ORDER BY j.entry_date,j.created_at,l.id`,
+        [p.companyId, user.id, to, payrollVisible],
       )
     ).rows;
     const balance = (key: string, before?: string) =>
@@ -44,12 +45,14 @@ export async function staffStatements(
         [p.companyId, user.id, from, to],
       )
     ).rows[0];
-    const advances = (
-      await c.query(
-        `SELECT count(*)::integer AS n FROM tenant.salary_advances a JOIN tenant.hr_employees e ON e.company_id=a.company_id AND e.id=a.employee_id WHERE a.company_id=$1 AND e.user_id=$2 AND a.paid_out_date<=$3::date AND a.status IN ('active','paid') AND NOT EXISTS(SELECT 1 FROM tenant.fin_source_links x WHERE x.company_id=a.company_id AND x.source_kind='hr_payout' AND x.source_id=a.id AND x.active)`,
-        [p.companyId, user.id, to],
-      )
-    ).rows[0].n;
+    const advances = payrollVisible
+      ? (
+          await c.query(
+            `SELECT count(*)::integer AS n FROM tenant.salary_advances a JOIN tenant.hr_employees e ON e.company_id=a.company_id AND e.id=a.employee_id WHERE a.company_id=$1 AND e.user_id=$2 AND a.paid_out_date<=$3::date AND a.status IN ('active','paid') AND NOT EXISTS(SELECT 1 FROM tenant.fin_source_links x WHERE x.company_id=a.company_id AND x.source_kind='hr_payout' AND x.source_id=a.id AND x.active)`,
+            [p.companyId, user.id, to],
+          )
+        ).rows[0].n
+      : 0;
     const outstanding = -balance("commission_ap"),
       salary = -balance("salary_ap"),
       advance = balance("salary_advance"),
@@ -98,8 +101,9 @@ export async function staffStatements(
           ),
       ),
       commissionOutstandingMinor: String(outstanding),
-      salaryOutstandingMinor: String(salary),
-      advanceBalanceMinor: String(advance),
+      salaryOutstandingMinor: payrollVisible ? String(salary) : null,
+      advanceBalanceMinor: payrollVisible ? String(advance) : null,
+      payrollRestricted: !payrollVisible,
       recoveryBalanceMinor: String(recovery),
       netPositionMinor: String(outstanding + salary - advance - recovery),
       unlinkedAdvances: advances,
