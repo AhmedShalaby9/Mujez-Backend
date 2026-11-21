@@ -74,11 +74,13 @@ export class AccountingTreasuryService {
             : o.kind === "employee_recovery"
               ? "commission_recovery"
               : "customer_ar"
-          : o.kind === "commission_payable"
-            ? "commission_ap"
-            : o.kind === "credit_note"
-              ? "refund_ap"
-              : "supplier_ap",
+          : o.kind === "salary_payable"
+            ? "salary_ap"
+            : o.kind === "commission_payable"
+              ? "commission_ap"
+              : o.kind === "credit_note"
+                ? "refund_ap"
+                : "supplier_ap",
       );
       Object.assign(dims, {
         branchId: o.branch_id,
@@ -200,6 +202,7 @@ export class AccountingTreasuryService {
               "customer_ar",
               "supplier_ap",
               "commission_ap",
+              "salary_ap",
               "refund_ap",
               "commission_recovery",
               "custody",

@@ -1,3 +1,4 @@
+import { staffStatements } from "./accounting-statements.js";
 import {
   Injectable,
   BadRequestException,
@@ -264,7 +265,7 @@ export class AccountingReportsService {
         w =
           "l.company_id=$1 AND j.status='posted' AND ($4::uuid IS NULL OR l.account_id=$4) AND ($5::uuid IS NULL OR l.party_id=$5) AND ($6::uuid IS NULL OR l.branch_id=$6) AND ($7::uuid IS NULL OR l.cost_centre_id=$7) AND ($8::uuid IS NULL OR l.project_id=$8) AND ($9::uuid IS NULL OR l.team_id=$9)" +
           (type === "party_statement"
-            ? " AND EXISTS(SELECT 1 FROM tenant.fin_accounts ca WHERE ca.company_id=l.company_id AND ca.id=l.account_id AND ca.system_key IN ('developer_ar','customer_ar','supplier_ap','commission_ap','custody','salary_advance','commission_recovery','refund_ap','developer_funds'))"
+            ? " AND EXISTS(SELECT 1 FROM tenant.fin_accounts ca WHERE ca.company_id=l.company_id AND ca.id=l.account_id AND ca.system_key IN ('developer_ar','customer_ar','supplier_ap','commission_ap','salary_ap','custody','salary_advance','commission_recovery','refund_ap','developer_funds'))"
             : "");
       const total = Number(
           (
@@ -386,6 +387,7 @@ export class AccountingReportsService {
           clientFundsMinor: String(-sys(["developer_funds"])),
           employeeCustodyMinor: String(sys(["custody"])),
           salaryAdvancesMinor: String(sys(["salary_advance"])),
+          salariesPayableMinor: String(-sys(["salary_ap"])),
           revenueMinor: String(
             -accounts
               .filter((x) => x.kind === "revenue")
@@ -464,7 +466,20 @@ export class AccountingReportsService {
         ),
         page: q.page,
         limit: q.limit,
+        staff: await staffStatements(this.core, c, p, ids, q),
       };
+    });
+  }
+  async staff(p: Principal, input: unknown) {
+    const q = this.core.parse(queryInput, input);
+    return this.core.read(p, async (c) => {
+      const ids = (
+        await c.query(
+          "SELECT id FROM tenant.users WHERE company_id=$1 AND deleted_at IS NULL",
+          [p.companyId],
+        )
+      ).rows.map((x) => x.id);
+      return staffStatements(this.core, c, p, ids, q);
     });
   }
 }

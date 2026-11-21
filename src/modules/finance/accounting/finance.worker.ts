@@ -1,3 +1,4 @@
+import { runFinanceAutomation } from "./finance-automation-sweep.js";
 import "reflect-metadata";
 import { writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
@@ -17,7 +18,11 @@ async function main() {
     await db.ready();
     while (!stopping) {
       try {
-        const result = await runFinanceSweep(db, () => stopping);
+        const automation = await runFinanceAutomation(db, () => stopping);
+        const result = {
+          ...(await runFinanceSweep(db, () => stopping)),
+          automation,
+        };
         await db.platform((c) =>
           c.query(
             "INSERT INTO platform.worker_heartbeats(key,seen_at,details) VALUES('company-finance',now(),$1) ON CONFLICT(key) DO UPDATE SET seen_at=excluded.seen_at,details=excluded.details",

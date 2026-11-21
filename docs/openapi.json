@@ -1242,6 +1242,169 @@
         "tags": ["Accounting"]
       }
     },
+    "/api/v1/accounting/commission-policies": {
+      "get": {
+        "operationId": "AccountingController_commissionPolicies",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_createPolicy",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/commission-policies/{id}": {
+      "post": {
+        "operationId": "AccountingController_editPolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/automation-rules": {
+      "get": {
+        "operationId": "AccountingController_rules",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_createRule",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/automation-rules/{id}": {
+      "post": {
+        "operationId": "AccountingController_editRule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/automation-process": {
+      "post": {
+        "operationId": "AccountingController_processRules",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/payroll-context": {
+      "get": {
+        "operationId": "AccountingController_payrollContext",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/payroll-options": {
+      "get": {
+        "operationId": "AccountingController_payrollOptions",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/salary-profiles": {
+      "get": {
+        "operationId": "AccountingController_salaryProfiles",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_salaryProfile",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/salary-profiles/{id}": {
+      "post": {
+        "operationId": "AccountingController_editSalaryProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/payroll-runs": {
+      "get": {
+        "operationId": "AccountingController_payrollRuns",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      },
+      "post": {
+        "operationId": "AccountingController_preparePayroll",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/payroll-runs/{id}": {
+      "get": {
+        "operationId": "AccountingController_payrollRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/payroll-runs/{id}/action": {
+      "post": {
+        "operationId": "AccountingController_payrollAction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
+    "/api/v1/accounting/staff-statements": {
+      "get": {
+        "operationId": "AccountingController_staffStatements",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Accounting"]
+      }
+    },
     "/api/v1/accounting/files/{kind}/{id}": {
       "get": {
         "operationId": "AccountingFilesController_list",

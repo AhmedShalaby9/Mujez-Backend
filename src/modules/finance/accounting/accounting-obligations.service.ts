@@ -101,6 +101,7 @@ export class AccountingObligationsService {
       supplier_bill: ["supplier"],
       expense: ["supplier", "employee"],
       commission_payable: ["employee"],
+      salary_payable: ["employee"],
       employee_recovery: ["employee"],
       customer_funds: ["customer"],
       credit_note: ["developer", "customer"],
@@ -427,7 +428,7 @@ export class AccountingObligationsService {
           return { id };
         }
         if (b.action === "reverse") {
-          if (r.deal_id || r.plan_id)
+          if (r.deal_id || r.plan_id || r.payroll_run_id)
             throw new ConflictException(
               "Use the linked deal adjustment or installment plan workflow to correct this generated document",
             );

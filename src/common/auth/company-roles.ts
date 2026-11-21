@@ -75,7 +75,7 @@ export const COMPANY_ROLE_DEFINITIONS: Record<
   },
   payroll_officer: {
     name: { en: "Payroll Officer", ar: "مسؤول الرواتب" },
-    permissions: [],
+    permissions: ["payroll.read", "payroll.manage"],
   },
 };
 export function primaryCompanyRole(roles: readonly string[]): CompanyRoleKey {

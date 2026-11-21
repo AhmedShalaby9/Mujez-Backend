@@ -12,6 +12,21 @@ import type { Principal } from "../../../common/auth/access.js";
 import { DatabaseService } from "../../../infrastructure/database/database.service.js";
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
 export const COA = [
+  ["2120", "Salaries payable / رواتب مستحقة", "liability", "salary_ap", false],
+  [
+    "5300",
+    "Salary expense / مصروف الرواتب",
+    "expense",
+    "salary_expense",
+    false,
+  ],
+  [
+    "5310",
+    "Approved salary deductions / خصومات رواتب معتمدة",
+    "expense",
+    "salary_deductions",
+    false,
+  ],
   ["1100", "Cash / النقدية", "asset", "cash", true],
   [
     "1200",
@@ -118,7 +133,26 @@ export class AccountingCore {
       !p.workspace
     );
   }
-  can(p: Principal, perm = "finance.read") {
+  can(p: Principal, perm = "finance.read"): boolean {
+    if (
+      perm.startsWith("payroll.") &&
+      !p.workspace &&
+      p.pool === "company_user"
+    ) {
+      if (
+        (p.roles ?? [p.role]).includes("payroll_officer") &&
+        ["payroll.read", "payroll.manage"].includes(perm) &&
+        p.permissions.includes(perm)
+      )
+        return true;
+      const financePerm =
+        perm === "payroll.read"
+          ? "finance.read"
+          : perm === "payroll.manage"
+            ? "finance.write"
+            : "finance.approve";
+      return this.can(p, financePerm);
+    }
     return (
       this.owner(p) ||
       (p.pool === "company_user" &&
@@ -155,8 +189,12 @@ export class AccountingCore {
       );
     return r.data;
   }
-  async read<T>(p: Principal, fn: (c: PoolClient) => Promise<T>) {
-    await this.access(p);
+  async read<T>(
+    p: Principal,
+    fn: (c: PoolClient) => Promise<T>,
+    perm = "finance.read",
+  ) {
+    await this.access(p, perm);
     return this.db.tenant(p.companyId!, async (c) =>
       JSON.parse(
         JSON.stringify(await fn(c), (k, v) =>
@@ -277,6 +315,7 @@ export class AccountingCore {
   ) {
     const dates: Record<string, string[]> = {
       journals: ["entry_date"],
+      payroll_runs: ["month", "entry_date"],
       periods: ["start_date", "end_date"],
       obligations: ["entry_date", "due_date"],
       cheques: ["due_date"],
@@ -388,6 +427,7 @@ export class AccountingCore {
           "commission_recovery",
           "supplier_ap",
           "commission_ap",
+          "salary_ap",
           "developer_funds",
           "refund_ap",
         ].includes(a.system_key) &&

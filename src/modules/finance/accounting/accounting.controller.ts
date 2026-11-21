@@ -1,3 +1,6 @@
+import { AccountingPoliciesService } from "./accounting-policies.service.js";
+import { AccountingPayrollService } from "./accounting-payroll.service.js";
+import { AccountingAutomationService } from "./accounting-automation.service.js";
 import { AccountingPerformanceService } from "./accounting-performance.service.js";
 import { AccountingInstallmentsService } from "./accounting-installments.service.js";
 import { AccountingReportsService } from "./accounting-reports.service.js";
@@ -22,6 +25,9 @@ import { AccountingObligationsService } from "./accounting-obligations.service.j
 @RequireAccess(["company_admin", "company_user"])
 export class AccountingController {
   constructor(
+    readonly policies: AccountingPoliciesService,
+    readonly payroll: AccountingPayrollService,
+    readonly automation: AccountingAutomationService,
     private readonly performance: AccountingPerformanceService,
     private readonly installments: AccountingInstallmentsService,
     private readonly reports: AccountingReportsService,
@@ -377,5 +383,94 @@ export class AccountingController {
     @Param("id", ParseUUIDPipe) id: string,
   ) {
     return this.s.history(r.principal, kind, id);
+  }
+  @Get("commission-policies") commissionPolicies(@Req() r: AuthRequest) {
+    return this.policies.list(r.principal);
+  }
+  @Post("commission-policies") createPolicy(
+    @Req() r: AuthRequest,
+    @Body() b: Record<string, unknown>,
+  ) {
+    return this.policies.save(r.principal, b);
+  }
+  @Post("commission-policies/:id") editPolicy(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: Record<string, unknown>,
+  ) {
+    return this.policies.save(r.principal, b, id);
+  }
+  @Get("automation-rules") rules(@Req() r: AuthRequest) {
+    return this.automation.list(r.principal);
+  }
+  @Post("automation-rules") createRule(
+    @Req() r: AuthRequest,
+    @Body() b: Record<string, unknown>,
+  ) {
+    return this.automation.save(r.principal, b);
+  }
+  @Post("automation-rules/:id") editRule(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: Record<string, unknown>,
+  ) {
+    return this.automation.save(r.principal, b, id);
+  }
+  @Post("automation-process") processRules(
+    @Req() r: AuthRequest,
+    @Body() b: Record<string, unknown>,
+  ) {
+    return this.automation.run(r.principal, b);
+  }
+  @Get("payroll-context") payrollContext(@Req() r: AuthRequest) {
+    return this.payroll.context(r.principal);
+  }
+  @Get("payroll-options") payrollOptions(@Req() r: AuthRequest) {
+    return this.payroll.options(r.principal);
+  }
+  @Get("salary-profiles") salaryProfiles(@Req() r: AuthRequest) {
+    return this.payroll.profiles(r.principal);
+  }
+  @Post("salary-profiles") salaryProfile(
+    @Req() r: AuthRequest,
+    @Body() b: Record<string, unknown>,
+  ) {
+    return this.payroll.profile(r.principal, b);
+  }
+  @Post("salary-profiles/:id") editSalaryProfile(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: Record<string, unknown>,
+  ) {
+    return this.payroll.profile(r.principal, b, id);
+  }
+  @Get("payroll-runs") payrollRuns(@Req() r: AuthRequest) {
+    return this.payroll.list(r.principal);
+  }
+  @Post("payroll-runs") preparePayroll(
+    @Req() r: AuthRequest,
+    @Body() b: Record<string, unknown>,
+  ) {
+    return this.payroll.prepare(r.principal, b);
+  }
+  @Get("payroll-runs/:id") payrollRun(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.payroll.detail(r.principal, id);
+  }
+  @Post("payroll-runs/:id/action") payrollAction(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: Record<string, unknown>,
+  ) {
+    return this.payroll.action(r.principal, id, b);
+  }
+
+  @Get("staff-statements") staffStatements(
+    @Req() r: AuthRequest,
+    @Query() q: Record<string, string>,
+  ) {
+    return this.reports.staff(r.principal, q);
   }
 }

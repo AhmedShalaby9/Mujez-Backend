@@ -142,10 +142,14 @@ test("authorized HR staff manage company records and files without acquiring rol
     404,
   );
 });
-test("Payroll Officer is assignable and has no current payroll, CRM, HR-management or role-admin grants", async () => {
+test("Payroll Officer can prepare payroll without CRM, HR-management or role-admin grants", async () => {
   const p = await profile(payroll);
   assert.equal(p.role, "payroll_officer");
-  assert.deepEqual(p.permissions, ["leave.self"]);
+  assert.deepEqual(p.permissions, [
+    "leave.self",
+    "payroll.manage",
+    "payroll.read",
+  ]);
   assert.deepEqual([...p.roles].sort(), ["employee", "payroll_officer"]);
   h.state.principal = p;
   for (const route of [

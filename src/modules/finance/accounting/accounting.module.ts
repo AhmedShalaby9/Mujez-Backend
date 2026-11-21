@@ -1,3 +1,6 @@
+import { AccountingPoliciesService } from "./accounting-policies.service.js";
+import { AccountingPayrollService } from "./accounting-payroll.service.js";
+import { AccountingAutomationService } from "./accounting-automation.service.js";
 import { AccountingPerformanceService } from "./accounting-performance.service.js";
 import { AccountingInstallmentsService } from "./accounting-installments.service.js";
 import { AccountingFilesService } from "./accounting-files.service.js";
@@ -13,6 +16,9 @@ import { AccountingTreasuryService } from "./accounting-treasury.service.js";
 import { AccountingController } from "./accounting.controller.js";
 @Module({
   providers: [
+    AccountingPoliciesService,
+    AccountingPayrollService,
+    AccountingAutomationService,
     AccountingPerformanceService,
     AccountingInstallmentsService,
     AccountingFilesService,

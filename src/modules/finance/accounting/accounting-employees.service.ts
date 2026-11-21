@@ -575,13 +575,13 @@ export class AccountingEmployeesService {
         if (
           (
             await c.query(
-              "SELECT 1 FROM tenant.fin_offsets WHERE company_id=$1 AND journal_id=$2",
+              "SELECT 1 FROM tenant.fin_offsets WHERE company_id=$1 AND journal_id=$2 UNION ALL SELECT 1 FROM tenant.fin_payroll_repayments pr JOIN tenant.fin_payroll_runs r ON r.company_id=pr.company_id AND r.id=pr.run_id WHERE pr.company_id=$1 AND r.journal_id=$2",
               [p.companyId, link.journal_id],
             )
           ).rowCount
         )
           throw new ConflictException(
-            "Reverse this commission offset from the commission payable workflow",
+            "Reverse this commission offset or payroll repayment from its source workflow",
           );
         if (
           !b.paymentId &&

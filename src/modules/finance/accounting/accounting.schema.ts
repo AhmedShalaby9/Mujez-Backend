@@ -396,3 +396,105 @@ export const targetInput = z
   })
   .strict()
   .refine((b) => b.to >= b.from, "Target end must follow its start");
+
+export const policyInput = z
+  .object({
+    requestId: id,
+    version: version.version.optional(),
+    name: z.string().trim().min(1).max(160),
+    roleKey: z.enum(["agent", "team_lead"]),
+    userId: id.nullable().default(null),
+    teamId: id.nullable().default(null),
+    mode: z.enum(["percent", "fixed", "tiers"]),
+    rateBps: z.number().int().min(0).max(10000).default(0),
+    fixedMinor: money.default("0"),
+    tiers: z
+      .array(
+        z
+          .object({
+            fromMinor: money,
+            rateBps: z.number().int().min(0).max(10000),
+          })
+          .strict(),
+      )
+      .max(20)
+      .default([]),
+    from: date,
+    to: date.nullable().default(null),
+    active: z.boolean().default(true),
+  })
+  .strict()
+  .refine((b) => !b.userId || !b.teamId, "Choose an employee or a team")
+  .refine((b) => !b.to || b.to >= b.from, "End must follow start")
+  .refine(
+    (b) =>
+      b.mode !== "tiers" ||
+      (b.tiers.length > 0 &&
+        b.tiers[0]!.fromMinor === "0" &&
+        b.tiers.every(
+          (x, i) =>
+            i === 0 || BigInt(x.fromMinor) > BigInt(b.tiers[i - 1]!.fromMinor),
+        )),
+    "Tiers must start at zero and increase",
+  );
+export const automationInput = z
+  .object({
+    requestId: id,
+    version: version.version.optional(),
+    name: z.string().trim().min(1).max(160),
+    contractType: z.enum([
+      "sale",
+      "reservation",
+      "lease",
+      "listing",
+      "broker_agreement",
+    ]),
+    crmProjectId: id.nullable().default(null),
+    agreementId: id,
+    autoAdjust: z.boolean().default(false),
+    createInstallments: z.boolean().default(false),
+    installments: z.number().int().min(1).max(120).default(1),
+    intervalMonths: z.number().int().min(1).max(12).default(1),
+    firstDueDays: z.number().int().min(0).max(730).default(30),
+    collectionOwner: z.enum(["company", "developer"]).default("developer"),
+    active: z.boolean().default(false),
+  })
+  .strict();
+export const salaryInput = z
+  .object({
+    requestId: id,
+    version: version.version.optional(),
+    employeeId: id,
+    baseMinor: positive,
+    allowanceMinor: money.default("0"),
+    deductionMinor: money.default("0"),
+    deductionNote: text(1000),
+    advanceCapBps: z.number().int().min(0).max(10000).default(10000),
+    active: z.boolean().default(true),
+  })
+  .strict()
+  .refine(
+    (b) =>
+      BigInt(b.deductionMinor) < BigInt(b.baseMinor) + BigInt(b.allowanceMinor),
+    "Deductions exceed salary",
+  )
+  .refine(
+    (b) => b.deductionMinor === "0" || b.deductionNote.length >= 3,
+    "Deduction reason required",
+  );
+export const payrollInput = z
+  .object({
+    requestId: id,
+    month: z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/),
+    date,
+    employeeIds: z
+      .array(id)
+      .min(1)
+      .max(500)
+      .refine((x) => new Set(x).size === x.length, "Duplicate employees"),
+  })
+  .strict()
+  .refine(
+    (b) => b.date >= b.month + "-01",
+    "Posting date must follow payroll month",
+  );

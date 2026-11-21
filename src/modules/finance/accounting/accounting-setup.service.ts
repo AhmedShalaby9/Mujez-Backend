@@ -112,6 +112,18 @@ export class AccountingSetupService {
           [p.companyId],
         )
       ).rows,
+      teams: (
+        await c.query(
+          "SELECT id,name FROM tenant.teams WHERE company_id=$1 ORDER BY name",
+          [p.companyId],
+        )
+      ).rows,
+      crmProjects: (
+        await c.query(
+          "SELECT id,name->>'en' AS name FROM tenant.projects WHERE company_id=$1 AND archived_at IS NULL ORDER BY name->>'en'",
+          [p.companyId],
+        )
+      ).rows,
       employees: (
         await c.query(
           "SELECT e.id,e.user_id,e.name,e.employee_code FROM tenant.hr_employees e WHERE e.company_id=$1 AND e.status<>'offboarded' ORDER BY e.name LIMIT 2000",
@@ -590,6 +602,10 @@ export class AccountingSetupService {
   async history(p: Principal, kind: string, id: string) {
     const tables: Record<string, string> = {
       accounts: "accounts",
+      "commission-policies": "commission_policies",
+      "automation-rules": "automation_rules",
+      "salary-profiles": "salary_profiles",
+      "payroll-runs": "payroll_runs",
       dimensions: "dimensions",
       parties: "parties",
       periods: "periods",
