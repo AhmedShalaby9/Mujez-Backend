@@ -2216,6 +2216,132 @@
         "tags": ["Leads"]
       }
     },
+    "/api/v1/cold-calls": {
+      "get": {
+        "operationId": "ColdCallsController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "allOf": [{ "$ref": "#/components/schemas/Object" }]
+            }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
+    "/api/v1/cold-calls/template": {
+      "get": {
+        "operationId": "ColdCallsController_template",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          }
+        },
+        "tags": ["ColdCalls"]
+      }
+    },
+    "/api/v1/cold-calls/preview": {
+      "post": {
+        "operationId": "ColdCallsController_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary" },
+                  "ownerId": { "type": "string", "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
+    "/api/v1/cold-calls/import": {
+      "post": {
+        "operationId": "ColdCallsController_import",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "requestId"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary" },
+                  "ownerId": { "type": "string", "format": "uuid" },
+                  "requestId": { "type": "string", "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
+    "/api/v1/cold-calls/{id}/convert": {
+      "post": {
+        "operationId": "ColdCallsController_convert",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ColdConvert" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
     "/api/v1/leads/{leadId}/unit-recommendations": {
       "get": {
         "operationId": "UnitRecommendationsController_latest",
@@ -7108,6 +7234,16 @@
           "note": { "type": "string" }
         },
         "required": ["requestId", "version", "note"]
+      },
+      "ColdConvert": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "segment": { "type": "string" },
+          "want": { "type": "string" }
+        },
+        "required": ["requestId", "version", "segment", "want"]
       },
       "AuditQuery": {
         "type": "object",

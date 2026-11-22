@@ -440,71 +440,76 @@ export class SalesService {
     return id;
   }
   async create(p: Principal, input: LeadInput) {
-    return this.write(p, "leads.manage", "lead.create", input, async (c) => {
-      const phone = normalizePhone(input.phone),
-        duplicate = await this.duplicate(c, p, phone, input);
-      const routed =
-        input.ownerId === undefined && p.scope !== "own"
-          ? await pickRoute(c, p.companyId!, input, true)
-          : null;
-      const owner = await this.owner(
-        c,
-        p,
-        input.ownerId === undefined ? (routed?.userId ?? p.id) : input.ownerId,
-      );
-      const campaign = await this.campaign(
-        c,
-        p,
-        input.campaignId ?? null,
-        input.source,
-      );
-      await requireCrmSlot(c, p.companyId!, "leads");
-      const l = (
-        await c.query(
-          `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,score,campaign_id,routing_rule_id,assigned_at,email) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END,$13) RETURNING id`,
-          [
-            p.companyId,
-            ref("L"),
-            { en: input.name, ar: input.nameAr ?? input.name },
-            phone,
-            input.segment,
-            { en: input.want, ar: input.wantAr ?? input.want },
-            input.budgetMinor ?? null,
-            input.source,
-            owner,
-            input.score ?? null,
-            campaign,
-            routed?.ruleId ?? null,
-            input.email?.toLowerCase() ?? null,
-          ],
-        )
-      ).rows[0];
-      if (routed)
-        await this.event(c, p, l.id, "lead.routed", {
-          ruleId: routed.ruleId,
-          ruleName: routed.ruleName,
-          ownerId: routed.userId,
-          ownerName: routed.userName,
-          strategy: routed.strategy,
-        });
-      if (duplicate && input.duplicateMode === "link")
-        await c.query(
-          "INSERT INTO tenant.lead_links(company_id,lead_id,related_id,reason) VALUES($1,$2,$3,$4)",
-          [p.companyId, l.id, duplicate, input.reason],
-        );
-      await this.event(c, p, l.id, "lead.created", {
-        duplicateOf: duplicate,
-        duplicateMode: input.duplicateMode ?? null,
-        reason: input.reason ?? null,
-      });
-      if (duplicate && input.duplicateMode === "link")
-        await this.event(c, p, duplicate, "lead.related", {
-          relatedId: l.id,
-          reason: input.reason!,
-        });
-      return leadDto(await this.row(c, p, l.id));
-    });
+    return this.write(p, "leads.manage", "lead.create", input, (c) =>
+      this.createWithin(c, p, input),
+    );
   }
+  /** Shared within an existing Sales transaction so cold-call conversion is atomic. */
+  async createWithin(c: PoolClient, p: Principal, input: LeadInput) {
+    const phone = normalizePhone(input.phone),
+      duplicate = await this.duplicate(c, p, phone, input);
+    const routed =
+      input.ownerId === undefined && p.scope !== "own"
+        ? await pickRoute(c, p.companyId!, input, true)
+        : null;
+    const owner = await this.owner(
+      c,
+      p,
+      input.ownerId === undefined ? (routed?.userId ?? p.id) : input.ownerId,
+    );
+    const campaign = await this.campaign(
+      c,
+      p,
+      input.campaignId ?? null,
+      input.source,
+    );
+    await requireCrmSlot(c, p.companyId!, "leads");
+    const l = (
+      await c.query(
+        `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,score,campaign_id,routing_rule_id,assigned_at,email) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END,$13) RETURNING id`,
+        [
+          p.companyId,
+          ref("L"),
+          { en: input.name, ar: input.nameAr ?? input.name },
+          phone,
+          input.segment,
+          { en: input.want, ar: input.wantAr ?? input.want },
+          input.budgetMinor ?? null,
+          input.source,
+          owner,
+          input.score ?? null,
+          campaign,
+          routed?.ruleId ?? null,
+          input.email?.toLowerCase() ?? null,
+        ],
+      )
+    ).rows[0];
+    if (routed)
+      await this.event(c, p, l.id, "lead.routed", {
+        ruleId: routed.ruleId,
+        ruleName: routed.ruleName,
+        ownerId: routed.userId,
+        ownerName: routed.userName,
+        strategy: routed.strategy,
+      });
+    if (duplicate && input.duplicateMode === "link")
+      await c.query(
+        "INSERT INTO tenant.lead_links(company_id,lead_id,related_id,reason) VALUES($1,$2,$3,$4)",
+        [p.companyId, l.id, duplicate, input.reason],
+      );
+    await this.event(c, p, l.id, "lead.created", {
+      duplicateOf: duplicate,
+      duplicateMode: input.duplicateMode ?? null,
+      reason: input.reason ?? null,
+    });
+    if (duplicate && input.duplicateMode === "link")
+      await this.event(c, p, duplicate, "lead.related", {
+        relatedId: l.id,
+        reason: input.reason!,
+      });
+    return leadDto(await this.row(c, p, l.id));
+  }
+
   async update(p: Principal, id: string, input: LeadUpdate) {
     return this.write(
       p,
