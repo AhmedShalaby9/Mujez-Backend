@@ -2221,6 +2221,30 @@
         "operationId": "ColdCallsController_list",
         "parameters": [
           {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "callback",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "outcome",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
             "name": "q",
             "required": false,
             "in": "query",
@@ -2252,6 +2276,120 @@
           }
         ],
         "responses": { "200": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
+    "/api/v1/cold-calls/options": {
+      "get": {
+        "operationId": "ColdCallsController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
+    "/api/v1/cold-calls/{id}/history": {
+      "get": {
+        "operationId": "ColdCallsController_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
+    "/api/v1/cold-calls/{id}/calls": {
+      "post": {
+        "operationId": "ColdCallsController_call",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ColdCallLog" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
+    "/api/v1/cold-calls/{id}/notes": {
+      "post": {
+        "operationId": "ColdCallsController_note",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ColdNote" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
+    "/api/v1/cold-calls/{id}/follow-up": {
+      "post": {
+        "operationId": "ColdCallsController_followUp",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ColdFollowUp" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
+    "/api/v1/cold-calls/assign": {
+      "post": {
+        "operationId": "ColdCallsController_assign",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ColdAssignment" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
         "tags": ["ColdCalls"]
       }
     },
@@ -7234,6 +7372,73 @@
           "note": { "type": "string" }
         },
         "required": ["requestId", "version", "note"]
+      },
+      "ColdCallLog": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "no_answer",
+              "busy",
+              "wrong_number",
+              "not_interested",
+              "interested",
+              "callback"
+            ]
+          },
+          "notes": { "type": "string" },
+          "followUpAt": {
+            "type": "object",
+            "description": "Local date and time in Africa/Cairo; callback requires a date"
+          }
+        },
+        "required": ["requestId", "version", "outcome"]
+      },
+      "ColdNote": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "notes": { "type": "string" }
+        },
+        "required": ["requestId", "version", "notes"]
+      },
+      "ColdFollowUp": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "followUpAt": {
+            "type": ["object", "null"],
+            "description": "Cairo local time; null cancels the appointment"
+          },
+          "notes": { "type": "string" }
+        },
+        "required": ["requestId", "version"]
+      },
+      "ColdAssignItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "version": { "type": "number" }
+        },
+        "required": ["id", "version"]
+      },
+      "ColdAssignment": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "ownerId": { "type": "string" },
+          "items": {
+            "maxItems": 100,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ColdAssignItem" }
+          }
+        },
+        "required": ["requestId", "ownerId", "items"]
       },
       "ColdConvert": {
         "type": "object",

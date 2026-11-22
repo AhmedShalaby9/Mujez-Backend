@@ -155,26 +155,32 @@ test("audit failure rolls back imports and conversions; duplicate CRM contacts a
   assert.equal(preview.duplicates, 1);
 });
 test("own-scope users cannot read or convert another agent records or assign their import to someone else", async () => {
-  const role = (
+  p.permissions.push("team.read", "team.manage");
+  const invite = (
+    await h.post("team/invite", {
+      name: "Cold Sales",
+      email: "cold@example.test",
+      role: "agent",
+    })
+  ).body;
+  await h.post(
+    "team/activate",
+    { token: invite.token, password: "cold-sales-fixture-password" },
+    200,
+  );
+  const account = (
     await h.db.query(
-      "INSERT INTO tenant.roles(company_id,key,name,permissions,scope) VALUES($1,'cold-sales','{}',ARRAY['leads.read','leads.manage'],'own') RETURNING id",
-      [p.companyId],
+      "SELECT * FROM platform.company_employee_accounts WHERE id=$1",
+      [invite.accountId],
     )
-  ).rows[0].id;
-  const id = (
-    await h.db.query(
-      "INSERT INTO tenant.users(company_id,oidc_subject,identity_pool,name,email,role_id,status) VALUES($1,$2,'company_user','Cold Sales','cold@example.test',$3,'active') RETURNING id",
-      [p.companyId, randomUUID(), role],
-    )
-  ).rows[0].id;
-  h.state.principal = {
-    ...p,
-    id,
-    role: "agent",
-    roles: ["agent", "employee"],
-    pool: "company_user",
-    scope: "own",
-  };
+  ).rows[0];
+  const { SessionService } =
+    await import("../dist/common/auth/session.service.js");
+  const principal = await new SessionService(h.database, {
+    consume: async () => true,
+  }).employeeProfile(account);
+  const id = principal.id;
+  h.state.principal = principal;
   assert.equal((await h.get("cold-calls?status=all")).body.total, 0);
   await h.post(
     "cold-calls/" + rows[1].id + "/convert",

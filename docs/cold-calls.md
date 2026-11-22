@@ -1,6 +1,6 @@
 # Cold calls
 
-Company CRM outreach contacts live separately from Leads and Pipeline. Importing creates no lead, opportunity, tasks, messaging, call, finance records or AI request. Each record starts with name, normalized phone and an owner. The company owner can import to an active CRM user; own-scope salespeople and team leads can only import to themselves and read/convert their own records. Existing `leads.read`/`leads.manage` grants and active subscription checks apply. Company RLS and composite keys protect all references. No additional paid module is required.
+Company CRM outreach contacts live separately from Leads and Pipeline. Importing creates no lead, opportunity, tasks, messaging, call, finance records or AI request. Each record starts with name, normalized phone and an owner. The company owner can import to an active CRM user; Salespeople see their own records. Current team leads see their own and current team members’ records, and can import or assign to active sales members of their team. Conversion remains limited to the assigned salesperson or company management, without broadening ordinary CRM access. Existing `leads.read`/`leads.manage` grants and active subscription checks apply. Company RLS and composite keys protect all references. No additional paid module is required.
 
 ## API and file contract
 
@@ -12,4 +12,18 @@ Company CRM outreach contacts live separately from Leads and Pipeline. Importing
 
 Formats: XLSX or UTF-8 CSV (comma or semicolon), exactly `name` then `phone`, case insensitive. No additional columns or multiple sheets. Up to 2,000 data rows and 5 MB input; XLSX expanded contents are bounded before workbook parsing. Formulas/objects and numeric phone cells are rejected rather than guessing lost leading zeros. Egyptian mobile numbers and international +country-code phones normalize with the existing CRM rules; Arabic digits are accepted. Duplicate numbers within the file, the company cold-call list or existing company leads (including archived leads) are skipped. Duplicates belonging to other owners are reported only as counts, never names or ownership details. Original files are not retained. Company storage is capped at 100,000 cold-call rows; active lead quota is enforced only at conversion.
 
-Call outcomes, reminders, bulk redistribution and automatic dialing are outside this first version. Interested contacts are converted explicitly; simply importing an old list never fills the active pipeline.
+## Call activity and callbacks
+
+- GET `/api/v1/cold-calls/options` returns permitted owners, scope, team and `canAssign`.
+- List accepts `view=all|mine`, `ownerId`, `outcome`, `status=open|closed|pending|converted|all`, `callback=all|due|today|upcoming|scheduled`. Returns scoped summary counts (open, due, today, upcoming), row versions, outcome, last call and follow-up dates, and conversion/lead visibility flags. Due includes overdue through now; today uses Cairo calendar date, so counts can overlap. Upcoming starts tomorrow.
+- GET `/:id/history?page=1` returns the current record and immutable activities in pages of 25, with actor and server timestamps.
+- POST `/:id/calls` takes `{requestId,version,outcome,notes?,followUpAt?}`. Outcomes: no_answer, busy, wrong_number, not_interested, interested, callback. Callback requires a date; wrong number/not interested close the record and cannot carry an appointment. Logging another call replaces or clears the old appointment.
+- POST `/:id/notes` takes `{requestId,version,notes}` and appends a note without recording a call.
+- POST `/:id/follow-up` takes `{requestId,version,followUpAt,notes?}`; null explicitly cancels the appointment. Dates are local `YYYY-MM-DDTHH:mm` in Africa/Cairo, future, at most two years ahead, validated against calendar and DST transitions.
+- POST `/assign` takes `{requestId,ownerId,items:[{id,version}]}` (1–100 unique records). Company managers assign within company; current team leads assign within their current team. Sales cannot reassign. All rows are checked and changed atomically. Call history, outcomes and follow-up dates survive assignment; the new owner sees callbacks. Converted records use normal CRM reassignment instead.
+
+Activities and writes are tenant scoped, versioned, actor-bound and idempotent. Failed audit rolls back data. Closed contacts must have a new open call outcome before conversion. Conversion clears the callback; notes/history remain available afterward. No automatic dialing, messages or email reminder worker is introduced. The queue refreshes on page load or refresh.
+
+Sales agents no longer see manual New lead buttons in the header or Leads page, including the new-form URL shortcut. Existing editing, backend permissions and explicit cold-contact conversion remain available; team leads and company owners retain manual creation.
+
+Interested contacts are converted explicitly; simply importing an old list never fills the active pipeline.

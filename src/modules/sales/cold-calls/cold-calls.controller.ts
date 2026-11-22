@@ -17,6 +17,9 @@ import {
   UseInterceptors,
   Res,
   StreamableFile,
+  DefaultValuePipe,
+  ParseIntPipe,
+  BadRequestException,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import type { Response } from "express";
@@ -29,6 +32,10 @@ import {
   ColdImport,
   ColdPreview,
   ColdConvert,
+  ColdCallLog,
+  ColdNote,
+  ColdFollowUp,
+  ColdAssignment,
 } from "./cold-calls.dto.js";
 @Controller("api/v1/cold-calls")
 @RequireAccess(["company_admin", "company_user"], "leads.read")
@@ -36,6 +43,49 @@ export class ColdCallsController {
   constructor(private readonly s: ColdCallsService) {}
   @Get() list(@Req() r: AuthRequest, @Query() q: ColdQuery) {
     return this.s.list(r.principal, q);
+  }
+  @Get("options") options(@Req() r: AuthRequest) {
+    return this.s.options(r.principal);
+  }
+  @Get(":id/history") history(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query("page", new DefaultValuePipe(1), ParseIntPipe) page: number,
+  ) {
+    if (page < 1 || page > 100000) throw new BadRequestException();
+    return this.s.detail(r.principal, id, page);
+  }
+  @Post(":id/calls")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  call(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: ColdCallLog,
+  ) {
+    return this.s.logCall(r.principal, id, b);
+  }
+  @Post(":id/notes")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  note(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: ColdNote,
+  ) {
+    return this.s.note(r.principal, id, b);
+  }
+  @Post(":id/follow-up")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  followUp(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: ColdFollowUp,
+  ) {
+    return this.s.followUp(r.principal, id, b);
+  }
+  @Post("assign")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  assign(@Req() r: AuthRequest, @Body() b: ColdAssignment) {
+    return this.s.assign(r.principal, b);
   }
   @ApiProduces(
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
