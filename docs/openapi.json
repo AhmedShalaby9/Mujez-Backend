@@ -5666,6 +5666,31 @@
         "tags": ["Companies"]
       }
     },
+    "/admin/api/v1/{id}/custom": {
+      "post": {
+        "operationId": "SubscriptionsController_custom",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionCustomUpdate"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Subscriptions"]
+      }
+    },
     "/admin/api/v1/plan-options": {
       "get": {
         "operationId": "SubscriptionsController_options",
@@ -7998,13 +8023,38 @@
       },
       "TeamActivate": { "type": "object", "properties": {} },
       "CompanyQuoteInput": { "type": "object", "properties": {} },
+      "CustomContractInput": {
+        "type": "object",
+        "properties": {
+          "amountMinor": {
+            "type": "string",
+            "description": "Total EGP price for the entire term, in minor units"
+          },
+          "durationMonths": { "type": "number", "minimum": 1, "maximum": 120 },
+          "endsOn": {
+            "type": "string",
+            "description": "Last access day in Africa/Cairo; choose this or durationMonths"
+          }
+        },
+        "required": ["amountMinor"]
+      },
       "CompanyDraftInput": {
         "type": "object",
         "properties": {
+          "customContract": {
+            "description": "Creation only: negotiated total price and duration; no public plan required",
+            "allOf": [{ "$ref": "#/components/schemas/CustomContractInput" }]
+          },
+          "aiEnabled": { "type": "boolean" },
           "hrEnabled": {
             "type": "boolean",
             "default": false,
             "description": "Enable the HR module for this company"
+          },
+          "financeEnabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable Finance accounting and payroll; CRM commissions remain independent"
           },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },
@@ -8021,10 +8071,20 @@
       "CompanyInput": {
         "type": "object",
         "properties": {
+          "customContract": {
+            "description": "Creation only: negotiated total price and duration; no public plan required",
+            "allOf": [{ "$ref": "#/components/schemas/CustomContractInput" }]
+          },
+          "aiEnabled": { "type": "boolean" },
           "hrEnabled": {
             "type": "boolean",
             "default": false,
             "description": "Enable the HR module for this company"
+          },
+          "financeEnabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable Finance accounting and payroll; CRM commissions remain independent"
           },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },
@@ -8044,17 +8104,26 @@
           "city",
           "adminEmail",
           "phone",
-          "website",
-          "plan"
+          "website"
         ]
       },
       "CompanyUpdate": {
         "type": "object",
         "properties": {
+          "customContract": {
+            "description": "Creation only: negotiated total price and duration; no public plan required",
+            "allOf": [{ "$ref": "#/components/schemas/CustomContractInput" }]
+          },
+          "aiEnabled": { "type": "boolean" },
           "hrEnabled": {
             "type": "boolean",
             "default": false,
             "description": "Enable the HR module for this company"
+          },
+          "financeEnabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable Finance accounting and payroll; CRM commissions remain independent"
           },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },
@@ -8076,7 +8145,6 @@
           "adminEmail",
           "phone",
           "website",
-          "plan",
           "version"
         ]
       },
@@ -8097,6 +8165,25 @@
           "version": { "type": "number" }
         },
         "required": ["step", "completed", "version"]
+      },
+      "SubscriptionCustomUpdate": {
+        "type": "object",
+        "properties": {
+          "amountMinor": {
+            "type": "string",
+            "description": "Total EGP price for the entire term, in minor units"
+          },
+          "durationMonths": { "type": "number", "minimum": 1, "maximum": 120 },
+          "endsOn": {
+            "type": "string",
+            "description": "Last access day in Africa/Cairo; choose this or durationMonths"
+          },
+          "version": { "type": "number" },
+          "aiEnabled": { "type": "boolean" },
+          "hrEnabled": { "type": "boolean" },
+          "financeEnabled": { "type": "boolean" }
+        },
+        "required": ["amountMinor", "version"]
       },
       "PlanCreate": {
         "type": "object",
@@ -8186,6 +8273,12 @@
       "SubscriptionCreate": {
         "type": "object",
         "properties": {
+          "customContract": {
+            "$ref": "#/components/schemas/CustomContractInput"
+          },
+          "aiEnabled": { "type": "boolean" },
+          "hrEnabled": { "type": "boolean" },
+          "financeEnabled": { "type": "boolean" },
           "companyId": { "type": "string" },
           "plan": { "type": "string" },
           "cycle": { "type": "string" },
@@ -8193,14 +8286,7 @@
           "status": { "type": "string" },
           "planVersionId": { "type": "string" }
         },
-        "required": [
-          "companyId",
-          "plan",
-          "cycle",
-          "payment",
-          "status",
-          "planVersionId"
-        ]
+        "required": ["companyId", "payment", "status"]
       },
       "CycleChange": {
         "type": "object",

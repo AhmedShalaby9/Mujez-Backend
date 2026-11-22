@@ -1,3 +1,4 @@
+import { requireAiModule } from "../../../../common/auth/company-modules.js";
 import {
   Injectable,
   BadRequestException,
@@ -37,7 +38,8 @@ export class CompanyInsightsService {
     private readonly work: CompanySnapshotService,
     private readonly ai: KimiCompanyInsightsGateway,
   ) {}
-  snapshot(p: Principal, days: number) {
+  async snapshot(p: Principal, days: number) {
+    await requireAiModule(this.db, p.companyId);
     return this.work.snapshot(p, days);
   }
   private view(row: any, snapshot: any) {

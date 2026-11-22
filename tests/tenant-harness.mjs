@@ -67,7 +67,7 @@ export async function tenantHarness() {
   for (const slug of ["test-alpha", "test-beta"]) {
     const companyId = (
       await db.query(
-        "INSERT INTO platform.companies(public_id,slug,name,status,hr_enabled) VALUES($1,$2,$3,'trial',true) RETURNING id",
+        "INSERT INTO platform.companies(public_id,slug,name,status,hr_enabled,finance_enabled,ai_enabled) VALUES($1,$2,$3,'trial',true,true,true) RETURNING id",
         ["MJ-" + slug, slug, { en: slug, ar: slug }],
       )
     ).rows[0].id;

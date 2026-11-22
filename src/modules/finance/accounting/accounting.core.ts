@@ -165,6 +165,7 @@ export class AccountingCore {
   }
   async access(p: Principal, perm = "finance.read") {
     if (!p.companyId || !this.can(p, perm)) throw new ForbiddenException();
+    await this.requireModule(p.companyId);
     const ok = await this.db.platform(
       async (c) =>
         (
@@ -178,6 +179,22 @@ export class AccountingCore {
       throw new ForbiddenException(
         "An active company subscription is required",
       );
+  }
+  async requireModule(companyId: string) {
+    const enabled = await this.db.platform(
+      async (c) =>
+        (
+          await c.query(
+            "SELECT finance_enabled FROM platform.companies WHERE id=$1",
+            [companyId],
+          )
+        ).rows[0]?.finance_enabled,
+    );
+    if (!enabled)
+      throw new ForbiddenException({
+        code: "finance_module_disabled",
+        message: "The Finance module is disabled for this company",
+      });
   }
   parse<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
     const r = schema.safeParse(input);

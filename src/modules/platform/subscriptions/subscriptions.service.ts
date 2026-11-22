@@ -1,3 +1,8 @@
+import {
+  createCustomSubscription,
+  customVersion,
+} from "./custom-subscription.js";
+import type { SubscriptionCustomUpdate } from "./subscriptions.dto.js";
 import { Optional } from "@nestjs/common";
 import { SettingsService } from "../settings/settings.service.js";
 import {
@@ -29,7 +34,12 @@ export function subDto(s: any) {
         ? "canceled"
         : "expired"
       : s.status;
-  const amount = s.cycle === "annual" ? s.annual_minor : s.monthly_minor;
+  const amount =
+    s.cycle === "custom"
+      ? s.term_amount_minor
+      : s.cycle === "annual"
+        ? s.annual_minor
+        : s.monthly_minor;
   return {
     subId: s.public_id,
     companyId: s.company_ref,
@@ -46,6 +56,8 @@ export function subDto(s: any) {
     cancellationNote: s.cancellation_note ?? null,
     canceledAt: s.canceled_at ? new Date(s.canceled_at).toISOString() : null,
     cycle: s.cycle,
+    durationMonths: s.term_months ?? null,
+    durationDays: s.term_days ?? null,
     status,
     payment: s.payment_method,
     renewsOn: new Date(s.period_end).toISOString(),
@@ -55,7 +67,13 @@ export function subDto(s: any) {
     currency: "EGP",
     mrr:
       status === "active"
-        ? Number(amount) / (s.cycle === "annual" ? 1200 : 100)
+        ? Number(amount) /
+          100 /
+          (s.cycle === "custom"
+            ? (s.term_months ?? Number(s.term_days) / 30.4375)
+            : s.cycle === "annual"
+              ? 12
+              : 1)
         : 0,
     version: s.version,
   };
@@ -66,6 +84,96 @@ export class SubscriptionsService {
     private readonly db: DatabaseService,
     @Optional() private readonly settings?: SettingsService,
   ) {}
+  private async customModules(
+    c: PoolClient,
+    company: any,
+    input: {
+      aiEnabled?: boolean;
+      hrEnabled?: boolean;
+      financeEnabled?: boolean;
+    },
+    actor: string,
+  ) {
+    const after = (
+      await c.query(
+        "UPDATE platform.companies SET ai_enabled=coalesce($2,ai_enabled),hr_enabled=coalesce($3,hr_enabled),finance_enabled=coalesce($4,finance_enabled),version=version+1,updated_at=now() WHERE id=$1 RETURNING *",
+        [
+          company.id,
+          input.aiEnabled ?? null,
+          input.hrEnabled ?? null,
+          input.financeEnabled ?? null,
+        ],
+      )
+    ).rows[0];
+    await recordPlatformEvent(c, {
+      actorId: actor,
+      companyId: company.id,
+      action: "company.modules_updated",
+      resourceType: "company",
+      resourceId: company.id,
+      before: company,
+      after,
+      payload: { companyId: company.id },
+    });
+  }
+  async custom(id: string, input: SubscriptionCustomUpdate, actor: string) {
+    return this.db.platform(async (c) => {
+      // Keep the established subscription-then-company lock order used by actions.
+      const before = (
+        await c.query(
+          "SELECT * FROM platform.subscriptions WHERE public_id=$1 FOR UPDATE",
+          [id],
+        )
+      ).rows[0];
+      if (!before) throw new NotFoundException("Subscription not found");
+      if (before.version !== input.version)
+        throw new ConflictException("Subscription changed; refresh first");
+      const company = (
+        await c.query(
+          "SELECT * FROM platform.companies WHERE id=$1 FOR UPDATE",
+          [before.company_id],
+        )
+      ).rows[0];
+      if (
+        ["archived", "suspended"].includes(company.status) ||
+        ["canceled", "expired", "suspended"].includes(before.status) ||
+        new Date(before.period_end).getTime() <= Date.now()
+      )
+        throw new ConflictException(
+          "Create a new subscription for an ended contract",
+        );
+      const terms = await customVersion(c, input);
+      const after = (
+        await c.query(
+          "UPDATE platform.subscriptions SET plan_key='custom',plan_version_id=$2,cycle='custom',term_amount_minor=$3,term_months=$4,term_days=$5,period_start=$6,period_end=$7,pending_version_id=NULL,pending_plan_key=NULL,pending_cycle=NULL,cancel_at_period_end=false,version=version+1,updated_at=now() WHERE id=$1 RETURNING *",
+          [
+            before.id,
+            terms.versionId,
+            input.amountMinor,
+            input.durationMonths ?? null,
+            terms.days,
+            terms.starts,
+            terms.ends,
+          ],
+        )
+      ).rows[0];
+      await c.query(
+        "UPDATE platform.companies SET selected_plan='custom' WHERE id=$1",
+        [company.id],
+      );
+      await this.customModules(c, company, input, actor);
+      await this.event(
+        c,
+        actor,
+        "subscription.custom_terms_updated",
+        before.id,
+        before,
+        after,
+        company.id,
+      );
+      return { subId: after.public_id };
+    });
+  }
   async event(
     c: PoolClient,
     actor: string,
@@ -120,7 +228,7 @@ export class SubscriptionsService {
   async plans() {
     return this.db.platform(async (c) => {
       const result = await c.query(
-        `SELECT p.key,p.archived,p.version,v.*, (SELECT round(coalesce(sum(CASE WHEN s.cycle='annual' THEN pv.annual_minor::numeric/12 ELSE pv.monthly_minor END),0))::text FROM platform.subscriptions s JOIN platform.plan_versions pv ON pv.id=s.plan_version_id WHERE s.plan_key=p.key AND s.status='active' AND s.period_end>now()) AS mrr_minor, (SELECT count(*)::integer FROM platform.subscriptions s WHERE s.plan_key=p.key AND s.status IN ('trialing','active','past_due','suspended') AND s.period_end>now()) AS companies FROM platform.subscription_plans p JOIN LATERAL (SELECT * FROM platform.plan_versions WHERE plan_key=p.key ORDER BY revision DESC LIMIT 1) v ON true ORDER BY CASE p.key WHEN 'starter' THEN 1 WHEN 'pro' THEN 2 WHEN 'business' THEN 3 ELSE 4 END`,
+        `SELECT p.key,p.archived,p.version,v.*, (SELECT round(coalesce(sum(CASE WHEN s.cycle='annual' THEN pv.annual_minor::numeric/12 ELSE pv.monthly_minor END),0))::text FROM platform.subscriptions s JOIN platform.plan_versions pv ON pv.id=s.plan_version_id WHERE s.plan_key=p.key AND s.status='active' AND s.period_end>now()) AS mrr_minor, (SELECT count(*)::integer FROM platform.subscriptions s WHERE s.plan_key=p.key AND s.status IN ('trialing','active','past_due','suspended') AND s.period_end>now()) AS companies FROM platform.subscription_plans p JOIN LATERAL (SELECT * FROM platform.plan_versions WHERE plan_key=p.key ORDER BY revision DESC LIMIT 1) v ON true WHERE p.key<>'custom' ORDER BY CASE p.key WHEN 'starter' THEN 1 WHEN 'pro' THEN 2 WHEN 'business' THEN 3 ELSE 4 END`,
       );
       return result.rows.map((v) => ({
         key: v.key,
@@ -310,6 +418,17 @@ export class SubscriptionsService {
           throw new ConflictException(
             "Company cannot receive a new subscription",
           );
+        if (input.customContract) {
+          const result = await createCustomSubscription(
+            c,
+            company.id,
+            actor,
+            input.customContract,
+            input.payment,
+          );
+          await this.customModules(c, company, input, actor);
+          return { subId: result.id };
+        }
         const plan = await this.currentPlan(c, input.plan, input.planVersionId);
         const expired = await c.query(
           "UPDATE platform.subscriptions SET status=CASE WHEN cancel_at_period_end THEN 'canceled' ELSE 'expired' END,version=version+1 WHERE company_id=$1 AND period_end<=now() AND status IN ('trialing','active','past_due','suspended') RETURNING *",
@@ -390,6 +509,10 @@ export class SubscriptionsService {
         )
       ).rows[0];
       if (!before) throw new NotFoundException();
+      if (before.cycle === "custom")
+        throw new ConflictException(
+          "Edit the custom term instead of scheduling a monthly or annual plan cycle",
+        );
       if (
         before.version !== input.version ||
         before.cancel_at_period_end ||
@@ -455,6 +578,10 @@ export class SubscriptionsService {
         action !== "cancel"
       )
         throw new ConflictException("Company unavailable");
+      if (before.cycle === "custom" && action === "change")
+        throw new ConflictException(
+          "Edit this custom subscription instead of selecting a plan",
+        );
       let after;
       if (action === "cancel") {
         if (
@@ -507,7 +634,14 @@ export class SubscriptionsService {
           );
         const planVersion = before.pending_version_id ?? before.plan_version_id;
         const cycle = before.pending_cycle ?? before.cycle;
-        const interval = cycle === "annual" ? "1 year" : "1 month";
+        const interval =
+          cycle === "custom"
+            ? before.term_months
+              ? before.term_months + " months"
+              : before.term_days + " days"
+            : cycle === "annual"
+              ? "1 year"
+              : "1 month";
         try {
           after = (
             await c.query(

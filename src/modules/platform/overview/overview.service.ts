@@ -109,7 +109,7 @@ export class OverviewService {
       if (canFinance) {
         const recurring = (
           await c.query(
-            `SELECT round(coalesce(sum(CASE WHEN s.cycle='annual' THEN v.annual_minor::numeric/12 ELSE v.monthly_minor::numeric END),0))::text AS mrr_minor,round(coalesce(sum(CASE WHEN s.cycle='annual' THEN v.annual_minor::numeric ELSE v.monthly_minor::numeric*12 END),0))::text AS arr_minor FROM platform.subscriptions s JOIN platform.plan_versions v ON v.id=s.plan_version_id JOIN platform.companies c ON c.id=s.company_id WHERE s.status='active' AND s.period_end>now() AND c.status='active'`,
+            `SELECT round(coalesce(sum(CASE WHEN s.cycle='custom' THEN s.term_amount_minor::numeric/coalesce(s.term_months::numeric,s.term_days::numeric/30.4375) WHEN s.cycle='annual' THEN v.annual_minor::numeric/12 ELSE v.monthly_minor::numeric END),0))::text AS mrr_minor,round(coalesce(sum(CASE WHEN s.cycle='custom' THEN 12*s.term_amount_minor::numeric/coalesce(s.term_months::numeric,s.term_days::numeric/30.4375) WHEN s.cycle='annual' THEN v.annual_minor::numeric ELSE v.monthly_minor::numeric*12 END),0))::text AS arr_minor FROM platform.subscriptions s JOIN platform.plan_versions v ON v.id=s.plan_version_id JOIN platform.companies c ON c.id=s.company_id WHERE s.status='active' AND s.period_end>now() AND c.status='active'`,
           )
         ).rows[0];
         const series = (

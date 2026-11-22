@@ -14,6 +14,7 @@ import {
   ValidateNested,
   IsUUID,
   IsISO31661Alpha2,
+  ValidateIf,
 } from "class-validator";
 export class OwnerProfileInput {
   @IsString() @Length(2, 160) name!: string;
@@ -21,7 +22,43 @@ export class OwnerProfileInput {
   @IsOptional() @IsString() @MaxLength(100) title?: string;
   @IsOptional() @IsIn(["ar", "en"]) lang?: string;
 }
+export class CustomContractInput {
+  @ApiProperty({
+    description: "Total EGP price for the entire term, in minor units",
+  })
+  @IsString()
+  @Matches(/^[1-9]\d{0,12}$/)
+  amountMinor!: string;
+  @ApiProperty({ required: false, minimum: 1, maximum: 120 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  durationMonths?: number;
+  @ApiProperty({
+    required: false,
+    description:
+      "Last access day in Africa/Cairo; choose this or durationMonths",
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  endsOn?: string;
+}
 export class CompanyInput {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CustomContractInput)
+  @ApiProperty({
+    required: false,
+    type: () => CustomContractInput,
+    description:
+      "Creation only: negotiated total price and duration; no public plan required",
+  })
+  customContract?: CustomContractInput;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  aiEnabled?: boolean;
   @IsOptional()
   @IsBoolean()
   @ApiProperty({
@@ -30,6 +67,15 @@ export class CompanyInput {
     description: "Enable the HR module for this company",
   })
   hrEnabled?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  @ApiProperty({
+    required: false,
+    default: false,
+    description:
+      "Enable Finance accounting and payroll; CRM commissions remain independent",
+  })
+  financeEnabled?: boolean;
   @IsOptional() @IsUUID() planVersionId?: string;
   @IsOptional() @IsISO31661Alpha2() country?: string;
   @IsOptional() @IsString() @MaxLength(500) address?: string;
@@ -60,7 +106,13 @@ export class CompanyInput {
   @ApiProperty()
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   declare slug: string;
-  @IsIn(["brokerage", "developer", "property_mgmt", "hybrid"])
+  @IsIn([
+    "brokerage",
+    "real_estate_office",
+    "developer",
+    "property_mgmt",
+    "hybrid",
+  ])
   @ApiProperty()
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   declare type: string;
@@ -85,8 +137,9 @@ export class CompanyInput {
   @ApiProperty()
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   declare website: string;
-  @IsIn(["starter", "pro", "business", "enterprise"])
-  @ApiProperty()
+  @ValidateIf((o) => !o.customContract || o.plan !== undefined)
+  @IsIn(["starter", "pro", "business", "enterprise", "custom"])
+  @ApiProperty({ required: false })
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   declare plan: string;
 }

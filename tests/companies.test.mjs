@@ -485,3 +485,190 @@ test("company HR opt-in persists through create, drafts, versioned editing and a
   );
   assert.equal(withHr.hrEnabled, true);
 });
+
+test("Finance module is opt-in for new companies, auditable, versioned and preserved by older updates and drafts", async () => {
+  const created = await service.create(
+    {
+      ...input,
+      slug: "finance-option",
+      adminEmail: "finance-option@example.test",
+    },
+    actor,
+  );
+  assert.equal(created.financeEnabled, false);
+  const enabled = await service.update(
+    created.id,
+    {
+      ...input,
+      slug: "finance-option",
+      adminEmail: "finance-option@example.test",
+      financeEnabled: true,
+      version: created.version,
+    },
+    actor,
+  );
+  assert.equal(enabled.financeEnabled, true);
+  const preserved = await service.update(
+    created.id,
+    {
+      ...input,
+      slug: "finance-option",
+      adminEmail: "finance-option@example.test",
+      version: enabled.version,
+    },
+    actor,
+  );
+  assert.equal(preserved.financeEnabled, true);
+  const disabled = await service.update(
+    created.id,
+    {
+      ...input,
+      slug: "finance-option",
+      adminEmail: "finance-option@example.test",
+      financeEnabled: false,
+      version: preserved.version,
+    },
+    actor,
+  );
+  assert.equal(disabled.financeEnabled, false);
+  assert.equal((await service.detail(created.id)).financeEnabled, false);
+  const audit = (
+    await db.query(
+      "SELECT before,after FROM platform.audit_logs WHERE action='company.updated' AND resource_id=$1",
+      [created.uuid],
+    )
+  ).rows;
+  assert.ok(
+    audit.some(
+      (x) =>
+        x.before.finance_enabled === false && x.after.finance_enabled === true,
+    ),
+  );
+});
+
+test("custom company subscriptions persist total-term price, exact duration and independent modules without a public package", async () => {
+  const custom = await service.create(
+    {
+      ...input,
+      plan: undefined,
+      slug: "office-custom",
+      type: "real_estate_office",
+      adminEmail: "office-custom@example.test",
+      hrEnabled: false,
+      financeEnabled: false,
+      aiEnabled: true,
+      customContract: { amountMinor: "1200000", durationMonths: 24 },
+    },
+    actor,
+  );
+  assert.equal(custom.type, "real_estate_office");
+  assert.equal(custom.plan, "custom");
+  assert.equal(custom.aiEnabled, true);
+  assert.equal(custom.financeEnabled, false);
+  const sub = (
+    await db.query("SELECT * FROM platform.subscriptions WHERE company_id=$1", [
+      custom.uuid,
+    ])
+  ).rows[0];
+  assert.equal(sub.cycle, "custom");
+  assert.equal(String(sub.term_amount_minor), "1200000");
+  assert.equal(sub.term_months, 24);
+  assert.equal(Number(custom.mrr), 500);
+  const ver = (
+    await db.query("SELECT limits FROM platform.plan_versions WHERE id=$1", [
+      sub.plan_version_id,
+    ])
+  ).rows[0];
+  assert.equal(ver.limits.users, null);
+  await assert.rejects(
+    service.create(
+      {
+        ...input,
+        plan: undefined,
+        slug: "bad-contract",
+        adminEmail: "bad-contract@example.test",
+        customContract: { amountMinor: "1200000", endsOn: "2000-01-01" },
+      },
+      actor,
+    ),
+    (e) => e.getStatus() === 400,
+  );
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::int n FROM platform.companies WHERE slug='bad-contract'",
+      )
+    ).rows[0].n,
+    0,
+  );
+  const { SubscriptionsService } =
+    await import("../dist/modules/platform/subscriptions/subscriptions.service.js");
+  const subs = new SubscriptionsService(service.db);
+  const plans = await subs.plans();
+  assert.ok(!plans.some((p) => p.key === "custom"));
+  const listed = (await subs.list()).items.find(
+    (x) => x.companyId === custom.id,
+  );
+  assert.equal(listed.amountMinor, "1200000");
+  assert.equal(listed.mrr, 500);
+  await subs.custom(
+    listed.subId,
+    {
+      version: listed.version,
+      amountMinor: "1800000",
+      durationMonths: 36,
+      aiEnabled: false,
+      hrEnabled: true,
+      financeEnabled: true,
+    },
+    actor,
+  );
+  const updated = await service.detail(custom.id);
+  assert.equal(updated.aiEnabled, false);
+  assert.equal(updated.hrEnabled, true);
+  assert.equal(updated.financeEnabled, true);
+  const current = (await subs.list()).items.find(
+    (x) => x.companyId === custom.id,
+  );
+  assert.equal(current.amountMinor, "1800000");
+  assert.equal(current.durationMonths, 36);
+  await assert.rejects(
+    subs.cycle(
+      current.subId,
+      { version: current.version, cycle: "annual" },
+      actor,
+    ),
+    (e) => e.getStatus() === 409,
+  );
+  const previousEnd = current.renewsOn;
+  await subs.action(current.subId, current.version, "renew", actor);
+  const renewed = (await subs.list()).items.find(
+    (x) => x.subId === current.subId,
+  );
+  assert.equal(renewed.cycle, "custom");
+  assert.equal(renewed.amountMinor, "1800000");
+  assert.ok(renewed.renewsOn > previousEnd);
+  const dateContract = await service.create(
+    {
+      ...input,
+      plan: undefined,
+      slug: "custom-date",
+      adminEmail: "custom-date@example.test",
+      customContract: { amountMinor: "500000", endsOn: "2028-06-30" },
+    },
+    actor,
+  );
+  assert.equal(
+    dateContract.subscription.periodEndsAt,
+    "2028-06-30T21:00:00.000Z",
+  );
+
+  await assert.rejects(
+    subs.custom(
+      listed.subId,
+      { version: listed.version, amountMinor: "10000", durationMonths: 12 },
+      actor,
+    ),
+    (e) => e.getStatus() === 409,
+  );
+});

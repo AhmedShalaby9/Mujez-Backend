@@ -425,6 +425,7 @@ export class AccountingReportsService {
       !p.permissions.includes("commissions.read")
     )
       throw new ForbiddenException();
+    await this.core.requireModule(p.companyId);
     const q = this.core.parse(queryInput, input);
     if (q.kind && q.kind !== "team")
       throw new BadRequestException("Choose personal or team view");

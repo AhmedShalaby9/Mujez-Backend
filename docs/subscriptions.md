@@ -82,3 +82,13 @@ embedded. Seeding is explicit, never repeated automatically on every deployment.
 Both screens use real API data, including counts, price versions, current terms,
 cancellation flags and pending renewal terms. Billing/payment screens are separate
 and still contain preview data.
+
+## Custom company contracts (current administration workflow)
+
+New company creation uses `customContract: {amountMinor, durationMonths}` or `{amountMinor, endsOn}` instead of a public package. Amount is the agreed total for the entire term in EGP minor units, not a monthly charge. Date mode includes the selected last access day in Africa/Cairo; duration starts at creation. Terms are limited to ten years. CRM is included with unlimited base resource limits; platform feature switches and user permissions still apply. Optional `aiEnabled`, `financeEnabled`, `hrEnabled` are independent company grants.
+
+`real_estate_office` describes a brokerage office also handling rentals and furnished rentals; `brokerage` remains a brokerage company. Existing company types and subscriptions are preserved. No automatic import or conversion of historical terms occurs.
+
+Subscription creation accepts the same `customContract` and module flags. `POST /admin/api/v1/subscriptions/:id/custom` requires `sub.manage`, current subscription version, total `amountMinor` and one duration mode, plus optional module flags. Editing explicitly starts replacement terms now, preserves previous invoices/payments and writes audit events. It creates no invoice or payment. Renewal retains the custom total price and original duration. Ended contracts need a new subscription. An archived internal `custom` compatibility record stores immutable terms for existing quota/billing infrastructure and is excluded from the public plan catalog. MRR is a normalized reporting projection, never the collected amount or a monthly invoice.
+
+Existing companies retain enabled AI and Finance during migrations; newly created companies opt in. Disabling AI blocks all recommendations and team/company analytics endpoints, without disabling ordinary team performance or CRM. Disabling modules preserves data. Subscription expiry continues to block workspace access.

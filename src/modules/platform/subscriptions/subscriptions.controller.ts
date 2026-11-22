@@ -22,9 +22,17 @@ import {
   SubscriptionChange,
   SubscriptionCancel,
   CycleChange,
+  SubscriptionCustomUpdate,
 } from "./subscriptions.dto.js";
 @Controller("admin/api/v1")
 export class SubscriptionsController {
+  @Post(":id/custom") @RequireAccess(["platform"], "sub.manage") custom(
+    @Param("id") id: string,
+    @Body() input: SubscriptionCustomUpdate,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.custom(id, input, req.principal.id);
+  }
   constructor(private readonly service: SubscriptionsService) {}
   @RequireAccess(["platform"], "sub.manage") @Get("plan-options") options() {
     return this.service.plans();

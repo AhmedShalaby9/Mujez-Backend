@@ -1,3 +1,7 @@
+import {
+  createCustomSubscription,
+  type CustomTerms,
+} from "./custom-subscription.js";
 import { ConflictException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
@@ -13,8 +17,17 @@ export async function createInitialSubscription(
     cycle?: string;
     paymentMethod?: string;
     planVersionId?: string;
+    customContract?: CustomTerms;
   } = {},
 ) {
+  if (terms.customContract)
+    return createCustomSubscription(
+      c,
+      company.id,
+      actor,
+      terms.customContract,
+      terms.paymentMethod,
+    );
   const catalog = (
     await c.query(
       "SELECT archived FROM platform.subscription_plans WHERE key=$1 FOR SHARE",

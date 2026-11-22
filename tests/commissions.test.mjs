@@ -37,6 +37,11 @@ function upload(kind, contractId) {
 before(async () => {
   h = await tenantHarness();
   [p, other] = h.principals;
+  // Exercise the entire native CRM commission lifecycle with Finance disabled.
+  await h.db.query(
+    "UPDATE platform.companies SET finance_enabled=false WHERE id=$1",
+    [p.companyId],
+  );
   lead = (
     await h.post(
       "leads",

@@ -1,3 +1,6 @@
+import { CustomContractInput } from "../companies/companies.dto.js";
+import { Type } from "class-transformer";
+import { ValidateIf, ValidateNested } from "class-validator";
 import { Transform } from "class-transformer";
 import {
   IsString,
@@ -108,16 +111,40 @@ export class PlanArchive extends Revision {
   @ApiProperty() @IsBoolean() declare archived: boolean;
 }
 export class SubscriptionCreate {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CustomContractInput)
+  @ApiProperty({ required: false, type: () => CustomContractInput })
+  customContract?: CustomContractInput;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  aiEnabled?: boolean;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  hrEnabled?: boolean;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  financeEnabled?: boolean;
   @ApiProperty() @IsString() @Length(3, 80) declare companyId: string;
-  @ApiProperty()
+  @ValidateIf((o) => !o.customContract)
+  @ApiProperty({ required: false })
   @IsString()
   @Matches(/^[a-z0-9]+(-[a-z0-9]+)*$/)
   @Length(2, 64)
   declare plan: string;
-  @ApiProperty() @IsIn(["monthly", "annual"]) declare cycle: string;
+  @ValidateIf((o) => !o.customContract)
+  @ApiProperty({ required: false })
+  @IsIn(["monthly", "annual"])
+  declare cycle: string;
   @ApiProperty() @IsIn(["card", "bank", "instapay"]) declare payment: string;
   @ApiProperty() @IsIn(["active"]) declare status: string;
-  @ApiProperty() @IsUUID() declare planVersionId: string;
+  @ValidateIf((o) => !o.customContract)
+  @ApiProperty({ required: false })
+  @IsUUID()
+  declare planVersionId: string;
 }
 export class SubscriptionCancel extends Revision {
   @ApiProperty({ required: false })
@@ -152,4 +179,23 @@ export class SubscriptionChange extends Revision {
   @Length(2, 64)
   declare plan: string;
   @ApiProperty() @IsUUID() declare planVersionId: string;
+}
+
+export class SubscriptionCustomUpdate extends CustomContractInput {
+  @ApiProperty()
+  @IsInt()
+  @Min(0)
+  version!: number;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  aiEnabled?: boolean;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  hrEnabled?: boolean;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  financeEnabled?: boolean;
 }

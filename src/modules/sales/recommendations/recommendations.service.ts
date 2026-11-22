@@ -1,3 +1,4 @@
+import { requireAiModule } from "../../../common/auth/company-modules.js";
 import {
   Injectable,
   ForbiddenException,
@@ -77,6 +78,7 @@ export class UnitRecommendationsService {
     private readonly ai: KimiRecommendationGateway,
   ) {}
   private async context(p: Principal, id: string) {
+    await requireAiModule(this.db, p.companyId);
     const lead = await this.sales.detail(p, id);
     await this.catalog.access(p, "units");
     if (lead.archivedAt)

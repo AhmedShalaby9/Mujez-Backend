@@ -39,6 +39,8 @@ export function companyDto(c: any) {
     phone: c.phone,
     website: c.website,
     hrEnabled: c.hr_enabled,
+    financeEnabled: c.finance_enabled,
+    aiEnabled: c.ai_enabled,
     plan: c.subscription_plan ?? c.selected_plan,
     status: c.status,
     statusReason: c.status_reason ?? null,
@@ -151,7 +153,7 @@ export class CompaniesService {
         const id = randomUUID();
         const row = (
           await c.query(
-            `INSERT INTO platform.companies(id,public_id,slug,name,company_type,city,admin_email,phone,website,selected_plan,status,country,address,company_email,tax_number,cr_number,owner_profile,hr_enabled) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+            `INSERT INTO platform.companies(id,public_id,slug,name,company_type,city,admin_email,phone,website,selected_plan,status,country,address,company_email,tax_number,cr_number,owner_profile,hr_enabled,finance_enabled,ai_enabled) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
             [
               id,
               "MJ-" + id.toUpperCase(),
@@ -162,7 +164,7 @@ export class CompaniesService {
               input.adminEmail.toLowerCase(),
               input.phone,
               input.website,
-              input.plan,
+              input.customContract ? "custom" : input.plan,
               input.country ?? "EG",
               input.address ?? "",
               input.companyEmail ?? null,
@@ -170,6 +172,8 @@ export class CompaniesService {
               input.crNumber ?? "",
               input.owner ?? {},
               input.hrEnabled ?? false,
+              input.financeEnabled ?? false,
+              input.aiEnabled ?? false,
             ],
           )
         ).rows[0];
@@ -373,6 +377,10 @@ export class CompaniesService {
     }
   }
   update(id: string, input: CompanyUpdate, actor: string) {
+    if (input.customContract)
+      throw new BadRequestException(
+        "Edit subscription terms from Subscriptions",
+      );
     return this.change(
       id,
       input.version,
@@ -383,7 +391,7 @@ export class CompaniesService {
           throw new ConflictException("Archived company is read-only");
         return (
           await c.query(
-            `UPDATE platform.companies SET slug=$2,name=$3,company_type=$4,city=$5,admin_email=$6,phone=$7,website=$8,selected_plan=$9,country=coalesce($10,country),address=coalesce($11,address),company_email=coalesce($12,company_email),tax_number=coalesce($13,tax_number),cr_number=coalesce($14,cr_number),hr_enabled=coalesce($15,hr_enabled),updated_at=now(),version=version+1 WHERE id=$1 RETURNING *`,
+            `UPDATE platform.companies SET slug=$2,name=$3,company_type=$4,city=$5,admin_email=$6,phone=$7,website=$8,selected_plan=$9,country=coalesce($10,country),address=coalesce($11,address),company_email=coalesce($12,company_email),tax_number=coalesce($13,tax_number),cr_number=coalesce($14,cr_number),hr_enabled=coalesce($15,hr_enabled),finance_enabled=coalesce($16,finance_enabled),ai_enabled=coalesce($17,ai_enabled),updated_at=now(),version=version+1 WHERE id=$1 RETURNING *`,
             [
               b.id,
               input.slug,
@@ -400,6 +408,8 @@ export class CompaniesService {
               input.taxNumber ?? null,
               input.crNumber ?? null,
               input.hrEnabled ?? null,
+              input.financeEnabled ?? null,
+              input.aiEnabled ?? null,
             ],
           )
         ).rows[0];
