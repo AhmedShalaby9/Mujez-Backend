@@ -629,6 +629,74 @@
         "tags": ["DemoRequests"]
       }
     },
+    "/admin/api/v1/cities": {
+      "get": {
+        "operationId": "CitiesController_list",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Cities"]
+      },
+      "post": {
+        "operationId": "CitiesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CityInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Cities"]
+      }
+    },
+    "/admin/api/v1/cities/{id}": {
+      "post": {
+        "operationId": "CitiesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CityUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Cities"]
+      }
+    },
+    "/admin/api/v1/cities/{id}/archive": {
+      "post": {
+        "operationId": "CitiesController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CityArchive" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Cities"]
+      }
+    },
     "/api/v1/office/options": {
       "get": {
         "operationId": "OfficeController_options",
@@ -7537,6 +7605,9 @@
         },
         "required": ["version", "status"]
       },
+      "CityInput": { "type": "object", "properties": {} },
+      "CityUpdate": { "type": "object", "properties": {} },
+      "CityArchive": { "type": "object", "properties": {} },
       "OfficeWrite": {
         "type": "object",
         "properties": {

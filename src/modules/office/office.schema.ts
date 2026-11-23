@@ -62,8 +62,18 @@ export const propertySchema = z
   .object({
     title: text.min(2),
     ownerName: text.min(2),
-    ownerPhones: z.array(text.min(8)).min(1).max(4),
-    city: text.min(2),
+    ownerPhones: z
+      .array(
+        z
+          .string()
+          .regex(
+            /^\+20[1-9][0-9]{8,9}$/,
+            "Enter one Egyptian phone number with +20",
+          ),
+      )
+      .length(1),
+    city: text.min(2).optional(),
+    cityId: z.uuid().optional(),
     areaName: text.min(2),
     address: text.min(2),
     type: z.enum([

@@ -234,6 +234,11 @@ export class OfficeService {
   async options(p: Principal) {
     await this.access(p);
     return this.db.tenant(p.companyId!, async (c) => ({
+      cities: (
+        await c.query(
+          `SELECT id,name_en AS "nameEn",name_ar AS "nameAr",archived FROM platform.cities ORDER BY name_en,id`,
+        )
+      ).rows,
       staff: (
         await c.query(
           "SELECT u.id,u.name FROM tenant.users u LEFT JOIN platform.team_employee_status a ON a.company_id=u.company_id AND a.user_id=u.id WHERE u.company_id=$1 AND u.status='active' AND u.deleted_at IS NULL AND (u.identity_pool='company_admin' OR a.status='active') AND EXISTS(SELECT 1 FROM tenant.roles r WHERE r.company_id=u.company_id AND 'leads.read'=ANY(r.permissions) AND (r.id=u.role_id OR EXISTS(SELECT 1 FROM tenant.user_additional_roles ar WHERE ar.company_id=u.company_id AND ar.user_id=u.id AND ar.role_id=r.id))) ORDER BY u.name LIMIT 1000",
@@ -369,6 +374,14 @@ export class OfficeService {
         !(await this.team(c, p))
       )
         throw new ForbiddenException();
+      const city = (
+        await c.query(
+          "SELECT * FROM platform.cities WHERE ($1::uuid IS NOT NULL AND id=$1) OR ($1::uuid IS NULL AND lower($2::text) IN (lower(name_en),lower(name_ar))) LIMIT 1",
+          [x.cityId ?? null, x.city ?? ""],
+        )
+      ).rows[0];
+      if (!city || (city.archived && r?.data.cityId !== city.id))
+        throw new BadRequestException("Choose an available city");
       const phones = x.ownerPhones.map(normalizePhone);
       const dup = (
         await c.query(
@@ -386,6 +399,8 @@ export class OfficeService {
         });
       const { responsibleId, status, duplicateReason, ...data } = x;
       data.ownerPhones = phones;
+      data.cityId = city.id;
+      data.city = city.name_en;
       const next = r?.status ?? "available";
       if (
         ["booked", "rented", "sold"].includes(next) &&
@@ -520,12 +535,13 @@ export class OfficeService {
             if ((q as any)[key] !== undefined)
               add(`${expr}${op}?`, (q as any)[key]);
           if (view === "properties") {
-            for (const key of ["city", "finish"] as const)
-              if (q[key])
-                add(
-                  `x.data->>'${key}' ILIKE ?`,
-                  "%" + q[key]!.replace(/[\\%_]/g, "\\$&") + "%",
-                );
+            if (q.city)
+              add("(x.data->>'cityId'=? OR x.data->>'city' ILIKE ?)", q.city);
+            if (q.finish)
+              add(
+                "x.data->>'finish' ILIKE ?",
+                "%" + q.finish.replace(/[\\%_]/g, "\\$&") + "%",
+              );
             if (q.createdBy) add("x.created_by=?", q.createdBy);
             if (q.verifiedBefore)
               add("(x.data->>'verifiedOn')::date<=?::date", q.verifiedBefore);

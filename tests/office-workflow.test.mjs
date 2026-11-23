@@ -33,7 +33,7 @@ async function employee(name, role = "agent") {
 const property = (more = {}) => ({
   title: "Apartment " + ++seq,
   ownerName: "Property Owner",
-  ownerPhones: ["+12025550100"],
+  ownerPhones: ["+201000000100"],
   city: "Cairo",
   areaName: "Maadi",
   address: "Street " + seq,
@@ -553,4 +553,70 @@ test("lease batches advance past already-notified rentals without starving remai
   assert.equal(await delivered(), 501);
   await runOfficeSweep(h.database);
   assert.equal(await delivered(), 501);
+});
+
+test("cities are selected from the managed directory, deleted cities cannot be newly chosen, and only one Egyptian owner phone is accepted", async () => {
+  h.state.principal = owner;
+  const options = (await h.get("office/options")).body;
+  const cairo = options.cities.find((c) => c.nameEn === "Cairo");
+  assert.ok(cairo);
+  await h.post(
+    "office/properties",
+    req(property({ ownerPhones: ["+12025550100"] })),
+    400,
+  );
+  await h.post(
+    "office/properties",
+    req(property({ ownerPhones: ["+201000000100", "+201000000101"] })),
+    400,
+  );
+  await h.post(
+    "office/properties",
+    req(property({ city: "Invented city" })),
+    400,
+  );
+  const saved = await createProperty({ cityId: cairo.id, city: undefined });
+  assert.equal(saved.data.cityId, cairo.id);
+  assert.equal(saved.data.city, "Cairo");
+  const filter = (await h.get("office/properties?city=" + cairo.id)).body;
+  assert.ok(filter.items.some((x) => x.id === saved.id));
+  const deleted = (
+    await h.db.query(
+      "INSERT INTO platform.cities(name_en,name_ar,archived) VALUES('Deleted town','مدينة محذوفة',true) RETURNING id",
+    )
+  ).rows[0];
+  await h.post("office/properties", req(property({ cityId: deleted.id })), 400);
+  await h.post(
+    "office/properties/" + saved.id,
+    req({ ...saved.data, title: saved.title, cityId: cairo.id }, saved.version),
+  );
+});
+test("office invitations and role edits accept only sales and team leads without changing brokerage roles", async () => {
+  h.state.principal = owner;
+  for (const role of [
+    "hr_manager",
+    "employee",
+    "accountant",
+    "finance_manager",
+  ])
+    await h.post(
+      "team/invite",
+      {
+        name: "Office blocked role",
+        email: randomUUID() + "@example.test",
+        role,
+      },
+      400,
+    );
+  const account = (
+    await h.db.query(
+      "SELECT id FROM platform.company_employee_accounts WHERE company_id=$1 AND user_id=$2",
+      [owner.companyId, a.id],
+    )
+  ).rows[0];
+  await h.post(
+    "team/" + account.id + "/roles",
+    { roles: ["agent", "hr_manager"], version: 0 },
+    400,
+  );
 });

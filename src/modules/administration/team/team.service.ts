@@ -114,6 +114,25 @@ export class TeamService {
     )
       throw new ForbiddenException("Only the company owner can assign roles");
   }
+  private async officeRoles(p: Principal, roles: TeamRole[]) {
+    const office = await this.db.platform(
+      async (c) =>
+        (
+          await c.query(
+            "SELECT 1 FROM platform.companies WHERE id=$1 AND company_type='real_estate_office'",
+            [p.companyId],
+          )
+        ).rowCount,
+    );
+    if (
+      office &&
+      (!roles.length || roles.some((r) => !["agent", "team_lead"].includes(r)))
+    )
+      throw new BadRequestException(
+        "Real estate offices can assign only Sales Agent and Team Lead",
+      );
+    return !!office;
+  }
   async changeRole(p: Principal, accountId: string, role: TeamRole) {
     return this.changeRoles(p, accountId, [role], undefined, true);
   }
@@ -126,6 +145,7 @@ export class TeamService {
   ) {
     this.owner(p);
     await this.sales.access(p, "team.manage");
+    const office = await this.officeRoles(p, selected);
     const account = (
       await this.db.platform((c) =>
         c.query(
@@ -149,6 +169,7 @@ export class TeamService {
       const roles = [
         ...new Set([
           ...selected,
+          ...(office && user.roles.includes("employee") ? ["employee"] : []),
           ...(legacy
             ? user.roles.filter(
                 (r: string) => !["agent", "team_lead"].includes(r),
@@ -418,6 +439,7 @@ export class TeamService {
     if ((input.role && input.roles) || (!input.role && !input.roles))
       throw new BadRequestException("Provide either role or roles");
     const roles = input.roles ?? [input.role!];
+    await this.officeRoles(p, roles);
     await this.sales.access(p, "team.manage");
     return this.db
       .platform(async (c) => {
