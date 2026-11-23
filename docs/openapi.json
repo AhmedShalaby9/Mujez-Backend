@@ -629,31 +629,31 @@
         "tags": ["DemoRequests"]
       }
     },
-    "/admin/api/v1/cities": {
+    "/api/v1/office/cities": {
       "get": {
-        "operationId": "CitiesController_list",
+        "operationId": "OfficeController_cities",
         "parameters": [],
         "responses": { "200": { "description": "" } },
-        "tags": ["Cities"]
+        "tags": ["Office"]
       },
       "post": {
-        "operationId": "CitiesController_create",
+        "operationId": "OfficeController_createCity",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CityInput" }
+              "schema": { "$ref": "#/components/schemas/OfficeWrite" }
             }
           }
         },
         "responses": { "201": { "description": "" } },
-        "tags": ["Cities"]
+        "tags": ["Office"]
       }
     },
-    "/admin/api/v1/cities/{id}": {
+    "/api/v1/office/cities/{id}": {
       "post": {
-        "operationId": "CitiesController_update",
+        "operationId": "OfficeController_updateCity",
         "parameters": [
           {
             "name": "id",
@@ -666,17 +666,17 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CityUpdate" }
+              "schema": { "$ref": "#/components/schemas/OfficeWrite" }
             }
           }
         },
         "responses": { "201": { "description": "" } },
-        "tags": ["Cities"]
+        "tags": ["Office"]
       }
     },
-    "/admin/api/v1/cities/{id}/archive": {
+    "/api/v1/office/cities/{id}/archive": {
       "post": {
-        "operationId": "CitiesController_archive",
+        "operationId": "OfficeController_archiveCity",
         "parameters": [
           {
             "name": "id",
@@ -689,12 +689,12 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CityArchive" }
+              "schema": { "$ref": "#/components/schemas/OfficeWrite" }
             }
           }
         },
         "responses": { "201": { "description": "" } },
-        "tags": ["Cities"]
+        "tags": ["Office"]
       }
     },
     "/api/v1/office/options": {
@@ -7605,9 +7605,6 @@
         },
         "required": ["version", "status"]
       },
-      "CityInput": { "type": "object", "properties": {} },
-      "CityUpdate": { "type": "object", "properties": {} },
-      "CityArchive": { "type": "object", "properties": {} },
       "OfficeWrite": {
         "type": "object",
         "properties": {

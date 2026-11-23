@@ -97,6 +97,10 @@ before(async () => {
     "UPDATE platform.companies SET company_type='real_estate_office',finance_enabled=false,ai_enabled=false WHERE id=$1",
     [owner.companyId],
   );
+  await h.db.query(
+    "INSERT INTO tenant.office_cities(company_id,name_en,name_ar) VALUES($1,'Cairo','القاهرة')",
+    [owner.companyId],
+  );
   owner.permissions.push("team.read", "team.manage");
   a = await employee("OfficeAlice");
   b = await employee("OfficeBob");
@@ -582,7 +586,8 @@ test("cities are selected from the managed directory, deleted cities cannot be n
   assert.ok(filter.items.some((x) => x.id === saved.id));
   const deleted = (
     await h.db.query(
-      "INSERT INTO platform.cities(name_en,name_ar,archived) VALUES('Deleted town','مدينة محذوفة',true) RETURNING id",
+      "INSERT INTO tenant.office_cities(company_id,name_en,name_ar,archived) VALUES($1,'Deleted town','مدينة محذوفة',true) RETURNING id",
+      [owner.companyId],
     )
   ).rows[0];
   await h.post("office/properties", req(property({ cityId: deleted.id })), 400);

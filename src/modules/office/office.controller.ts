@@ -26,6 +26,29 @@ import { OfficeWrite } from "./office.dto.js";
 @Controller("api/v1/office")
 export class OfficeController {
   constructor(private readonly s: OfficeService) {}
+  @Get("cities") cities(
+    @Req() r: AuthRequest,
+    @Query() q: Record<string, string>,
+  ) {
+    return this.s.cities(r.principal, q);
+  }
+  @Post("cities") createCity(@Req() r: AuthRequest, @Body() b: OfficeWrite) {
+    return this.s.saveCity(r.principal, b);
+  }
+  @Post("cities/:id") updateCity(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: OfficeWrite,
+  ) {
+    return this.s.saveCity(r.principal, b, id);
+  }
+  @Post("cities/:id/archive") archiveCity(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: OfficeWrite,
+  ) {
+    return this.s.saveCity(r.principal, b, id, true);
+  }
   @Get("options") options(@Req() r: AuthRequest) {
     return this.s.options(r.principal);
   }

@@ -231,12 +231,130 @@ export class OfficeService {
       booking,
     };
   }
+  private async cityOwner(p: Principal) {
+    await this.access(p);
+    if (
+      p.pool !== "company_admin" ||
+      p.role !== "company_owner" ||
+      p.scope !== "company" ||
+      p.workspace
+    )
+      throw new ForbiddenException(
+        "Only the office owner can manage its cities",
+      );
+  }
+  async cities(p: Principal, q: Record<string, string>) {
+    await this.cityOwner(p);
+    const v = parse(
+      z
+        .object({
+          q: z.string().trim().max(100).default(""),
+          archived: z.enum(["true", "false", "all"]).default("false"),
+        })
+        .strict(),
+      q,
+    );
+    return this.db.tenant(p.companyId!, async (c) => ({
+      items: (
+        await c.query(
+          `SELECT id,name_en AS "nameEn",name_ar AS "nameAr",archived,version FROM tenant.office_cities WHERE company_id=$1 AND ($2='all' OR archived=($2='true')) AND ($3='' OR strpos(lower(name_en||' '||name_ar),lower($3))>0) ORDER BY name_en,id`,
+          [p.companyId, v.archived, v.q],
+        )
+      ).rows,
+    }));
+  }
+  async saveCity(p: Principal, b: OfficeWrite, id?: string, archive = false) {
+    await this.cityOwner(p);
+    const x = archive
+      ? parse(z.object({ archived: z.boolean() }).strict(), b.data)
+      : parse(
+          z
+            .object({
+              nameEn: z.string().trim().min(2).max(100),
+              nameAr: z.string().trim().min(2).max(100),
+            })
+            .strict(),
+          b.data,
+        );
+    try {
+      return await this.write(
+        p,
+        "city:" + (archive ? "archive:" : "save:") + (id ?? "new"),
+        b,
+        async (c) => {
+          const old = id
+            ? (
+                await c.query(
+                  "SELECT * FROM tenant.office_cities WHERE company_id=$1 AND id=$2 FOR UPDATE",
+                  [p.companyId, id],
+                )
+              ).rows[0]
+            : null;
+          if (id && !old) throw new NotFoundException("City not found");
+          if (old) this.version(old, b.version);
+          let row;
+          if (archive)
+            row = (
+              await c.query(
+                "UPDATE tenant.office_cities SET archived=$3,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2 RETURNING *",
+                [p.companyId, id, (x as any).archived],
+              )
+            ).rows[0];
+          else if (old)
+            row = (
+              await c.query(
+                "UPDATE tenant.office_cities SET name_en=$3,name_ar=$4,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2 RETURNING *",
+                [p.companyId, id, (x as any).nameEn, (x as any).nameAr],
+              )
+            ).rows[0];
+          else
+            row = (
+              await c.query(
+                "INSERT INTO tenant.office_cities(company_id,name_en,name_ar) VALUES($1,$2,$3) RETURNING *",
+                [p.companyId, (x as any).nameEn, (x as any).nameAr],
+              )
+            ).rows[0];
+          await this.event(
+            c,
+            p,
+            archive
+              ? row.archived
+                ? "city.archived"
+                : "city.restored"
+              : old
+                ? "city.updated"
+                : "city.created",
+            row.id,
+            {
+              nameEn: row.name_en,
+              nameAr: row.name_ar,
+              archived: row.archived,
+            },
+          );
+          return {
+            id: row.id,
+            nameEn: row.name_en,
+            nameAr: row.name_ar,
+            archived: row.archived,
+            version: row.version,
+          };
+        },
+      );
+    } catch (e: any) {
+      if (e.code === "23505")
+        throw new ConflictException(
+          "This city already exists in your office, including deleted cities; restore it instead",
+        );
+      throw e;
+    }
+  }
   async options(p: Principal) {
     await this.access(p);
     return this.db.tenant(p.companyId!, async (c) => ({
       cities: (
         await c.query(
-          `SELECT id,name_en AS "nameEn",name_ar AS "nameAr",archived FROM platform.cities ORDER BY name_en,id`,
+          `SELECT id,name_en AS "nameEn",name_ar AS "nameAr",archived FROM tenant.office_cities WHERE company_id=$1 ORDER BY name_en,id`,
+          [p.companyId],
         )
       ).rows,
       staff: (
@@ -376,8 +494,8 @@ export class OfficeService {
         throw new ForbiddenException();
       const city = (
         await c.query(
-          "SELECT * FROM platform.cities WHERE ($1::uuid IS NOT NULL AND id=$1) OR ($1::uuid IS NULL AND lower($2::text) IN (lower(name_en),lower(name_ar))) LIMIT 1",
-          [x.cityId ?? null, x.city ?? ""],
+          "SELECT * FROM tenant.office_cities WHERE company_id=$1 AND (($2::uuid IS NOT NULL AND id=$2) OR ($2::uuid IS NULL AND lower($3::text) IN (lower(name_en),lower(name_ar)))) LIMIT 1 FOR SHARE",
+          [p.companyId, x.cityId ?? null, x.city ?? ""],
         )
       ).rows[0];
       if (!city || (city.archived && r?.data.cityId !== city.id))
@@ -424,16 +542,24 @@ export class OfficeService {
       if (r)
         result = (
           await c.query(
-            "UPDATE tenant.office_properties SET title=$3,data=$4,responsible_id=$5,status=$6,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2 RETURNING *",
-            [p.companyId, id, x.title, data, responsible, status ?? next],
+            "UPDATE tenant.office_properties SET title=$3,data=$4,responsible_id=$5,status=$6,city_id=$7,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2 RETURNING *",
+            [
+              p.companyId,
+              id,
+              x.title,
+              data,
+              responsible,
+              status ?? next,
+              city.id,
+            ],
           )
         ).rows[0];
       else {
         await this.cap(c, p, "office_properties");
         result = (
           await c.query(
-            "INSERT INTO tenant.office_properties(company_id,code,title,data,responsible_id,created_by) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",
-            [p.companyId, ref("OP"), x.title, data, responsible, p.id],
+            "INSERT INTO tenant.office_properties(company_id,code,title,data,responsible_id,created_by,city_id) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+            [p.companyId, ref("OP"), x.title, data, responsible, p.id, city.id],
           )
         ).rows[0];
       }
