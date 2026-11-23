@@ -149,7 +149,7 @@ export class WorkspaceService {
     return this.db.platform(async (c) => {
       const row = (
         await c.query(
-          `SELECT s.*,co.id AS co_uuid,co.public_id,co.slug,co.name AS co_name,co.status AS co_status
+          `SELECT s.*,co.id AS co_uuid,co.public_id,co.slug,co.name AS co_name,co.status AS co_status,co.company_type
            FROM platform.workspace_sessions s JOIN platform.companies co ON co.id=s.company_id
            WHERE s.digest=$1 AND s.ended_at IS NULL`,
           [digest(token)],
@@ -213,6 +213,7 @@ export class WorkspaceService {
           company: {
             id: row.public_id,
             uuid: row.co_uuid,
+            type: row.company_type,
             slug: row.slug,
             name: row.co_name,
             status: row.co_status,

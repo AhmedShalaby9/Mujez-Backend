@@ -1,3 +1,4 @@
+import { OfficeModule } from "./modules/office/office.module.js";
 import { AccountingModule } from "./modules/finance/accounting/accounting.module.js";
 import { HrModule } from "./modules/hr/hr.module.js";
 import { UnitRecommendationsModule } from "./modules/sales/recommendations/recommendations.module.js";
@@ -35,6 +36,7 @@ import { PlatformHealthModule } from "./modules/platform/health/health.module.js
 import { PlatformWorkspaceModule } from "./modules/platform/workspace/workspace.module.js";
 
 export const DOMAIN_MODULES = [
+  OfficeModule,
   AccountingModule,
   HrModule,
   UnitRecommendationsModule,

@@ -298,7 +298,7 @@ export class SessionService {
       async (c) =>
         (
           await c.query(
-            `SELECT a.*,co.public_id,co.slug,co.name AS company_name,co.hr_enabled,co.finance_enabled,co.ai_enabled,co.status AS company_status FROM platform.company_employee_sessions s JOIN platform.company_employee_accounts a ON a.id=s.account_id JOIN platform.companies co ON co.id=a.company_id WHERE s.digest=$1 AND s.expires_at>now() AND a.status='active'`,
+            `SELECT a.*,co.public_id,co.slug,co.name AS company_name,co.hr_enabled,co.finance_enabled,co.ai_enabled,co.company_type,co.status AS company_status FROM platform.company_employee_sessions s JOIN platform.company_employee_accounts a ON a.id=s.account_id JOIN platform.companies co ON co.id=a.company_id WHERE s.digest=$1 AND s.expires_at>now() AND a.status='active'`,
             [digest(token)],
           )
         ).rows[0],
@@ -317,6 +317,7 @@ export class SessionService {
         hrEnabled: a.hr_enabled,
         financeEnabled: a.finance_enabled,
         aiEnabled: a.ai_enabled,
+        type: a.company_type,
       },
     };
   }
@@ -390,7 +391,7 @@ export class SessionService {
       async (c) =>
         (
           await c.query(
-            `SELECT a.*,p.must_change_password,p.temporary_expires_at,co.public_id,co.slug,co.name AS company_name,co.hr_enabled,co.finance_enabled,co.ai_enabled,co.status AS company_status FROM platform.company_owner_sessions s JOIN platform.company_owner_accounts a ON a.id=s.account_id JOIN platform.company_owner_credentials p ON p.account_id=a.id JOIN platform.companies co ON co.id=a.company_id WHERE s.digest=$1 AND s.expires_at>now() AND a.status='active'`,
+            `SELECT a.*,p.must_change_password,p.temporary_expires_at,co.public_id,co.slug,co.name AS company_name,co.hr_enabled,co.finance_enabled,co.ai_enabled,co.company_type,co.status AS company_status FROM platform.company_owner_sessions s JOIN platform.company_owner_accounts a ON a.id=s.account_id JOIN platform.company_owner_credentials p ON p.account_id=a.id JOIN platform.companies co ON co.id=a.company_id WHERE s.digest=$1 AND s.expires_at>now() AND a.status='active'`,
             [digest(token)],
           )
         ).rows[0],
@@ -415,6 +416,7 @@ export class SessionService {
         hrEnabled: a.hr_enabled,
         financeEnabled: a.finance_enabled,
         aiEnabled: a.ai_enabled,
+        type: a.company_type,
       },
     };
   }

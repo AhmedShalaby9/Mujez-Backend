@@ -34,6 +34,7 @@ export interface Principal {
     company: {
       id: string;
       uuid: string;
+      type?: string;
       slug: string;
       name: { en: string; ar: string };
       status: string;

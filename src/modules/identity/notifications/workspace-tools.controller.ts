@@ -48,7 +48,50 @@ export class WorkspaceToolsController {
       q = raw.trim();
     if (q.length < 2 || q.length > 100)
       throw new BadRequestException("Search must be 2–100 characters");
+    const office = await this.db.platform(
+      async (pc) =>
+        (
+          await pc.query(
+            "SELECT 1 FROM platform.companies WHERE id=$1 AND company_type='real_estate_office'",
+            [p.companyId],
+          )
+        ).rowCount,
+    );
     return this.db.tenant(p.companyId!, async (c) => {
+      if (office) {
+        const items: any[] = [];
+        const pattern = "%" + q.replace(/[\\%_]/g, "\\$&") + "%";
+        if (p.permissions.includes("leads.read")) {
+          const r = await c.query(
+            `SELECT id,name FROM tenant.office_clients WHERE company_id=$1 AND concat_ws(' ',name,phone,code) ILIKE $2 ${p.scope === "company" ? "" : "AND owner_id=$3"} ORDER BY updated_at DESC LIMIT 10`,
+            p.scope === "company"
+              ? [p.companyId, pattern]
+              : [p.companyId, pattern, p.id],
+          );
+          items.push(
+            ...r.rows.map((x) => ({
+              ...x,
+              type: "office_client",
+              route: "/company/office/clients?clientId=" + x.id,
+            })),
+          );
+        }
+        if (p.permissions.includes("units.read")) {
+          const r = await c.query(
+            "SELECT id,title AS name FROM tenant.office_properties WHERE company_id=$1 AND concat_ws(' ',title,code,data->>'address') ILIKE $2 ORDER BY updated_at DESC LIMIT 10",
+            [p.companyId, pattern],
+          );
+          items.push(
+            ...r.rows.map((x) => ({
+              ...x,
+              type: "office_property",
+              route: "/company/office/properties?propertyId=" + x.id,
+            })),
+          );
+        }
+        return { items };
+      }
+
       const items: any[] = [];
       const pattern = "%" + q.replace(/[\\%_]/g, "\\$&") + "%";
       for (const [table, permission, name, owner, route, key] of [

@@ -1,3 +1,4 @@
+import { runOfficeSweep } from "../../office/office-sweep.js";
 import { runFinanceAutomation } from "./finance-automation-sweep.js";
 import "reflect-metadata";
 import { writeFile } from "node:fs/promises";
@@ -18,10 +19,18 @@ async function main() {
     await db.ready();
     while (!stopping) {
       try {
+        let office: unknown;
+        try {
+          office = await runOfficeSweep(db, () => stopping);
+        } catch {
+          office = { failed: true };
+          console.error(JSON.stringify({ event: "office.lease_sweep_failed" }));
+        }
         const automation = await runFinanceAutomation(db, () => stopping);
         const result = {
           ...(await runFinanceSweep(db, () => stopping)),
           automation,
+          office,
         };
         await db.platform((c) =>
           c.query(
