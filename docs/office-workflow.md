@@ -46,3 +46,11 @@ New offices start with no cities. Migration072 copies only cities referenced by 
 Property forms submit a city ID resolved by the server within the company. Filters accept the stable ID. Owner phones accept exactly one Egyptian number (`+20` followed by9–10 national digits, without a leading zero). The form uses a fixed +20 prefix and a single telephone input. Historical phone arrays are not truncated by migrations.
 
 Office Team invitations and explicit role changes accept only Sales Agent and Team Lead. An existing Employee role remains internal when editing sales roles; other company types retain full role selection. Existing accounts are not bulk modified.
+
+## Tasks, calendar and contacts
+
+Real estate offices retain the shared Tasks, Calendar and Contacts screens at `/company/tasks`, `/company/calendar` and `/company/contacts`. Contacts keep their existing company isolation and personal ownership. The office Contacts route is no longer redirected to Clients.
+
+In office workspaces the existing task/event `leadId` field selects an office client; it is persisted in a separate `office_client_id` column with a composite company foreign key, never inserted into the brokerage lead foreign key. Responses retain the compatible `lead` shape with bilingual name and `kind: office_client`. The UI opens `/company/office/clients?clientId=...`. Brokerage workspaces retain their original lead links. Generic unlinked work is available in either workspace, while linked work is scoped to the active workspace family.
+
+Sales see their assigned tasks and owned events and link only their accessible clients/contacts. Current team leads see their active team's work and may assign tasks/events to current team members. Linked client work assigned to another user must match that client's responsible salesperson. Every read/write rechecks current team membership and versions within the transaction. When a client/contact moves outside a viewer's scope, task/event responses hide its live identity/link, including search and picker results. Calendar contact choices respect existing personal contact ownership. Existing task status, event status, idempotency, audit and subscription rules remain in effect.

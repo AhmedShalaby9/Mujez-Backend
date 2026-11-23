@@ -1,4 +1,10 @@
 import {
+  isOfficeCompany,
+  officeMembers,
+  officeRelatedRow,
+  officeClientLink,
+} from "../office-links.js";
+import {
   Injectable,
   NotFoundException,
   ConflictException,
@@ -17,7 +23,7 @@ import {
   type EventUpdate,
   type EventStatus,
 } from "./calendar.dto.js";
-const SELECT = `SELECT e.*,u.name AS owner_name,ct.public_id AS contact_ref,ct.name AS contact_name,l.public_id AS lead_ref,l.name AS lead_name FROM tenant.events e LEFT JOIN tenant.users u ON u.company_id=e.company_id AND u.id=e.owner_user_id LEFT JOIN tenant.contacts ct ON ct.company_id=e.company_id AND ct.id=e.contact_id LEFT JOIN tenant.leads l ON l.company_id=e.company_id AND l.id=e.lead_id`;
+const SELECT = `SELECT e.*,u.name AS owner_name,ct.public_id AS contact_ref,ct.name AS contact_name,l.public_id AS lead_ref,l.name AS lead_name,ct.owner_user_id AS contact_owner,oc.code AS office_client_ref,oc.name AS office_client_name,oc.owner_id AS office_client_owner FROM tenant.events e LEFT JOIN tenant.users u ON u.company_id=e.company_id AND u.id=e.owner_user_id LEFT JOIN tenant.contacts ct ON ct.company_id=e.company_id AND ct.id=e.contact_id LEFT JOIN tenant.leads l ON l.company_id=e.company_id AND l.id=e.lead_id LEFT JOIN tenant.office_clients oc ON oc.company_id=e.company_id AND oc.id=e.office_client_id`;
 const iso = (v: any) => (v ? new Date(v).toISOString() : null);
 export function eventDto(e: any) {
   return {
@@ -31,9 +37,16 @@ export function eventDto(e: any) {
     contact: e.contact_id
       ? { id: e.contact_id, reference: e.contact_ref, name: e.contact_name }
       : null,
-    lead: e.lead_id
-      ? { id: e.lead_id, reference: e.lead_ref, name: e.lead_name }
-      : null,
+    lead: e.office_client_id
+      ? {
+          id: e.office_client_id,
+          reference: e.office_client_ref,
+          name: { en: e.office_client_name, ar: e.office_client_name },
+          kind: "office_client",
+        }
+      : e.lead_id
+        ? { id: e.lead_id, reference: e.lead_ref, name: e.lead_name }
+        : null,
     owner: e.owner_user_id ? { id: e.owner_user_id, name: e.owner_name } : null,
     notes: e.notes,
     status: e.status,
@@ -50,7 +63,13 @@ export class CalendarService {
     private readonly db: DatabaseService,
     private readonly sales: SalesService,
   ) {}
-  async row(c: PoolClient, p: Principal, id: string, lock = false) {
+  async row(
+    c: PoolClient,
+    p: Principal,
+    id: string,
+    lock = false,
+    office = false,
+  ) {
     const row = (
       await c.query(
         SELECT +
@@ -59,12 +78,49 @@ export class CalendarService {
         [p.companyId, id],
       )
     ).rows[0];
-    if (!row || (p.scope === "own" && row.owner_user_id !== p.id))
+    const members = office ? await officeMembers(c, p) : null;
+    if (
+      !row ||
+      (office
+        ? row.lead_id !== null ||
+          (members !== null && !members.includes(row.owner_user_id))
+        : !!row.office_client_id ||
+          (p.scope === "own" && row.owner_user_id !== p.id))
+    )
       throw new NotFoundException("Event not found");
-    return row;
+    return office ? officeRelatedRow(row, members, p) : row;
   }
   async options(p: Principal) {
     await this.sales.access(p, "calendar.read");
+    if (await isOfficeCompany(this.db, p))
+      return this.db.tenant(p.companyId!, async (c) => {
+        const members = await officeMembers(c, p);
+        return {
+          owners: (
+            await c.query(
+              "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL AND ($2::uuid[] IS NULL OR id=ANY($2::uuid[])) AND role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND 'leads.read'=ANY(permissions)) ORDER BY name,id LIMIT 1000",
+              [p.companyId, members],
+            )
+          ).rows,
+          contacts: p.permissions.includes("contacts.read")
+            ? (
+                await c.query(
+                  "SELECT id,public_id AS reference,name FROM tenant.contacts WHERE company_id=$1 AND archived_at IS NULL AND ($2::uuid IS NULL OR owner_user_id=$2) ORDER BY created_at DESC,id LIMIT 1000",
+                  [p.companyId, p.scope === "company" ? null : p.id],
+                )
+              ).rows
+            : [],
+          leads: p.permissions.includes("leads.read")
+            ? (
+                await c.query(
+                  "SELECT id,code AS reference,jsonb_build_object('en',name,'ar',name) AS name FROM tenant.office_clients WHERE company_id=$1 AND ($2::uuid[] IS NULL OR owner_id=ANY($2::uuid[])) ORDER BY created_at DESC,id LIMIT 1000",
+                  [p.companyId, members],
+                )
+              ).rows
+            : [],
+          canManage: p.permissions.includes("calendar.manage"),
+        };
+      });
     return this.db.tenant(p.companyId!, async (c) => ({
       owners: (
         await c.query(
@@ -93,6 +149,7 @@ export class CalendarService {
   }
   async list(p: Principal, q: EventQuery) {
     await this.sales.access(p, "calendar.read");
+    const office = await isOfficeCompany(this.db, p);
     const from = new Date(q.from),
       to = new Date(q.to);
     if (
@@ -108,7 +165,16 @@ export class CalendarService {
       async (c) => {
         const args: any[] = [p.companyId, from.toISOString(), to.toISOString()],
           where = ["e.company_id=$1", "e.starts_at<$3", "e.ends_at>$2"];
-        const own = ownWhere(p, args, "e.owner_user_id");
+        const members = office ? await officeMembers(c, p) : null;
+        if (office) {
+          where.push("e.lead_id IS NULL");
+          if (members !== null) {
+            args.push(members);
+            where.push("e.owner_user_id=ANY($" + args.length + "::uuid[])");
+          }
+        }
+        if (!office) where.push("e.office_client_id IS NULL");
+        const own = office ? "" : ownWhere(p, args, "e.owner_user_id");
         if (own) where.push(own);
         if (q.type) {
           args.push(q.type);
@@ -127,15 +193,22 @@ export class CalendarService {
             args,
           )
         ).rows;
-        return { items: rows.map(eventDto), from: q.from, to: q.to };
+        return {
+          items: rows.map((r) =>
+            eventDto(office ? officeRelatedRow(r, members, p) : r),
+          ),
+          from: q.from,
+          to: q.to,
+        };
       },
       true,
     );
   }
   async detail(p: Principal, id: string) {
     await this.sales.access(p, "calendar.read");
+    const office = await isOfficeCompany(this.db, p);
     return this.db.tenant(p.companyId!, async (c) =>
-      eventDto(await this.row(c, p, id)),
+      eventDto(await this.row(c, p, id, false, office)),
     );
   }
   check(row: any, version: number) {
@@ -152,7 +225,7 @@ export class CalendarService {
       endsAt: iso(e.ends_at),
       place: e.place,
       contactId: e.contact_id,
-      leadId: e.lead_id,
+      leadId: e.office_client_id ?? e.lead_id,
       ownerId: e.owner_user_id,
       status: e.status,
     };
@@ -183,7 +256,32 @@ export class CalendarService {
       leadId?: string | null;
       ownerId?: string | null;
     },
+    office = false,
   ) {
+    if (office) {
+      const members = await officeMembers(c, p);
+      if (b.ownerId && members !== null && !members.includes(b.ownerId))
+        throw new ForbiddenException("Assignment outside your team");
+      if (b.leadId) await officeClientLink(c, p, b.leadId, b.ownerId ?? p.id);
+      if (b.contactId) {
+        const contact = (
+          await c.query(
+            "SELECT owner_user_id FROM tenant.contacts WHERE company_id=$1 AND id=$2 AND archived_at IS NULL",
+            [p.companyId, b.contactId],
+          )
+        ).rows[0];
+        if (
+          !contact ||
+          (p.scope !== "company" && contact.owner_user_id !== p.id) ||
+          (b.ownerId &&
+            b.ownerId !== p.id &&
+            contact.owner_user_id !== b.ownerId)
+        )
+          throw new BadRequestException(
+            "Choose an accessible contact for this event owner",
+          );
+      }
+    }
     if (b.contactId) {
       if (!p.permissions.includes("contacts.read"))
         throw new BadRequestException(
@@ -201,7 +299,7 @@ export class CalendarService {
           "Choose an active contact from this company",
         );
     }
-    if (b.leadId) {
+    if (!office && b.leadId) {
       if (!p.permissions.includes("leads.read"))
         throw new BadRequestException(
           "Lead access is required to link an event",
@@ -218,7 +316,7 @@ export class CalendarService {
           "Choose an active lead from this company",
         );
     }
-    if (p.scope === "own" && b.ownerId && b.ownerId !== p.id)
+    if (!office && p.scope === "own" && b.ownerId && b.ownerId !== p.id)
       throw new ForbiddenException();
     if (
       b.ownerId &&
@@ -243,6 +341,7 @@ export class CalendarService {
     return { starts, ends };
   }
   async create(p: Principal, b: EventInput) {
+    const office = await isOfficeCompany(this.db, p);
     return this.sales.write(
       p,
       "calendar.manage",
@@ -251,15 +350,20 @@ export class CalendarService {
       async (c) => {
         const { starts, ends } = this.window(b);
         const ownerId = b.ownerId ?? p.id;
-        await this.validateLinks(c, p, {
-          contactId: b.contactId,
-          leadId: b.leadId,
-          ownerId,
-        });
+        await this.validateLinks(
+          c,
+          p,
+          {
+            contactId: b.contactId,
+            leadId: b.leadId,
+            ownerId,
+          },
+          office,
+        );
         const row = (
           await c.query(
-            `INSERT INTO tenant.events(company_id,public_id,type,title,starts_at,ends_at,place,contact_id,lead_id,owner_user_id,notes)
-           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+            `INSERT INTO tenant.events(company_id,public_id,type,title,starts_at,ends_at,place,contact_id,lead_id,owner_user_id,notes,office_client_id)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
             [
               p.companyId,
               "EV-" + randomBytes(6).toString("hex").toUpperCase(),
@@ -269,38 +373,45 @@ export class CalendarService {
               ends.toISOString(),
               b.place ?? "",
               b.contactId ?? null,
-              b.leadId ?? null,
+              office ? null : (b.leadId ?? null),
               ownerId,
               b.notes ?? "",
+              office ? (b.leadId ?? null) : null,
             ],
           )
         ).rows[0];
-        const fresh = await this.row(c, p, row.id);
+        const fresh = await this.row(c, p, row.id, false, office);
         await this.event(c, p, fresh, "event.created");
         return eventDto(fresh);
       },
     );
   }
   async update(p: Principal, id: string, b: EventUpdate) {
+    const office = await isOfficeCompany(this.db, p);
     return this.sales.write(
       p,
       "calendar.manage",
       "event.update:" + id,
       b,
       async (c) => {
-        const old = await this.row(c, p, id, true);
+        const old = await this.row(c, p, id, true, office);
         this.check(old, b.version);
         if (old.status !== "scheduled")
           throw new ConflictException("Reopen this event before editing it");
         const { starts, ends } = this.window(b);
         const ownerId = b.ownerId ?? old.owner_user_id;
-        await this.validateLinks(c, p, {
-          contactId: b.contactId,
-          leadId: b.leadId,
-          ownerId,
-        });
+        await this.validateLinks(
+          c,
+          p,
+          {
+            contactId: b.contactId,
+            leadId: b.leadId,
+            ownerId,
+          },
+          office,
+        );
         await c.query(
-          `UPDATE tenant.events SET type=$3,title=$4,starts_at=$5,ends_at=$6,place=$7,contact_id=$8,lead_id=$9,owner_user_id=$10,notes=$11,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2`,
+          `UPDATE tenant.events SET type=$3,title=$4,starts_at=$5,ends_at=$6,place=$7,contact_id=$8,lead_id=$9,owner_user_id=$10,notes=$11,office_client_id=$12,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2`,
           [
             p.companyId,
             id,
@@ -310,25 +421,27 @@ export class CalendarService {
             ends.toISOString(),
             b.place ?? "",
             b.contactId ?? null,
-            b.leadId ?? null,
+            office ? null : (b.leadId ?? null),
             ownerId,
             b.notes ?? "",
+            office ? (b.leadId ?? null) : null,
           ],
         );
-        const fresh = await this.row(c, p, id);
+        const fresh = await this.row(c, p, id, false, office);
         await this.event(c, p, fresh, "event.updated", old);
         return eventDto(fresh);
       },
     );
   }
   async status(p: Principal, id: string, b: EventStatus) {
+    const office = await isOfficeCompany(this.db, p);
     return this.sales.write(
       p,
       "calendar.manage",
       "event.status:" + id,
       b,
       async (c) => {
-        const old = await this.row(c, p, id, true);
+        const old = await this.row(c, p, id, true, office);
         this.check(old, b.version);
         const next = b.action === "reopen" ? "scheduled" : b.action;
         if (
@@ -343,7 +456,7 @@ export class CalendarService {
           "UPDATE tenant.events SET status=$3,outcome=$4,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
           [p.companyId, id, next, next === "done" ? (b.outcome ?? null) : null],
         );
-        const fresh = await this.row(c, p, id);
+        const fresh = await this.row(c, p, id, false, office);
         await this.event(c, p, fresh, "event." + next, old);
         return eventDto(fresh);
       },

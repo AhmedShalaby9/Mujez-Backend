@@ -1,4 +1,10 @@
 import {
+  isOfficeCompany,
+  officeMembers,
+  officeRelatedRow,
+  officeClientLink,
+} from "../office-links.js";
+import {
   Injectable,
   NotFoundException,
   ConflictException,
@@ -19,7 +25,7 @@ import {
   type TaskUpdate,
   type TaskStatus,
 } from "./tasks.dto.js";
-const SELECT = `SELECT t.*,t.due_date::text AS due_date,l.public_id AS lead_ref,l.name AS lead_name,l.segment AS lead_segment,l.archived_at AS lead_archived_at,u.name AS assignee_name,creator.name AS creator_name,finisher.name AS finisher_name FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id LEFT JOIN tenant.users creator ON creator.company_id=t.company_id AND creator.id=t.created_by LEFT JOIN tenant.users finisher ON finisher.company_id=t.company_id AND finisher.id=t.completed_by`;
+const SELECT = `SELECT t.*,t.due_date::text AS due_date,l.public_id AS lead_ref,l.name AS lead_name,l.segment AS lead_segment,l.archived_at AS lead_archived_at,oc.id AS office_client_ref_id,oc.code AS office_client_ref,oc.name AS office_client_name,oc.owner_id AS office_client_owner,u.name AS assignee_name,creator.name AS creator_name,finisher.name AS finisher_name FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.office_clients oc ON oc.company_id=t.company_id AND oc.id=t.office_client_id LEFT JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id LEFT JOIN tenant.users creator ON creator.company_id=t.company_id AND creator.id=t.created_by LEFT JOIN tenant.users finisher ON finisher.company_id=t.company_id AND finisher.id=t.completed_by`;
 const iso = (v: any) => (v ? new Date(v).toISOString() : null);
 export function taskGroup(due: string, today: string) {
   const delta =
@@ -68,15 +74,24 @@ export function taskDto(t: any, today: string) {
     reference: t.public_id,
     title: t.title,
     description: t.description,
-    lead: t.lead_id
+    lead: t.office_client_id
       ? {
-          id: t.lead_id,
-          reference: t.lead_ref,
-          name: t.lead_name,
-          segment: t.lead_segment,
-          archivedAt: iso(t.lead_archived_at),
+          id: t.office_client_id,
+          reference: t.office_client_ref,
+          name: { en: t.office_client_name, ar: t.office_client_name },
+          segment: "res",
+          archivedAt: null,
+          kind: "office_client",
         }
-      : null,
+      : t.lead_id
+        ? {
+            id: t.lead_id,
+            reference: t.lead_ref,
+            name: t.lead_name,
+            segment: t.lead_segment,
+            archivedAt: iso(t.lead_archived_at),
+          }
+        : null,
     assignee: t.assignee_id
       ? { id: t.assignee_id, name: t.assignee_name }
       : null,
@@ -110,7 +125,13 @@ export class TasksService {
       )
     ).rows[0];
   }
-  async row(c: PoolClient, p: Principal, id: string, lock = false) {
+  async row(
+    c: PoolClient,
+    p: Principal,
+    id: string,
+    lock = false,
+    office = false,
+  ) {
     const t = (
       await c.query(
         SELECT +
@@ -119,12 +140,34 @@ export class TasksService {
         [p.companyId, id],
       )
     ).rows[0];
-    if (!t || (p.scope === "own" && t.assignee_id !== p.id))
+    const members = office ? await officeMembers(c, p) : null;
+    if (
+      !t ||
+      (office
+        ? t.lead_id !== null ||
+          (members !== null && !members.includes(t.assignee_id))
+        : !!t.office_client_id || (p.scope === "own" && t.assignee_id !== p.id))
+    )
       throw new NotFoundException("Task not found");
-    return t;
+    return office ? officeRelatedRow(t, members, p) : t;
   }
   async options(p: Principal) {
     await this.sales.access(p, "tasks.read");
+    const office = await isOfficeCompany(this.db, p);
+    if (office)
+      return this.db.tenant(p.companyId!, async (c) => {
+        const members = await officeMembers(c, p);
+        return {
+          canAssign: members === null || members.length > 1,
+          assignees: (
+            await c.query(
+              "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL AND ($2::uuid[] IS NULL OR id=ANY($2::uuid[])) AND role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND 'leads.read'=ANY(permissions)) ORDER BY name,id LIMIT 1000",
+              [p.companyId, members],
+            )
+          ).rows,
+          canManage: p.permissions.includes("tasks.manage"),
+        };
+      });
     return this.db.tenant(p.companyId!, async (c) => ({
       canAssign: p.scope !== "own",
       assignees:
@@ -142,6 +185,34 @@ export class TasksService {
   async leadOptions(p: Principal, q: SalesQuery) {
     await this.sales.access(p, "tasks.read");
     if (!p.permissions.includes("leads.read")) throw new ForbiddenException();
+    if (await isOfficeCompany(this.db, p))
+      return this.db.tenant(
+        p.companyId!,
+        async (c) => {
+          const members = await officeMembers(c, p);
+          const args = [p.companyId, members, q.q ?? ""];
+          const where =
+            "company_id=$1 AND ($2::uuid[] IS NULL OR owner_id=ANY($2::uuid[])) AND ($3='' OR strpos(lower(name||' '||code||' '||phone),lower($3))>0)";
+          return {
+            items: (
+              await c.query(
+                "SELECT id,code AS reference,jsonb_build_object('en',name,'ar',name) AS name FROM tenant.office_clients WHERE " +
+                  where +
+                  " ORDER BY created_at DESC,id LIMIT $4 OFFSET $5",
+                [...args, q.limit, (q.page - 1) * q.limit],
+              )
+            ).rows,
+            total: (
+              await c.query(
+                "SELECT count(*)::int AS n FROM tenant.office_clients WHERE " +
+                  where,
+                args,
+              )
+            ).rows[0].n,
+          };
+        },
+        true,
+      );
     const args: any[] = [p.companyId],
       where = ["company_id=$1", "archived_at IS NULL"];
     if (q.q) {
@@ -179,13 +250,23 @@ export class TasksService {
   }
   async list(p: Principal, q: TaskQuery) {
     await this.sales.access(p, "tasks.read");
+    const office = await isOfficeCompany(this.db, p);
     return this.db.tenant(
       p.companyId!,
       async (c) => {
+        const members = office ? await officeMembers(c, p) : null;
         const now = await this.clock(c),
           args: any[] = [p.companyId, now.today],
           where = ["t.company_id=$1", "$2::date IS NOT NULL"];
-        const own = ownWhere(p, args, "t.assignee_id");
+        if (office) {
+          where.push("t.lead_id IS NULL");
+          if (members !== null) {
+            args.push(members);
+            where.push("t.assignee_id=ANY($" + args.length + "::uuid[])");
+          }
+        }
+        if (!office) where.push("t.office_client_id IS NULL");
+        const own = office ? "" : ownWhere(p, args, "t.assignee_id");
         if (own) where.push(own);
         if (q.status !== "all") {
           args.push(q.status ?? "open");
@@ -193,7 +274,9 @@ export class TasksService {
         }
         if (q.leadId) {
           args.push(q.leadId);
-          where.push("t.lead_id=$" + args.length);
+          where.push(
+            (office ? "t.office_client_id=$" : "t.lead_id=$") + args.length,
+          );
         }
         if (q.assigneeId?.toLowerCase() === "unassigned")
           where.push("t.assignee_id IS NULL");
@@ -205,11 +288,11 @@ export class TasksService {
           args.push("%" + q.q.replace(/[\\%_]/g, "\\$&") + "%");
           const n = "$" + args.length;
           where.push(
-            `(t.title->>'en' ILIKE ${n} OR t.title->>'ar' ILIKE ${n} OR t.description ILIKE ${n} OR t.public_id ILIKE ${n} OR l.name->>'en' ILIKE ${n} OR l.name->>'ar' ILIKE ${n})`,
+            `(t.title->>'en' ILIKE ${n} OR t.title->>'ar' ILIKE ${n} OR t.description ILIKE ${n} OR t.public_id ILIKE ${n} OR l.name->>'en' ILIKE ${n} OR l.name->>'ar' ILIKE ${n} OR ${office && members !== null ? "(oc.owner_id=ANY($3::uuid[]) AND oc.name ILIKE " + n + ")" : "oc.name ILIKE " + n})`,
           );
         }
         const joins =
-          " FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id";
+          " FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.office_clients oc ON oc.company_id=t.company_id AND oc.id=t.office_client_id";
         const counts = (
           await c.query(
             "SELECT " +
@@ -225,7 +308,7 @@ export class TasksService {
         ).rows;
         const byAssignee = (
           await c.query(
-            "SELECT t.assignee_id AS id,u.name,count(*)::int AS open FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id WHERE " +
+            "SELECT t.assignee_id AS id,u.name,count(*)::int AS open FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.office_clients oc ON oc.company_id=t.company_id AND oc.id=t.office_client_id LEFT JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id WHERE " +
               where.join(" AND ") +
               " AND t.status='open' GROUP BY t.assignee_id,u.name ORDER BY count(*) DESC,t.assignee_id",
             args,
@@ -255,7 +338,9 @@ export class TasksService {
           )
         ).rows;
         return {
-          items: rows.map((t) => taskDto(t, now.today)),
+          items: rows.map((t) =>
+            taskDto(office ? officeRelatedRow(t, members, p) : t, now.today),
+          ),
           total: q.group ? summary[q.group] : all,
           summary: { ...summary, all, byAssignee },
           today: now.today,
@@ -269,16 +354,21 @@ export class TasksService {
   }
   async detail(p: Principal, id: string) {
     await this.sales.access(p, "tasks.read");
+    const office = await isOfficeCompany(this.db, p);
     return this.db.tenant(p.companyId!, async (c) =>
-      taskDto(await this.row(c, p, id), (await this.clock(c)).today),
+      taskDto(
+        await this.row(c, p, id, false, office),
+        (await this.clock(c)).today,
+      ),
     );
   }
   async activities(p: Principal, id: string, q: ActivityQuery) {
     await this.sales.access(p, "tasks.read");
+    const office = await isOfficeCompany(this.db, p);
     return this.db.tenant(
       p.companyId!,
       async (c) => {
-        await this.row(c, p, id);
+        await this.row(c, p, id, false, office);
         return {
           items: (
             await c.query(
@@ -297,18 +387,32 @@ export class TasksService {
       true,
     );
   }
-  async validate(c: PoolClient, p: Principal, input: TaskInput, old?: any) {
+  async validate(
+    c: PoolClient,
+    p: Principal,
+    input: TaskInput,
+    old?: any,
+    office = false,
+  ) {
     const leadId =
-        input.leadId === undefined ? (old?.lead_id ?? null) : input.leadId,
+        input.leadId === undefined
+          ? ((office ? old?.office_client_id : old?.lead_id) ?? null)
+          : input.leadId,
       assigneeId =
         input.assigneeId === undefined
           ? old
             ? old.assignee_id
             : p.id
           : input.assigneeId;
-    if (p.scope === "own" && assigneeId !== p.id)
+    if (office) {
+      const members = await officeMembers(c, p);
+      if (members !== null && (!assigneeId || !members.includes(assigneeId)))
+        throw new ForbiddenException();
+      if (leadId) await officeClientLink(c, p, leadId, assigneeId);
+    }
+    if (!office && p.scope === "own" && assigneeId !== p.id)
       throw new ForbiddenException();
-    if (leadId !== old?.lead_id && leadId) {
+    if (!office && leadId !== old?.lead_id && leadId) {
       if (!p.permissions.includes("leads.read"))
         throw new ForbiddenException("Lead access is required to link a task");
       if (
@@ -348,7 +452,7 @@ export class TasksService {
   snapshot(t: any) {
     return {
       title: t.title,
-      leadId: t.lead_id,
+      leadId: t.office_client_id ?? t.lead_id,
       assigneeId: t.assignee_id,
       dueDate: t.due_date,
       priority: t.priority,
@@ -406,76 +510,81 @@ export class TasksService {
       throw new ConflictException("Task changed. Refresh before trying again.");
   }
   async create(p: Principal, b: TaskInput) {
+    const office = await isOfficeCompany(this.db, p);
     return this.sales.write(p, "tasks.manage", "task.create", b, async (c) => {
-      const v = await this.validate(c, p, b);
+      const v = await this.validate(c, p, b, undefined, office);
       const t = (
         await c.query(
-          `INSERT INTO tenant.tasks(company_id,public_id,title,description,lead_id,assignee_id,due_date,priority,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$9) RETURNING id`,
+          `INSERT INTO tenant.tasks(company_id,public_id,title,description,lead_id,assignee_id,due_date,priority,created_by,updated_by,office_client_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,$10) RETURNING id`,
           [
             p.companyId,
             "T-" + randomBytes(6).toString("hex").toUpperCase(),
             { en: b.title, ar: b.titleAr ?? b.title },
             b.description ?? "",
-            v.leadId,
+            office ? null : v.leadId,
             v.assigneeId,
             v.dueDate,
             b.priority,
             p.id,
+            office ? v.leadId : null,
           ],
         )
       ).rows[0];
-      const row = await this.row(c, p, t.id);
+      const row = await this.row(c, p, t.id, false, office);
       await this.event(c, p, row, "task.created");
       return taskDto(row, (await this.clock(c)).today);
     });
   }
   async update(p: Principal, id: string, b: TaskUpdate) {
+    const office = await isOfficeCompany(this.db, p);
     return this.sales.write(
       p,
       "tasks.manage",
       "task.update:" + id,
       b,
       async (c) => {
-        const old = await this.row(c, p, id, true);
+        const old = await this.row(c, p, id, true, office);
         this.check(old, b.version);
         if (old.status !== "open")
           throw new ConflictException("Reopen this task before editing it");
-        const v = await this.validate(c, p, b, old);
+        const v = await this.validate(c, p, b, old, office);
         await c.query(
-          `UPDATE tenant.tasks SET title=$3,description=$4,lead_id=$5,assignee_id=$6,due_date=$7,priority=$8,version=version+1,updated_by=$9,updated_at=now() WHERE company_id=$1 AND id=$2`,
+          `UPDATE tenant.tasks SET title=$3,description=$4,lead_id=$5,assignee_id=$6,due_date=$7,priority=$8,office_client_id=$10,version=version+1,updated_by=$9,updated_at=now() WHERE company_id=$1 AND id=$2`,
           [
             p.companyId,
             id,
             { en: b.title, ar: b.titleAr ?? b.title },
             b.description ?? "",
-            v.leadId,
+            office ? null : v.leadId,
             v.assigneeId,
             v.dueDate,
             b.priority,
             p.id,
+            office ? v.leadId : null,
           ],
         );
-        const t = await this.row(c, p, id);
+        const t = await this.row(c, p, id, false, office);
         await this.event(c, p, t, "task.updated", old);
         return taskDto(t, (await this.clock(c)).today);
       },
     );
   }
   async status(p: Principal, id: string, b: TaskStatus) {
+    const office = await isOfficeCompany(this.db, p);
     return this.sales.write(
       p,
       "tasks.manage",
       "task.status:" + id,
       b,
       async (c) => {
-        const old = await this.row(c, p, id, true);
+        const old = await this.row(c, p, id, true, office);
         this.check(old, b.version);
         const next = taskNextStatus(old, b.action, b.reason);
         await c.query(
           `UPDATE tenant.tasks SET status=$3,completed_at=CASE WHEN $3='done' THEN now() ELSE NULL END,completed_by=CASE WHEN $3='done' THEN $4::uuid ELSE NULL END,updated_by=$4,updated_at=now(),version=version+1 WHERE company_id=$1 AND id=$2`,
           [p.companyId, id, next, p.id],
         );
-        const t = await this.row(c, p, id);
+        const t = await this.row(c, p, id, false, office);
         await this.event(
           c,
           p,

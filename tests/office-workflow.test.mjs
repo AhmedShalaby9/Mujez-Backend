@@ -625,3 +625,161 @@ test("office invitations and role edits accept only sales and team leads without
     400,
   );
 });
+
+test("office tasks and calendar link real office clients, preserve personal and current-team access, and keep contacts private", async () => {
+  h.state.principal = owner;
+  const currentTeam = (
+    await h.db.query(
+      "SELECT version FROM tenant.teams WHERE company_id=$1 AND id=$2",
+      [owner.companyId, team.id],
+    )
+  ).rows[0];
+  team = (
+    await h.post("team/groups/" + team.id, {
+      name: "Office Team",
+      leadUserId: tl.id,
+      memberUserIds: [a.id],
+      version: currentTeam.version,
+    })
+  ).body;
+  h.state.principal = a;
+  const client = await createClient({
+    name: "Private Office Client For Tools",
+  });
+  const contact = (
+    await h.post("contacts", {
+      requestId: randomUUID(),
+      name: "Office Contact A",
+      type: "buyer",
+      phones: ["+201000000111"],
+    })
+  ).body;
+  const options = (await h.get("tasks/lead-options")).body;
+  assert.ok(options.items.some((x) => x.id === client.id));
+  const task = (
+    await h.post("tasks", {
+      requestId: randomUUID(),
+      title: "Office follow-up",
+      priority: "high",
+      leadId: client.id,
+      dueDate: "2027-01-05",
+    })
+  ).body;
+  assert.equal(task.lead.id, client.id);
+  assert.equal(task.lead.kind, "office_client");
+  const data = {
+    requestId: randomUUID(),
+    title: "Office viewing",
+    type: "viewing",
+    startsAt: "2027-01-05T10:00:00Z",
+    endsAt: "2027-01-05T11:00:00Z",
+    leadId: client.id,
+    contactId: contact.id,
+  };
+  const event = (await h.post("events", data)).body;
+  assert.equal(event.lead.id, client.id);
+  assert.equal(event.contact.id, contact.id);
+  assert.equal((await h.post("events", data)).body.id, event.id);
+  h.state.principal = b;
+  await h.get("tasks/" + task.id, 404);
+  await h.get("events/" + event.id, 404);
+  assert.ok(
+    !(await h.get("events/options")).body.contacts.some(
+      (x) => x.id === contact.id,
+    ),
+  );
+  assert.ok(
+    !(await h.get("events/options")).body.leads.some((x) => x.id === client.id),
+  );
+  await h.post(
+    "tasks",
+    {
+      requestId: randomUUID(),
+      title: "Cannot link",
+      priority: "med",
+      leadId: client.id,
+    },
+    400,
+  );
+  await h.post("events", { ...data, requestId: randomUUID() }, 400);
+  await h.post(
+    "events",
+    { ...data, requestId: randomUUID(), leadId: null },
+    400,
+  );
+  h.state.principal = tl;
+  assert.ok((await h.get("tasks")).body.items.some((x) => x.id === task.id));
+  assert.ok(
+    (
+      await h.get("events?from=2027-01-04T00:00:00Z&to=2027-01-10T00:00:00Z")
+    ).body.items.some((x) => x.id === event.id),
+  );
+  const delegated = (
+    await h.post("tasks", {
+      requestId: randomUUID(),
+      title: "Team office task",
+      priority: "med",
+      leadId: client.id,
+      assigneeId: a.id,
+    })
+  ).body;
+  assert.equal(delegated.assignee.id, a.id);
+  await h.post("tasks/" + delegated.id + "/status", {
+    requestId: randomUUID(),
+    version: delegated.version,
+    action: "complete",
+  });
+  await h.post(
+    "tasks",
+    {
+      requestId: randomUUID(),
+      title: "Outside team",
+      priority: "med",
+      assigneeId: b.id,
+    },
+    403,
+  );
+  const teamEvent = (
+    await h.post("events", {
+      ...data,
+      requestId: randomUUID(),
+      ownerId: a.id,
+      contactId: null,
+    })
+  ).body;
+  assert.equal(teamEvent.owner.id, a.id);
+  await h.post(
+    "events",
+    { ...data, requestId: randomUUID(), ownerId: b.id, contactId: null },
+    403,
+  );
+  h.state.principal = owner;
+  await h.post(
+    "office/clients/" + client.id,
+    req(
+      {
+        name: client.name,
+        phone: client.phone,
+        email: client.email ?? "",
+        source: client.source,
+        status: client.status,
+        needs: client.needs,
+        followUpAt: null,
+        ownerId: b.id,
+      },
+      client.version,
+    ),
+  );
+  h.state.principal = a;
+  assert.equal((await h.get("tasks/" + task.id)).body.lead, null);
+  assert.equal((await h.get("events/" + event.id)).body.lead, null);
+  assert.equal(
+    (await h.get("tasks?q=Private%20Office%20Client%20For%20Tools")).body.total,
+    0,
+  );
+  assert.ok(
+    !(await h.get("tasks/lead-options")).body.items.some(
+      (x) => x.id === client.id,
+    ),
+  );
+});
