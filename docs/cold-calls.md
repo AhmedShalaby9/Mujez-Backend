@@ -27,3 +27,13 @@ Activities and writes are tenant scoped, versioned, actor-bound and idempotent. 
 Sales agents no longer see manual New lead buttons in the header or Leads page, including the new-form URL shortcut. Existing editing, backend permissions and explicit cold-contact conversion remain available; team leads and company owners retain manual creation.
 
 Interested contacts are converted explicitly; simply importing an old list never fills the active pipeline.
+
+## My team performance
+
+GET `/api/v1/team/my-team/performance?days=7|30|90` includes `coldCalls: {summary, items}`. Each item has current member `id`, `name`, `role`, `status`, `calls`, `convertedToLeads`, `overdueCallbacks`, and `outcomes` with all six outcome keys, including zero values. Summary sums the member metrics and all outcome buckets.
+
+Calls count immutable `call` activities, including repeated attempts, by the actor who logged them. Conversion counts `converted` activities by their actor, rather than current lead ownership. Notes, appointments, imports and assignments are not calls; idempotent retries never count twice. Later reassignment does not move credit. Period starts at Cairo midnight N−1 days before today and ends at the server `asOf` instant. Future-dated activity is excluded.
+
+Overdue callbacks are current unconverted appointments before `asOf`, grouped by their current cold-contact owner. They include old overdue appointments outside the selected activity period; future, unscheduled and converted contacts are excluded. Reassignment moves callback workload, without moving activity credit.
+
+Only the current active team lead can read the report, including a lead with additional roles. Current database membership defines the roster, including zero-activity members and the lead; removal immediately removes a member's metrics. Other-team actors and companies are excluded. Existing subscription/CRM access and tenant isolation apply. No AI request or paid module is required. These are recorded activities, not proof of completed phone calls or automatic telephony events.

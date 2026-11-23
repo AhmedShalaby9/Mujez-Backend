@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Req,
 } from "@nestjs/common";
+import { ApiOperation } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { Public, RequireAccess } from "../../../common/auth/access.js";
 import type { AuthRequest } from "../../../common/auth/access.guard.js";
@@ -72,6 +73,11 @@ export class TeamController {
     return this.work.tasks(req.principal, q);
   }
   @Get("my-team/performance")
+  @ApiOperation({
+    summary: "Current team CRM and cold-call performance",
+    description:
+      "Includes coldCalls.items and coldCalls.summary: calls, all six outcome counts and convertedToLeads credited to the recorded actor in the selected 7/30/90 Cairo calendar days through asOf; overdueCallbacks is the current unconverted workload by current owner, independent of the period. Restricted to the current team lead and current roster.",
+  })
   @RequireAccess(["company_user"], "team.self.read")
   performance(@Req() req: AuthRequest, @Query() q: TeamPerformanceQuery) {
     return this.work.performance(req.principal, q);

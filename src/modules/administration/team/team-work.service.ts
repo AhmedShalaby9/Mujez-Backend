@@ -1,3 +1,4 @@
+import { CALL_OUTCOMES } from "../../sales/cold-calls/cold-calls.dto.js";
 import { teamSnapshot } from "./insights/team-snapshot.js";
 import {
   Injectable,
@@ -36,7 +37,10 @@ export class TeamWorkService {
   ) {}
   private async access(p: Principal, permission: string) {
     await this.sales.access(p, "team.self.read");
-    if (p.pool !== "company_user" || p.role !== "team_lead")
+    if (
+      p.pool !== "company_user" ||
+      !(p.roles ?? [p.role]).includes("team_lead")
+    )
       throw new ForbiddenException();
     await this.sales.access(p, permission);
   }
@@ -213,6 +217,51 @@ export class TeamWorkService {
         [p.companyId, ids, clock.since, clock.today],
       )
     ).rows;
+    // Credit work to its recorded actor, independently of subsequent ownership.
+    // Workload is the current unconverted callback queue for the current roster.
+    const coldActivities = (
+      await c.query(
+        `SELECT actor_id AS id,count(*) FILTER(WHERE kind='call')::int AS calls,
+        count(*) FILTER(WHERE kind='converted')::int AS "convertedToLeads",
+        jsonb_build_object(${CALL_OUTCOMES.map((outcome) => `'${outcome}',count(*) FILTER(WHERE kind='call' AND outcome='${outcome}')::int`).join(",")}) AS outcomes
+        FROM tenant.cold_call_activities WHERE company_id=$1 AND actor_id=ANY($2::uuid[])
+        AND kind IN ('call','converted') AND created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND created_at<=$4::timestamptz
+        GROUP BY actor_id`,
+        [p.companyId, ids, clock.since, clock.at],
+      )
+    ).rows;
+    const coldCallbacks = (
+      await c.query(
+        `SELECT owner_user_id AS id,count(*)::int AS "overdueCallbacks" FROM tenant.cold_calls
+        WHERE company_id=$1 AND owner_user_id=ANY($2::uuid[]) AND lead_id IS NULL AND follow_up_at<$3::timestamptz GROUP BY owner_user_id`,
+        [p.companyId, ids, clock.at],
+      )
+    ).rows;
+    const emptyCold = () => ({
+      calls: 0,
+      convertedToLeads: 0,
+      overdueCallbacks: 0,
+      outcomes: Object.fromEntries(
+        CALL_OUTCOMES.map((key) => [key, 0]),
+      ) as Record<(typeof CALL_OUTCOMES)[number], number>,
+    });
+    const coldItems = members.map((m) => ({
+      ...emptyCold(),
+      ...coldActivities.find((a) => a.id === m.id),
+      ...coldCallbacks.find((a) => a.id === m.id),
+      id: m.id,
+      name: m.name,
+      role: m.role,
+      status: m.account_status,
+    }));
+    const coldSummary = emptyCold();
+    for (const item of coldItems) {
+      coldSummary.calls += item.calls;
+      coldSummary.convertedToLeads += item.convertedToLeads;
+      coldSummary.overdueCallbacks += item.overdueCallbacks;
+      for (const outcome of CALL_OUTCOMES)
+        coldSummary.outcomes[outcome] += item.outcomes[outcome];
+    }
     const zero = {
       leads: 0,
       openLeads: 0,
@@ -259,6 +308,7 @@ export class TeamWorkService {
       team,
       items,
       summary,
+      coldCalls: { items: coldItems, summary: coldSummary },
       days: q.days,
       from: clock.since,
       to: clock.today,
