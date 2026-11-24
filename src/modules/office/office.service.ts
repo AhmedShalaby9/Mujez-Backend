@@ -161,6 +161,41 @@ export class OfficeService {
     await this.access(p, "leads.manage");
     return this.sales.write(p, "leads.manage", "office." + op, b, work);
   }
+  async moveClient(p: Principal, id: string, b: OfficeWrite) {
+    const x = parse(
+      z
+        .object({
+          status: z.enum([
+            "new",
+            "contacted",
+            "viewing",
+            "negotiating",
+            "lost",
+          ]),
+        })
+        .strict(),
+      b.data,
+    );
+    return this.write(p, "client.stage:" + id, b, async (c) => {
+      const r = await this.client(c, p, id, true);
+      this.version(r, b.version);
+      if (r.status === "closed")
+        throw new ConflictException(
+          "Closed clients follow their completed deal; open the client to review it",
+        );
+      const next = (
+        await c.query(
+          "UPDATE tenant.office_clients SET status=$3,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2 RETURNING *",
+          [p.companyId, id, x.status],
+        )
+      ).rows[0];
+      await this.event(c, p, "client.stage_changed", id, {
+        from: r.status,
+        to: x.status,
+      });
+      return { id, version: next.version, status: next.status };
+    });
+  }
   async localTime(c: PoolClient, value: string | null) {
     if (!value) return null;
     parse(stamp, value);
@@ -757,6 +792,18 @@ export class OfficeService {
                   : this.dealDto(r),
             ),
           ),
+          ...(view === "clients"
+            ? {
+                stats: (
+                  await c.query(
+                    "SELECT x.status,count(*)::int AS count " +
+                      from +
+                      " GROUP BY x.status",
+                    a,
+                  )
+                ).rows,
+              }
+            : {}),
           total,
           page: q.page,
           limit: q.limit,

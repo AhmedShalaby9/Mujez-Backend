@@ -829,6 +829,31 @@
         "tags": ["Office"]
       }
     },
+    "/api/v1/office/clients/{id}/stage": {
+      "post": {
+        "description": "Scoped to current office ownership/team. Requires current version and requestId. Closed stage is set through deal closure, never through this endpoint.",
+        "operationId": "OfficeController_moveClient",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OfficeWrite" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "summary": "Move an office client pipeline stage",
+        "tags": ["Office"]
+      }
+    },
     "/api/v1/office/clients/{id}/activities": {
       "post": {
         "operationId": "OfficeController_activity",

@@ -783,3 +783,106 @@ test("office tasks and calendar link real office clients, preserve personal and 
     ),
   );
 });
+
+test("office pipeline stages are scoped, versioned and audited while closure follows deals and brokerage is isolated", async () => {
+  const c = await createClient({ name: "Pipeline scoped client" });
+  const before = (await h.get("office/clients?q=Pipeline%20scoped%20client"))
+    .body;
+  assert.equal(before.total, 1);
+  assert.equal(before.stats.find((s) => s.status === "new").count, 1);
+  const payload = req({ status: "contacted" }, c.version);
+  const moved = (await h.post("office/clients/" + c.id + "/stage", payload))
+    .body;
+  assert.equal(moved.status, "contacted");
+  assert.deepEqual(
+    (await h.post("office/clients/" + c.id + "/stage", payload)).body,
+    moved,
+  );
+  await h.post(
+    "office/clients/" + c.id + "/stage",
+    req({ status: "viewing" }, c.version),
+    409,
+  );
+  await h.post(
+    "office/clients/" + c.id + "/stage",
+    req({ status: "closed" }, moved.version),
+    400,
+  );
+  h.state.principal = b;
+  assert.equal(
+    (await h.get("office/clients?q=Pipeline%20scoped%20client")).body.total,
+    0,
+  );
+  await h.post(
+    "office/clients/" + c.id + "/stage",
+    req({ status: "lost" }, moved.version),
+    404,
+  );
+  h.state.principal = a;
+  h.state.failAudit = true;
+  await h.post(
+    "office/clients/" + c.id + "/stage",
+    req({ status: "viewing" }, moved.version),
+    500,
+  );
+  h.state.failAudit = false;
+  assert.equal(
+    (await h.get("office/clients/" + c.id)).body.status,
+    "contacted",
+  );
+  const p = await createProperty();
+  const booking = await book(p, c, "sale");
+  await h.post(
+    "office/deals/" + booking.id,
+    req({ action: "close", priceMinor: "100000000" }, booking.version),
+  );
+  const closed = (await h.get("office/clients/" + c.id)).body;
+  assert.equal(closed.status, "closed");
+  await h.post(
+    "office/clients/" + c.id + "/stage",
+    req({ status: "new" }, closed.version),
+    409,
+  );
+  h.state.principal = other;
+  await h.get("office/clients", 403);
+  await h.post(
+    "office/clients/" + c.id + "/stage",
+    req({ status: "new" }, closed.version),
+    403,
+  );
+});
+
+test("all other company types retain their original CRM pipeline and cannot use office stage writes", async () => {
+  h.state.principal = owner;
+  owner.permissions.push("tasks.read", "calendar.read", "contacts.read");
+  try {
+    for (const type of ["brokerage", "developer", "property_mgmt", "hybrid"]) {
+      await h.db.query(
+        "UPDATE platform.companies SET company_type=$2 WHERE id=$1",
+        [owner.companyId, type],
+      );
+      const pipeline = (await h.get("pipeline")).body;
+      assert.ok(Array.isArray(pipeline.items));
+      assert.ok(Array.isArray(pipeline.stats));
+      for (const path of [
+        "tasks",
+        "events?from=2027-01-04T00:00:00Z&to=2027-01-10T00:00:00Z",
+        "contacts",
+      ]) {
+        const result = (await h.get(path)).body;
+        assert.ok(Array.isArray(result.items));
+      }
+      await h.get("office/clients", 403);
+      await h.post(
+        "office/clients/" + randomUUID() + "/stage",
+        req({ status: "new" }, 0),
+        403,
+      );
+    }
+  } finally {
+    await h.db.query(
+      "UPDATE platform.companies SET company_type='real_estate_office' WHERE id=$1",
+      [owner.companyId],
+    );
+  }
+});

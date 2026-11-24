@@ -331,14 +331,20 @@ test("calendar data classifies public holidays and approved leave without exposi
     "leave/policy",
     b({ version: 0, annualDays: 21, weekends: [5, 6] }),
   );
+  // Leave validation uses the database date, independently of AttendanceClock.
+  const leaveDay = (
+    await h.db.query(
+      "SELECT ((now() AT TIME ZONE 'Africa/Cairo')::date + ((8-extract(isodow FROM now() AT TIME ZONE 'Africa/Cairo')::int)%7) + 7)::text AS day",
+    )
+  ).rows[0].day;
   h.state.principal = outsiderP;
   const leave = (
     await h.post(
       "leave/requests",
       b({
         employeeId: e,
-        startDate: "2026-11-23",
-        endDate: "2026-11-23",
+        startDate: leaveDay,
+        endDate: leaveDay,
         reason: "Private reason",
       }),
     )
@@ -348,8 +354,8 @@ test("calendar data classifies public holidays and approved leave without exposi
     "leave/requests/" + leave.id + "/action",
     b({ version: leave.version, action: "hr_approve", note: "Approved" }),
   );
-  now = new Date("2026-11-23T18:00:00Z");
-  r = (await report("company", "2026-11-23")).body;
+  now = new Date(leaveDay + "T18:00:00Z");
+  r = (await report("company", leaveDay)).body;
   assert.equal(r.items.find((x) => x.employeeId === e).status, "on_leave");
   assert.equal(r.summary.leaveDays, 1);
   assert.equal(JSON.stringify(r).includes("Private reason"), false);

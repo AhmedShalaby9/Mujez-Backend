@@ -92,6 +92,19 @@ export class OfficeController {
   ) {
     return this.s.saveClient(r.principal, b, id);
   }
+  @Post("clients/:id/stage")
+  @ApiOperation({
+    summary: "Move an office client pipeline stage",
+    description:
+      "Scoped to current office ownership/team. Requires current version and requestId. Closed stage is set through deal closure, never through this endpoint.",
+  })
+  moveClient(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: OfficeWrite,
+  ) {
+    return this.s.moveClient(r.principal, id, b);
+  }
   @Post("properties") createProperty(
     @Req() r: AuthRequest,
     @Body() b: OfficeWrite,
