@@ -886,3 +886,162 @@ test("all other company types retain their original CRM pipeline and cannot use 
     );
   }
 });
+
+test("office My team returns current scoped clients, tasks and exact office performance without brokerage records", async () => {
+  h.state.principal = owner;
+  const current = (await h.get("team/groups")).body.items.find(
+    (t) => t.id === team.id,
+  );
+  team = (
+    await h.post("team/groups/" + team.id, {
+      name: current.name,
+      leadUserId: tl.id,
+      memberUserIds: [a.id],
+      version: current.version,
+    })
+  ).body;
+  h.state.principal = a;
+  const client = await createClient({ name: "My team office client" });
+  const task = (
+    await h.post("tasks", {
+      requestId: randomUUID(),
+      title: "My team office task",
+      priority: "high",
+      leadId: client.id,
+      dueDate: "2026-01-01",
+    })
+  ).body;
+  await h.post(
+    "office/clients/" + client.id + "/activities",
+    req({ kind: "call", notes: "Recorded team call" }, client.version),
+  );
+  const property = await createProperty();
+  const booking = await book(property, client, "sale");
+  await h.post(
+    "office/deals/" + booking.id,
+    req({ action: "close", priceMinor: "123456789" }, booking.version),
+  );
+  h.state.principal = b;
+  const hidden = await createClient({ name: "Outside team private client" });
+  await h.post("tasks", {
+    requestId: randomUUID(),
+    title: "Outside team private task",
+    priority: "low",
+    leadId: hidden.id,
+  });
+  h.state.principal = tl;
+  const result = (
+    await h.get("office/my-team/clients?q=My%20team%20office&limit=1")
+  ).body;
+  assert.equal(result.total, 1);
+  assert.equal(result.items[0].id, client.id);
+  assert.equal(result.team.id, team.id);
+  assert.equal(
+    (await h.get("office/my-team/clients?q=Outside%20team")).body.total,
+    0,
+  );
+  await h.get("office/my-team/clients?memberId=" + b.id, 404);
+  const tasks = (
+    await h.get("office/my-team/tasks?q=My%20team%20office&memberId=" + a.id)
+  ).body;
+  assert.equal(tasks.total, 1);
+  assert.equal(tasks.items[0].id, task.id);
+  assert.equal(tasks.items[0].overdue, true);
+  assert.equal(JSON.stringify(tasks).includes("Outside team"), false);
+  const perf = (await h.get("office/my-team/performance?days=7")).body;
+  assert.equal(perf.team.id, team.id);
+  assert.equal(perf.timeZone, "Africa/Cairo");
+  assert.deepEqual(perf.items.map((m) => m.id).sort(), [a.id, tl.id].sort());
+  const member = perf.items.find((m) => m.id === a.id);
+  assert.ok(member.clients >= 1);
+  assert.ok(member.calls >= 1);
+  assert.ok(member.overdueTasks >= 1);
+  assert.ok(BigInt(member.saleMinor) >= 123456789n);
+  assert.equal(
+    perf.summary.saleMinor,
+    perf.items.reduce((n, m) => n + BigInt(m.saleMinor), 0n).toString(),
+  );
+  await h.get("office/my-team/performance?days=8", 400);
+  await h.get("office/my-team/tasks?status=not-real", 400);
+  // Old brokerage rows must not enter office My team or its performance.
+  await h.db.query(
+    'INSERT INTO tenant.leads(company_id,public_id,name,phone,source,owner_user_id,segment,want) VALUES($1,\'L-MYTEAM-PRIVATE\',\'{"en":"Broker only record","ar":"Broker only record"}\',\'+12020009999\',\'manual\',$2,\'res\',\'{"en":"Apartment","ar":"Apartment"}\')',
+    [owner.companyId, a.id],
+  );
+  assert.equal(
+    (await h.get("office/my-team/clients?q=Broker%20only")).body.total,
+    0,
+  );
+  const multiRole = {
+    ...tl,
+    role: "agent",
+    roles: ["agent", "employee", "team_lead"],
+  };
+  h.state.principal = multiRole;
+  assert.equal(
+    (await h.get("office/my-team/performance")).body.team.id,
+    team.id,
+  );
+  h.state.principal = {
+    ...tl,
+    permissions: tl.permissions.filter((x) => x !== "tasks.read"),
+  };
+  await h.get("office/my-team/performance", 403);
+  await h.get("office/my-team/tasks", 403);
+  h.state.principal = tl;
+  try {
+    for (const type of ["brokerage", "developer", "property_mgmt", "hybrid"]) {
+      await h.db.query(
+        "UPDATE platform.companies SET company_type=$2 WHERE id=$1",
+        [owner.companyId, type],
+      );
+      await h.get("office/my-team/performance", 403);
+      assert.ok(
+        Array.isArray((await h.get("team/my-team/performance")).body.items),
+      );
+    }
+  } finally {
+    await h.db.query(
+      "UPDATE platform.companies SET company_type='real_estate_office' WHERE id=$1",
+      [owner.companyId],
+    );
+  }
+  h.state.principal = a;
+  await h.get("office/my-team/performance", 403);
+  h.state.principal = owner;
+  await h.get("office/my-team/clients", 403);
+  h.state.principal = other;
+  await h.get("office/my-team/tasks", 403);
+  h.state.principal = owner;
+  const latest = (await h.get("team/groups")).body.items.find(
+    (t) => t.id === team.id,
+  );
+  await h.post("team/groups/" + team.id, {
+    name: latest.name,
+    leadUserId: tl.id,
+    memberUserIds: [],
+    version: latest.version,
+  });
+  h.state.principal = tl;
+  assert.equal(
+    (await h.get("office/my-team/clients?q=My%20team%20office")).body.total,
+    0,
+  );
+  assert.equal(
+    (await h.get("office/my-team/tasks?q=My%20team%20office")).body.total,
+    0,
+  );
+  await h.get("office/my-team/tasks?memberId=" + a.id, 404);
+  assert.deepEqual(
+    (await h.get("office/my-team/performance")).body.items.map((m) => m.id),
+    [tl.id],
+  );
+  h.state.principal = owner;
+  await h.db.query(
+    "UPDATE tenant.teams SET lead_user_id=$2 WHERE company_id=$1 AND id=$3",
+    [owner.companyId, b.id, team.id],
+  );
+  h.state.principal = tl;
+  await h.get("office/my-team/performance", 404);
+  await h.get("office/my-team/clients", 404);
+});

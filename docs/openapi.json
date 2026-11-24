@@ -991,6 +991,35 @@
         "tags": ["Office"]
       }
     },
+    "/api/v1/office/my-team/clients": {
+      "get": {
+        "description": "Active team lead only. Rechecks current roster; memberId, q, status, page and limit filters run before pagination. Office records only.",
+        "operationId": "OfficeTeamController_clients",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "summary": "Current office team's clients",
+        "tags": ["OfficeTeam"]
+      }
+    },
+    "/api/v1/office/my-team/tasks": {
+      "get": {
+        "operationId": "OfficeTeamController_tasks",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "summary": "Current office team's assigned tasks",
+        "tags": ["OfficeTeam"]
+      }
+    },
+    "/api/v1/office/my-team/performance": {
+      "get": {
+        "description": "7/30/90 Cairo calendar days through asOf. Current workload; new clients, logged actor calls/viewings, completed tasks and closed deals in period. Exact sale values and agreed monthly rents are separate, with no accounting revenue or rent collection implied.",
+        "operationId": "OfficeTeamController_performance",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "summary": "Current office team's performance",
+        "tags": ["OfficeTeam"]
+      }
+    },
     "/api/v1/leads": {
       "get": {
         "operationId": "LeadsController_list",
