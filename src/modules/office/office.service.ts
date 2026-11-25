@@ -25,6 +25,10 @@ import {
 const ref = (prefix: string) =>
   prefix + "-" + randomBytes(5).toString("hex").toUpperCase();
 const iso = (v: any) => (v ? new Date(v).toISOString() : null);
+const maskOwnerPhones = (data: any) =>
+  data?.ownerPhones
+    ? { ...data, ownerPhones: data.ownerPhones.map(() => "*******") }
+    : data;
 export function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const r = schema.safeParse(value);
   if (!r.success)
@@ -250,19 +254,19 @@ export class OfficeService {
         ...(visible ? { id: active.id } : {}),
       };
     }
+    const allowed = await this.canProperty(c, p, r);
+    const ownsContact = allowed || r.created_by === p.id;
     return {
       id: r.id,
       code: r.code,
       title: r.title,
-      data: r.data,
+      data: ownsContact ? r.data : maskOwnerPhones(r.data),
       status: r.status,
       version: r.version,
       responsible: { id: r.responsible_id, name: r.responsible_name },
       createdBy: { id: r.created_by, name: r.creator_name },
       createdAt: iso(r.created_at),
-      canEdit:
-        p.permissions.includes("leads.manage") &&
-        (await this.canProperty(c, p, r)),
+      canEdit: p.permissions.includes("leads.manage") && allowed,
       booking,
     };
   }
