@@ -178,10 +178,21 @@ export class SalesService {
     return this.db.tenant(p.companyId!, async (c) => ({
       owners: (
         await c.query(
-          "SELECT id,name FROM tenant.users WHERE company_id=$1 AND status='active' AND deleted_at IS NULL AND role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND 'leads.read'=ANY(permissions)) ORDER BY name,id LIMIT 1000",
+          `SELECT u.id,u.name,count(l.id)::int AS lead_count
+           FROM tenant.users u
+           LEFT JOIN tenant.leads l ON l.company_id=$1 AND l.owner_user_id=u.id AND l.archived_at IS NULL
+           WHERE u.company_id=$1 AND u.status='active' AND u.deleted_at IS NULL
+             AND u.role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND 'leads.read'=ANY(permissions))
+           GROUP BY u.id,u.name
+           ORDER BY u.name,u.id
+           LIMIT 1000`,
           [p.companyId],
         )
-      ).rows,
+      ).rows.map((r: { id: string; name: string; lead_count: number }) => ({
+        id: r.id,
+        name: r.name,
+        leadCount: r.lead_count,
+      })),
       canManage: p.permissions.includes("leads.manage"),
     }));
   }
