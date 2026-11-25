@@ -159,11 +159,7 @@ export class SessionService {
       );
     await this.ownerProfile(a);
     const token = "c_" + randomBytes(32).toString("hex"),
-      seconds = a.must_change_password
-        ? 600
-        : remember
-          ? 2592000
-          : policy.sessionLength * 60;
+      seconds = remember ? 2592000 : policy.sessionLength * 60;
     await this.db.platform(async (c) => {
       const current = (
         await c.query(
