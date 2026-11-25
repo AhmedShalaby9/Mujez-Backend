@@ -16,6 +16,7 @@ import { DatabaseService } from "../../../infrastructure/database/database.servi
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
 import {
   STAGES,
+  BROKERAGE_LEAD_STATUSES,
   CLOSED_STAGES,
   type SalesQuery,
   type SalesRequest,
@@ -711,6 +712,9 @@ export class SalesService {
   }
   async pipeline(p: Principal, q: SalesQuery) {
     await this.access(p, "pipeline.read");
+    const brokerage = brokerageWorkspace(p);
+    const statusColumn = brokerage ? "l.brokerage_status" : "l.stage";
+    const boardStages = brokerage ? BROKERAGE_LEAD_STATUSES : STAGES;
     const { where, args } = filters(p, q, true);
     // Assigned leads are real pipeline cards before an opportunity is recorded.
     // Keep missing deal details null; do not create synthetic zero-value opportunities.
@@ -723,13 +727,13 @@ export class SalesService {
       async (c) => {
         const rows = (
           await c.query(
-            `SELECT coalesce(o.id,l.id) AS id,o.id AS opportunity_id,coalesce(o.public_id,l.public_id) AS public_id,l.id AS lead_id,o.title,o.deal_type,o.value_minor::text AS value_minor,o.version,l.public_id AS lead_ref,l.name AS contact,l.owner_user_id,u.name AS owner_name,l.stage,l.segment,l.stage_changed_at,l.version AS lead_version,o.seed_key,l.seed_key AS lead_seed_key${boardFrom} WHERE ${boardWhere} ORDER BY coalesce(o.created_at,l.assigned_at,l.created_at) DESC,l.id LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
+            `SELECT coalesce(o.id,l.id) AS id,o.id AS opportunity_id,coalesce(o.public_id,l.public_id) AS public_id,l.id AS lead_id,o.title,o.deal_type,o.value_minor::text AS value_minor,o.version,l.public_id AS lead_ref,l.name AS contact,l.owner_user_id,u.name AS owner_name,l.stage,l.brokerage_status,l.segment,l.stage_changed_at,l.version AS lead_version,o.seed_key,l.seed_key AS lead_seed_key${boardFrom} WHERE ${boardWhere} ORDER BY coalesce(o.created_at,l.assigned_at,l.created_at) DESC,l.id LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
             [...args, q.limit, (q.page - 1) * q.limit],
           )
         ).rows;
         const stats = (
           await c.query(
-            `SELECT l.stage,count(*)::int AS count,count(*) FILTER(WHERE o.id IS NULL)::int AS unset_count,coalesce(sum(o.value_minor) FILTER(WHERE o.deal_type='sale'),0)::text AS sale_minor${boardFrom} WHERE ${boardWhere} GROUP BY l.stage`,
+            `SELECT ${statusColumn} AS board_status,count(*)::int AS count,count(*) FILTER(WHERE o.id IS NULL)::int AS unset_count,coalesce(sum(o.value_minor) FILTER(WHERE o.deal_type='sale'),0)::text AS sale_minor${boardFrom} WHERE ${boardWhere} GROUP BY ${statusColumn}`,
             args,
           )
         ).rows;
@@ -748,6 +752,7 @@ export class SalesService {
               ? { id: r.owner_user_id, name: r.owner_name }
               : null,
             stage: r.stage,
+            brokerageStatus: r.brokerage_status ?? null,
             segment: r.segment,
             stageChangedAt: iso(r.stage_changed_at),
             version: r.version ?? r.lead_version,
@@ -755,11 +760,11 @@ export class SalesService {
             sample: !!(r.seed_key || r.lead_seed_key),
           })),
           total: stats.reduce((n, r) => n + r.count, 0),
-          stats: STAGES.map((stage) => ({
+          stats: boardStages.map((stage) => ({
             stage,
-            count: stats.find((r) => r.stage === stage)?.count ?? 0,
-            saleMinor: stats.find((r) => r.stage === stage)?.sale_minor ?? "0",
-            unsetCount: stats.find((r) => r.stage === stage)?.unset_count ?? 0,
+            count: stats.find((r) => r.board_status === stage)?.count ?? 0,
+            saleMinor: stats.find((r) => r.board_status === stage)?.sale_minor ?? "0",
+            unsetCount: stats.find((r) => r.board_status === stage)?.unset_count ?? 0,
           })),
           page: q.page,
           limit: q.limit,
