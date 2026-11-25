@@ -182,7 +182,14 @@ export class SalesService {
            FROM tenant.users u
            LEFT JOIN tenant.leads l ON l.company_id=$1 AND l.owner_user_id=u.id AND l.archived_at IS NULL
            WHERE u.company_id=$1 AND u.status='active' AND u.deleted_at IS NULL
-             AND u.role_id IN(SELECT id FROM tenant.roles WHERE company_id=$1 AND 'leads.read'=ANY(permissions))
+             AND EXISTS (
+               SELECT 1 FROM tenant.roles r
+               WHERE r.company_id=$1 AND 'leads.read'=ANY(r.permissions)
+                 AND (r.id=u.role_id OR EXISTS (
+                   SELECT 1 FROM tenant.user_additional_roles ar
+                   WHERE ar.company_id=$1 AND ar.user_id=u.id AND ar.role_id=r.id
+                 ))
+             )
            GROUP BY u.id,u.name
            ORDER BY u.name,u.id
            LIMIT 1000`,
