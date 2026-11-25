@@ -17,6 +17,7 @@ import {
   clientSchema,
   propertySchema,
   querySchema,
+  agentPermissionsSchema,
   day,
   stamp,
   money,
@@ -97,7 +98,64 @@ export class OfficeService {
       )
     ).rows[0];
     if (!r) throw new NotFoundException("Property not found");
+    if (p.scope !== "company" && !(await this.propertyVisible(c, p, r)))
+      throw new NotFoundException("Property not found");
     return r;
+  }
+  /** Agent-level view scope: which purposes and cities an agent's own browsing
+   * (list, detail, recommendations) is restricted to. Does not affect who can
+   * edit a property -- that stays governed by canProperty (responsible/team). */
+  async agentPermissions(c: PoolClient, companyId: string, userId: string) {
+    const row = (
+      await c.query(
+        "SELECT * FROM tenant.office_agent_permissions WHERE company_id=$1 AND user_id=$2",
+        [companyId, userId],
+      )
+    ).rows[0];
+    if (!row)
+      return {
+        viewSale: true,
+        viewRent: true,
+        viewPhones: true,
+        addClient: true,
+        addProperty: true,
+        editData: true,
+        deleteProperties: false,
+        allCities: true,
+        cityIds: [] as string[],
+      };
+    const cityIds = row.all_cities
+      ? []
+      : (
+          await c.query(
+            "SELECT city_id FROM tenant.office_agent_cities WHERE company_id=$1 AND user_id=$2",
+            [companyId, userId],
+          )
+        ).rows.map((x) => x.city_id as string);
+    return {
+      viewSale: row.view_sale as boolean,
+      viewRent: row.view_rent as boolean,
+      viewPhones: row.view_phones as boolean,
+      addClient: row.add_client as boolean,
+      addProperty: row.add_property as boolean,
+      editData: row.edit_data as boolean,
+      deleteProperties: row.delete_properties as boolean,
+      allCities: row.all_cities as boolean,
+      cityIds,
+    };
+  }
+  async propertyVisible(c: PoolClient, p: Principal, r: any) {
+    const perm = await this.agentPermissions(c, p.companyId!, p.id);
+    const purpose = r.data?.purpose;
+    const purposeOk =
+      purpose === "both"
+        ? perm.viewSale || perm.viewRent
+        : purpose === "rent"
+          ? perm.viewRent
+          : perm.viewSale;
+    const cityOk =
+      perm.allCities || (!!r.city_id && perm.cityIds.includes(r.city_id));
+    return purposeOk && cityOk;
   }
   async canProperty(c: PoolClient, p: Principal, r: any) {
     if (p.scope === "company" || r.responsible_id === p.id) return true;
@@ -231,7 +289,12 @@ export class OfficeService {
       createdAt: iso(r.created_at),
     };
   }
-  async propertyDto(c: PoolClient, p: Principal, r: any) {
+  async propertyDto(
+    c: PoolClient,
+    p: Principal,
+    r: any,
+    perm?: Awaited<ReturnType<OfficeService["agentPermissions"]>> | null,
+  ) {
     const active = (
       await c.query(
         "SELECT d.id,d.owner_id,u.name AS owner_name,d.status,d.lease_end::text AS lease_end,d.client_id FROM tenant.office_deals d JOIN tenant.users u ON u.company_id=d.company_id AND u.id=d.owner_id WHERE d.company_id=$1 AND d.property_id=$2 AND d.status IN ('booked','rented')",
@@ -255,7 +318,10 @@ export class OfficeService {
       };
     }
     const allowed = await this.canProperty(c, p, r);
-    const ownsContact = allowed || r.created_by === p.id;
+    const viewPhones =
+      p.scope === "company" ||
+      (perm ?? (await this.agentPermissions(c, p.companyId!, p.id))).viewPhones;
+    const ownsContact = (allowed || r.created_by === p.id) && viewPhones;
     return {
       id: r.id,
       code: r.code,
@@ -412,11 +478,109 @@ export class OfficeService {
       timeZone: "Africa/Cairo",
     }));
   }
+  async getAgentPermissions(p: Principal, userId: string) {
+    await this.cityOwner(p);
+    return this.db.tenant(p.companyId!, async (c) => {
+      if (
+        !(
+          await c.query(
+            "SELECT 1 FROM tenant.users WHERE company_id=$1 AND id=$2 AND identity_pool='company_user' AND deleted_at IS NULL",
+            [p.companyId, userId],
+          )
+        ).rowCount
+      )
+        throw new NotFoundException("Team member not found");
+      const version =
+        (
+          await c.query(
+            "SELECT version FROM tenant.office_agent_permissions WHERE company_id=$1 AND user_id=$2",
+            [p.companyId, userId],
+          )
+        ).rows[0]?.version ?? 0;
+      return { ...(await this.agentPermissions(c, p.companyId!, userId)), version };
+    });
+  }
+  async saveAgentPermissions(p: Principal, userId: string, b: OfficeWrite) {
+    const x = parse(agentPermissionsSchema, b.data);
+    await this.cityOwner(p);
+    return this.write(p, "agent_permissions:" + userId, b, async (c) => {
+      if (
+        !(
+          await c.query(
+            "SELECT 1 FROM tenant.users WHERE company_id=$1 AND id=$2 AND identity_pool='company_user' AND deleted_at IS NULL",
+            [p.companyId, userId],
+          )
+        ).rowCount
+      )
+        throw new NotFoundException("Team member not found");
+      const current = (
+        await c.query(
+          "SELECT version FROM tenant.office_agent_permissions WHERE company_id=$1 AND user_id=$2 FOR UPDATE",
+          [p.companyId, userId],
+        )
+      ).rows[0];
+      this.version({ version: current?.version ?? 0 }, b.version);
+      await c.query(
+        `INSERT INTO tenant.office_agent_permissions(company_id,user_id,view_sale,view_rent,view_phones,add_client,add_property,edit_data,delete_properties,all_cities)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT(company_id,user_id) DO UPDATE SET view_sale=$3,view_rent=$4,view_phones=$5,add_client=$6,add_property=$7,edit_data=$8,delete_properties=$9,all_cities=$10,version=tenant.office_agent_permissions.version+1,updated_at=now()`,
+        [
+          p.companyId,
+          userId,
+          x.viewSale,
+          x.viewRent,
+          x.viewPhones,
+          x.addClient,
+          x.addProperty,
+          x.editData,
+          x.deleteProperties,
+          x.allCities,
+        ],
+      );
+      await c.query(
+        "DELETE FROM tenant.office_agent_cities WHERE company_id=$1 AND user_id=$2",
+        [p.companyId, userId],
+      );
+      if (!x.allCities && x.cityIds.length)
+        await c.query(
+          "INSERT INTO tenant.office_agent_cities(company_id,user_id,city_id) SELECT $1,$2,unnest($3::uuid[])",
+          [p.companyId, userId, x.cityIds],
+        );
+      const next = (
+        await c.query(
+          "SELECT version FROM tenant.office_agent_permissions WHERE company_id=$1 AND user_id=$2",
+          [p.companyId, userId],
+        )
+      ).rows[0].version;
+      await this.event(c, p, "agent_permissions.updated", userId, {
+        viewSale: x.viewSale,
+        viewRent: x.viewRent,
+        viewPhones: x.viewPhones,
+        addClient: x.addClient,
+        addProperty: x.addProperty,
+        editData: x.editData,
+        deleteProperties: x.deleteProperties,
+        allCities: x.allCities,
+      });
+      return { version: next };
+    });
+  }
   async saveClient(p: Principal, b: OfficeWrite, id?: string) {
     const x = parse(clientSchema, b.data);
     return this.write(p, "client:" + String(id ?? "new"), b, async (c) => {
       const r = id ? await this.client(c, p, id, true) : null;
       if (r) this.version(r, b.version);
+      if (p.scope !== "company") {
+        const perm = await this.agentPermissions(c, p.companyId!, p.id);
+        if (!r && !perm.addClient)
+          throw new ForbiddenException(
+            "You don't have permission to add clients",
+          );
+        if (r && !perm.editData)
+          throw new ForbiddenException(
+            "You don't have permission to edit records",
+          );
+      }
       const ownerId = x.ownerId ?? r?.owner_id ?? p.id;
       await this.target(c, p, ownerId);
       if (
@@ -520,6 +684,17 @@ export class OfficeService {
         if (!(await this.canProperty(c, p, r)))
           throw new ForbiddenException(
             "Only the responsible salesperson or management can edit",
+          );
+      }
+      if (p.scope !== "company") {
+        const perm = await this.agentPermissions(c, p.companyId!, p.id);
+        if (!r && !perm.addProperty)
+          throw new ForbiddenException(
+            "You don't have permission to add properties",
+          );
+        if (r && !perm.editData)
+          throw new ForbiddenException(
+            "You don't have permission to edit records",
           );
       }
       const responsible = x.responsibleId ?? r?.responsible_id ?? p.id;
@@ -631,6 +806,18 @@ export class OfficeService {
         };
         if (view !== "properties") where.push(await this.scope(c, p, "x", a));
         if (view === "deals") where.push(await this.scope(c, p, "cl", a));
+        const perm =
+          view === "properties" && p.scope !== "company"
+            ? await this.agentPermissions(c, p.companyId!, p.id)
+            : null;
+        if (perm && (!perm.viewSale || !perm.viewRent)) {
+          const purposes = [
+            ...(perm.viewSale ? ["sale", "both"] : []),
+            ...(perm.viewRent ? ["rent", "both"] : []),
+          ];
+          add(`x.data->>'purpose'=ANY(?::text[])`, purposes);
+        }
+        if (perm && !perm.allCities) add(`x.city_id=ANY(?::uuid[])`, perm.cityIds);
         if (q.q) {
           const expr =
             view === "properties"
@@ -792,7 +979,7 @@ export class OfficeService {
               view === "clients"
                 ? this.clientDto(r)
                 : view === "properties"
-                  ? this.propertyDto(c, p, r)
+                  ? this.propertyDto(c, p, r, perm)
                   : this.dealDto(r),
             ),
           ),
@@ -1098,6 +1285,18 @@ export class OfficeService {
     return this.db.tenant(
       p.companyId!,
       async (c) => {
+        const perm =
+          p.scope !== "company"
+            ? await this.agentPermissions(c, p.companyId!, p.id)
+            : null;
+        if (
+          perm &&
+          ((purpose === "sale" && !perm.viewSale) ||
+            (purpose === "rent" && !perm.viewRent))
+        )
+          throw new ForbiddenException(
+            "You don't have permission to view this purpose",
+          );
         const client = await this.client(c, p, id),
           n = client.needs;
         if (n.purpose !== "both" && n.purpose !== purpose)
@@ -1123,6 +1322,7 @@ export class OfficeService {
           AND ($8::int IS NULL OR (p.data->>'bedrooms')::int>=$8) AND ($9::int IS NULL OR (p.data->>'bathrooms')::int>=$9)
           AND ($10::numeric IS NULL OR (p.data->>'area')::numeric>=$10) AND ($11::numeric IS NULL OR (p.data->>'area')::numeric<=$11)
           AND (cardinality($12::text[])=0 OR EXISTS(SELECT 1 FROM unnest($12::text[]) need WHERE strpos(translate(lower(concat_ws(' ',p.data->>'areaName',p.data->>'city',p.data->>'address')),'أإآى','اااي'),translate(lower(need),'أإآى','اااي'))>0))
+          AND ($13::boolean OR p.city_id=ANY($14::uuid[]))
           ORDER BY (p.data->>$3)::bigint,p.id LIMIT 1000`,
             [
               p.companyId,
@@ -1137,6 +1337,8 @@ export class OfficeService {
               n.minArea,
               n.maxArea,
               n.areas ?? [],
+              !perm || perm.allCities,
+              perm?.cityIds ?? [],
             ],
           )
         ).rows;
@@ -1182,7 +1384,7 @@ export class OfficeService {
             ),
             delta = price > BigInt(budget) ? price - BigInt(budget) : 0n;
           items.push({
-            property: await this.propertyDto(c, p, r),
+            property: await this.propertyDto(c, p, r, perm),
             priceMinor: price.toString(),
             aboveBudgetMinor: delta.toString(),
             aboveBudgetPercent: Number((delta * 10000n) / BigInt(budget)) / 100,

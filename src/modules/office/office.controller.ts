@@ -52,6 +52,19 @@ export class OfficeController {
   @Get("options") options(@Req() r: AuthRequest) {
     return this.s.options(r.principal);
   }
+  @Get("agents/:id/permissions") agentPermissions(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.s.getAgentPermissions(r.principal, id);
+  }
+  @Post("agents/:id/permissions") saveAgentPermissions(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: OfficeWrite,
+  ) {
+    return this.s.saveAgentPermissions(r.principal, id, b);
+  }
   @Get("clients") clients(
     @Req() r: AuthRequest,
     @Query() q: Record<string, string>,

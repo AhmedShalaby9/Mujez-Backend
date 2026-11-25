@@ -166,3 +166,16 @@ export const querySchema = z
       !v.minPrice || !v.maxPrice || BigInt(v.minPrice) <= BigInt(v.maxPrice),
     "Price range invalid",
   );
+export const agentPermissionsSchema = z
+  .object({
+    viewSale: z.boolean().default(true),
+    viewRent: z.boolean().default(true),
+    viewPhones: z.boolean().default(true),
+    addClient: z.boolean().default(true),
+    addProperty: z.boolean().default(true),
+    editData: z.boolean().default(true),
+    deleteProperties: z.boolean().default(false),
+    allCities: z.boolean().default(true),
+    cityIds: z.array(z.uuid()).max(500).default([]),
+  })
+  .strict();

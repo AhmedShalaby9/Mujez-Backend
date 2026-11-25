@@ -464,6 +464,12 @@ export class TeamService {
             [p.companyId, input.name, input.email.toLowerCase(), roles, p.id],
           )
         ).rows[0].id;
+        const userId = (
+          await c.query(
+            "SELECT user_id FROM platform.company_employee_accounts WHERE id=$1",
+            [accountId],
+          )
+        ).rows[0].user_id;
         const token = randomBytes(32).toString("hex"),
           expiresAt = (
             await c.query(
@@ -474,6 +480,7 @@ export class TeamService {
         return {
           status: "invited",
           accountId,
+          userId,
           token,
           expiresAt,
           email: input.email.toLowerCase(),

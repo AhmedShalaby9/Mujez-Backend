@@ -705,6 +705,42 @@
         "tags": ["Office"]
       }
     },
+    "/api/v1/office/agents/{id}/permissions": {
+      "get": {
+        "operationId": "OfficeController_agentPermissions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Office"]
+      },
+      "post": {
+        "operationId": "OfficeController_saveAgentPermissions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OfficeWrite" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Office"]
+      }
+    },
     "/api/v1/office/clients": {
       "get": {
         "operationId": "OfficeController_clients",
