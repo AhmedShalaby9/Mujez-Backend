@@ -29,6 +29,25 @@ export const STAGES = [
   "lost",
   "unqualified",
 ] as const;
+export const BROKERAGE_LEAD_STATUSES = [
+  "new_lead",
+  "call_back",
+  "hot_case",
+  "low_budget",
+  "no_answer",
+  "non_potential",
+  "potential",
+  "resale",
+  "wrong_number",
+  "switched_off",
+  "whatsapp",
+  "closed_deal",
+  "closed_outside",
+  "eoi",
+  "meeting_scheduled",
+  "meeting_done",
+] as const;
+export type BrokerageLeadStatus = (typeof BROKERAGE_LEAD_STATUSES)[number];
 /** Stages that take a lead out of the active pipeline. */
 export const CLOSED_STAGES = ["won", "lost", "unqualified"] as const;
 export class SalesQuery {
@@ -67,6 +86,10 @@ export class SalesQuery {
   @IsIn(STAGES)
   @ApiPropertyOptional({ type: String, enum: STAGES })
   stage?: string;
+  @IsOptional()
+  @IsIn(BROKERAGE_LEAD_STATUSES)
+  @ApiPropertyOptional({ type: String, enum: BROKERAGE_LEAD_STATUSES })
+  leadStatus?: BrokerageLeadStatus;
   @IsOptional()
   @IsIn(["active", "archived", "all"])
   @ApiPropertyOptional({ type: String })
@@ -170,6 +193,18 @@ export class StageChange extends SalesRequest {
   @IsIn([...STAGES, "reopen"])
   @ApiProperty({ type: String, enum: [...STAGES, "reopen"] })
   declare stage: string;
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  @MaxLength(500)
+  @ApiPropertyOptional({ type: String })
+  reason?: string;
+}
+export class BrokerageLeadStatusChange extends SalesRequest {
+  @IsInt() @Min(0) @ApiProperty({ type: Number }) declare version: number;
+  @IsIn(BROKERAGE_LEAD_STATUSES)
+  @ApiProperty({ type: String, enum: BROKERAGE_LEAD_STATUSES })
+  declare status: BrokerageLeadStatus;
   @IsOptional()
   @IsString()
   @Transform(trim)

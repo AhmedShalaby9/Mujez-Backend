@@ -1131,6 +1131,32 @@
             }
           },
           {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
+              ]
+            }
+          },
+          {
             "name": "archived",
             "required": false,
             "in": "query",
@@ -1244,6 +1270,31 @@
           "content": {
             "application/json": {
               "schema": { "$ref": "#/components/schemas/StageChange" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leads"]
+      }
+    },
+    "/api/v1/leads/{id}/status": {
+      "post": {
+        "operationId": "LeadsController_status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrokerageLeadStatusChange"
+              }
             }
           }
         },
@@ -3460,6 +3511,32 @@
             }
           },
           {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
+              ]
+            }
+          },
+          {
             "name": "archived",
             "required": false,
             "in": "query",
@@ -3555,6 +3632,32 @@
                 "won",
                 "lost",
                 "unqualified"
+              ]
+            }
+          },
+          {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
               ]
             }
           },
@@ -3771,6 +3874,32 @@
                 "won",
                 "lost",
                 "unqualified"
+              ]
+            }
+          },
+          {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
               ]
             }
           },
@@ -4067,6 +4196,32 @@
             }
           },
           {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
+              ]
+            }
+          },
+          {
             "name": "archived",
             "required": false,
             "in": "query",
@@ -4331,6 +4486,32 @@
             }
           },
           {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
+              ]
+            }
+          },
+          {
             "name": "archived",
             "required": false,
             "in": "query",
@@ -4521,6 +4702,32 @@
             }
           },
           {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
+              ]
+            }
+          },
+          {
             "name": "archived",
             "required": false,
             "in": "query",
@@ -4678,6 +4885,32 @@
                 "won",
                 "lost",
                 "unqualified"
+              ]
+            }
+          },
+          {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
               ]
             }
           },
@@ -4889,6 +5122,32 @@
             }
           },
           {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
+              ]
+            }
+          },
+          {
             "name": "archived",
             "required": false,
             "in": "query",
@@ -5059,6 +5318,32 @@
                 "won",
                 "lost",
                 "unqualified"
+              ]
+            }
+          },
+          {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
               ]
             }
           },
@@ -5285,6 +5570,32 @@
                 "won",
                 "lost",
                 "unqualified"
+              ]
+            }
+          },
+          {
+            "name": "leadStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new_lead",
+                "call_back",
+                "hot_case",
+                "low_budget",
+                "no_answer",
+                "non_potential",
+                "potential",
+                "resale",
+                "wrong_number",
+                "switched_off",
+                "whatsapp",
+                "closed_deal",
+                "closed_outside",
+                "eoi",
+                "meeting_scheduled",
+                "meeting_done"
               ]
             }
           },
@@ -7792,6 +8103,36 @@
           "reason": { "type": "string" }
         },
         "required": ["requestId", "version", "stage"]
+      },
+      "BrokerageLeadStatusChange": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new_lead",
+              "call_back",
+              "hot_case",
+              "low_budget",
+              "no_answer",
+              "non_potential",
+              "potential",
+              "resale",
+              "wrong_number",
+              "switched_off",
+              "whatsapp",
+              "closed_deal",
+              "closed_outside",
+              "eoi",
+              "meeting_scheduled",
+              "meeting_done"
+            ]
+          },
+          "reason": { "type": "string" }
+        },
+        "required": ["requestId", "version", "status"]
       },
       "LeadArchive": {
         "type": "object",
