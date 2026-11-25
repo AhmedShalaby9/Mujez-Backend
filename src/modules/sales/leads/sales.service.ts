@@ -27,6 +27,7 @@ import {
   type ActivityQuery,
   type DealInput,
   type DealUpdate,
+  type BrokerageLeadStatusChange,
 } from "./leads.dto.js";
 export function normalizePhone(value: string) {
   if (!/^[+0-9 ()-]+$/.test(value))
@@ -43,6 +44,8 @@ export function normalizePhone(value: string) {
 const LEAD = `SELECT l.*,(SELECT max(a.created_at) FROM tenant.lead_activities a WHERE a.company_id=l.company_id AND a.lead_id=l.id) AS last_activity_at,l.budget_minor::text AS budget_minor,u.name AS owner_name,o.id AS opportunity_id,o.public_id AS deal_ref,o.title AS deal_title,o.value_minor::text AS deal_value,o.deal_type,o.version AS deal_version,mc.name AS campaign_name,rr.name AS routing_rule_name,CASE WHEN ${NOT_CONTACTED_SQL} AND rr.active AND rr.archived_at IS NULL AND rr.sla_minutes>0 THEN l.assigned_at+make_interval(mins=>rr.sla_minutes) ELSE NULL END AS sla_due_at FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id LEFT JOIN tenant.marketing_campaigns mc ON mc.company_id=l.company_id AND mc.id=l.campaign_id LEFT JOIN tenant.routing_rules rr ON rr.company_id=l.company_id AND rr.id=l.routing_rule_id`;
 const ref = (prefix: string) =>
   prefix + "-" + randomBytes(6).toString("hex").toUpperCase();
+const brokerageWorkspace = (p: Principal) =>
+  (p.company?.type ?? p.workspace?.company.type) === "brokerage";
 const iso = (value: any) => (value ? new Date(value).toISOString() : null);
 export function leadDto(l: any) {
   return {
@@ -58,6 +61,7 @@ export function leadDto(l: any) {
     budgetMinor: l.budget_minor === null ? null : String(l.budget_minor),
     currency: "EGP",
     source: l.source,
+    brokerageStatus: l.brokerage_status ?? null,
     campaign: l.campaign_id
       ? { id: l.campaign_id, name: l.campaign_name }
       : null,
@@ -129,6 +133,10 @@ function filters(p: Principal, q: SalesQuery, board = false) {
   if (q.stage) {
     args.push(q.stage);
     where.push("l.stage=$" + args.length);
+  }
+  if (q.leadStatus) {
+    args.push(q.leadStatus);
+    where.push("l.brokerage_status=$" + args.length);
   }
   if (q.q) {
     args.push("%" + q.q.replace(/[\\%_]/g, "\\$&") + "%");
@@ -466,7 +474,7 @@ export class SalesService {
     await requireCrmSlot(c, p.companyId!, "leads");
     const l = (
       await c.query(
-        `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,score,campaign_id,routing_rule_id,assigned_at,email) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END,$13) RETURNING id`,
+        `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,score,campaign_id,routing_rule_id,assigned_at,email,brokerage_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END,$13,$14) RETURNING id`,
         [
           p.companyId,
           ref("L"),
@@ -481,6 +489,7 @@ export class SalesService {
           campaign,
           routed?.ruleId ?? null,
           input.email?.toLowerCase() ?? null,
+          brokerageWorkspace(p) ? "new_lead" : null,
         ],
       )
     ).rows[0];
@@ -606,6 +615,35 @@ export class SalesService {
           reason: input.reason ?? null,
         });
         return leadDto(await this.row(c, p, leadId));
+      },
+    );
+  }
+  async brokerageStatus(
+    p: Principal,
+    id: string,
+    input: BrokerageLeadStatusChange,
+  ) {
+    if (!brokerageWorkspace(p)) throw new ForbiddenException();
+    return this.write(
+      p,
+      "leads.manage",
+      "lead.status:" + id,
+      input,
+      async (c) => {
+        const l = await this.row(c, p, id, true);
+        this.check(l, input.version);
+        if (l.brokerage_status === input.status)
+          throw new ConflictException("Lead already has that status");
+        await c.query(
+          "UPDATE tenant.leads SET brokerage_status=$3,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
+          [p.companyId, id, input.status],
+        );
+        await this.event(c, p, id, "lead.status_changed", {
+          from: l.brokerage_status,
+          to: input.status,
+          reason: input.reason ?? null,
+        });
+        return leadDto(await this.row(c, p, id));
       },
     );
   }

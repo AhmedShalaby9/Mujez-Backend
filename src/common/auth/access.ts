@@ -18,6 +18,7 @@ export interface Principal {
   roles?: string[];
   rolesVersion?: number;
   permissions: string[];
+  company?: { type?: string };
   scope: "own" | "team" | "company" | "platform";
   teamId?: string;
   mustChangePassword?: boolean;

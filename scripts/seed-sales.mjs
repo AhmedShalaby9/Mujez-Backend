@@ -14,7 +14,7 @@ export async function seedSales(
     deals = 0;
   const companies = (
     await c.query(
-      "SELECT co.id,co.slug FROM platform.companies co WHERE co.slug=ANY($1::text[]) AND co.status IN ('pending','trial','active') AND EXISTS(SELECT 1 FROM platform.subscriptions s WHERE s.company_id=co.id AND s.status IN ('active','trialing') AND s.period_end>now()) ORDER BY co.id",
+      "SELECT co.id,co.slug,co.company_type FROM platform.companies co WHERE co.slug=ANY($1::text[]) AND co.status IN ('pending','trial','active') AND EXISTS(SELECT 1 FROM platform.subscriptions s WHERE s.company_id=co.id AND s.status IN ('active','trialing') AND s.period_end>now()) ORDER BY co.id",
       [slugs],
     )
   ).rows;
@@ -52,7 +52,7 @@ export async function seedSales(
       const key = "sales-v1-" + n;
       const l = (
         await c.query(
-          `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,stage,seed_key) VALUES($1,$2,$3,$4,$5,$6,$7,'manual',$8,$9,$10) ON CONFLICT(company_id,seed_key) DO NOTHING RETURNING id`,
+          `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,stage,seed_key,brokerage_status) VALUES($1,$2,$3,$4,$5,$6,$7,'manual',$8,$9,$10,$11) ON CONFLICT(company_id,seed_key) DO NOTHING RETURNING id`,
           [
             company.id,
             "SAMPLE-L-" + n,
@@ -64,6 +64,13 @@ export async function seedSales(
             actor,
             stage,
             key,
+            company.company_type === "brokerage"
+              ? {
+                  new: "new_lead",
+                  qualified: "potential",
+                  lost: "non_potential",
+                }[stage] ?? "new_lead"
+              : null,
           ],
         )
       ).rows[0];

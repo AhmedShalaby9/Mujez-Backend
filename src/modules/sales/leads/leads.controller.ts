@@ -19,6 +19,7 @@ import {
   LeadArchive,
   LeadNote,
   ActivityQuery,
+  BrokerageLeadStatusChange,
 } from "./leads.dto.js";
 @RequireAccess(["company_admin", "company_user"], "leads.read")
 @Controller("api/v1/leads")
@@ -65,6 +66,15 @@ export class LeadsController {
     @Body() b: StageChange,
   ) {
     return this.service.stage(req.principal, id, b);
+  }
+  @Post(":id/status")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  status(
+    @Req() req: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() b: BrokerageLeadStatusChange,
+  ) {
+    return this.service.brokerageStatus(req.principal, id, b);
   }
   @Post(":id/archive")
   @RequireAccess(["company_admin", "company_user"], "leads.manage")
