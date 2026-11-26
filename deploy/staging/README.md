@@ -60,10 +60,10 @@ TRUST_PROXY_CIDRS in the server Compose .env identifies the trusted ingress gate
 5. Back up PostgreSQL with `pg_dump` (custom format).
 6. Run pending checked-in `database/migrations/*.sql` using the owner connection.
 7. Restart the API and require database/Redis readiness within 120 seconds.
-8. Switch the active backend path and check public HTTPS readiness.
-9. Raise the staging API request limit to 15 MB for deal document submissions,
-   validate Nginx, and reload it. The script preserves TLS settings and restores
-   the prior config if validation or reload fails.
+8. Switch the active backend path and, in the same SSH session, raise the API
+   request limit to 15 MB for deal documents. Validate Nginx and reload it; the
+   script preserves TLS settings and restores the prior config on failure.
+9. Check public HTTPS readiness.
 
 The migration runner records filenames/checksums and skips applied files. Add a
 new numbered SQL migration for each schema change; do not edit applied files.
