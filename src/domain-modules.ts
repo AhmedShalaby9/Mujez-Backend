@@ -6,6 +6,7 @@ import { CatalogModule } from "./modules/inventory/catalog/catalog.module.js";
 import { PlatformOverviewModule } from "./modules/platform/overview/overview.module.js";
 import { PlatformAuditModule } from "./modules/platform/audit/audit.module.js";
 import { SalesLeadsModule } from "./modules/sales/leads/leads.module.js";
+import { BrokerageDealsModule } from "./modules/sales/brokerage-deals/brokerage-deals.module.js";
 import { SalesContactsModule } from "./modules/sales/contacts/contacts.module.js";
 import { SalesPipelineModule } from "./modules/sales/pipeline/pipeline.module.js";
 import { SalesTasksModule } from "./modules/sales/tasks/tasks.module.js";
@@ -44,6 +45,7 @@ export const DOMAIN_MODULES = [
   PlatformOverviewModule,
   PlatformAuditModule,
   SalesLeadsModule,
+  BrokerageDealsModule,
   SalesContactsModule,
   SalesPipelineModule,
   SalesTasksModule,

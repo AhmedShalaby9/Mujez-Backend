@@ -3248,6 +3248,217 @@
         "tags": ["PlatformAudit"]
       }
     },
+    "/api/v1/brokerage/deals/options": {
+      "get": {
+        "operationId": "BrokerageDealsController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
+    "/api/v1/brokerage/deals/leads": {
+      "get": {
+        "operationId": "BrokerageDealsController_leads",
+        "parameters": [
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
+    "/api/v1/brokerage/deals": {
+      "get": {
+        "operationId": "BrokerageDealsController_list",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      },
+      "post": {
+        "operationId": "BrokerageDealsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DealInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
+    "/api/v1/brokerage/deals/{id}": {
+      "get": {
+        "operationId": "BrokerageDealsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
+    "/api/v1/brokerage/deals/{id}/update": {
+      "post": {
+        "operationId": "BrokerageDealsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DealUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
+    "/api/v1/brokerage/deals/{id}/decision": {
+      "post": {
+        "operationId": "BrokerageDealsController_decide",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DealDecision" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
+    "/api/v1/brokerage/deals/{id}/documents/{documentId}": {
+      "get": {
+        "operationId": "BrokerageDealsController_document",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
+    "/api/v1/brokerage/developers": {
+      "get": {
+        "operationId": "BrokerageDealsController_developers",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      },
+      "post": {
+        "operationId": "BrokerageDealsController_createDeveloper",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DeveloperInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
+    "/api/v1/brokerage/developers/{id}/update": {
+      "post": {
+        "operationId": "BrokerageDealsController_updateDeveloper",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DeveloperUpdate" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
+    "/api/v1/brokerage/developers/{id}/archive": {
+      "post": {
+        "operationId": "BrokerageDealsController_archiveDeveloper",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DeveloperArchive" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
+    "/api/v1/brokerage/projects": {
+      "post": {
+        "operationId": "BrokerageDealsController_createProject",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BrokerageProjectInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["BrokerageDeals"]
+      }
+    },
     "/api/v1/contacts": {
       "get": {
         "operationId": "ContactsController_list",
@@ -8252,6 +8463,82 @@
         },
         "required": ["password", "reason", "filters"]
       },
+      "DealInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "leadId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "title": { "type": "string" },
+          "titleAr": { "type": "string" },
+          "type": { "type": "string" },
+          "valueMinor": {
+            "type": "string",
+            "description": "Integer EGP minor units as a string"
+          }
+        },
+        "required": [
+          "requestId",
+          "leadId",
+          "version",
+          "title",
+          "type",
+          "valueMinor"
+        ]
+      },
+      "DealUpdate": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "title": { "type": "string" },
+          "titleAr": { "type": "string" },
+          "type": { "type": "string" },
+          "valueMinor": {
+            "type": "string",
+            "description": "Integer EGP minor units as a string"
+          }
+        },
+        "required": ["requestId", "version", "title", "type", "valueMinor"]
+      },
+      "DealDecision": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "decision": { "type": "string" },
+          "reason": { "type": "string" }
+        },
+        "required": ["version", "decision"]
+      },
+      "DeveloperInput": {
+        "type": "object",
+        "properties": { "name": { "type": "string" } },
+        "required": ["name"]
+      },
+      "DeveloperUpdate": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "number" }
+        },
+        "required": ["name", "version"]
+      },
+      "DeveloperArchive": {
+        "type": "object",
+        "properties": { "version": { "type": "number" } },
+        "required": ["version"]
+      },
+      "BrokerageProjectInput": {
+        "type": "object",
+        "properties": {
+          "developerId": { "type": "string" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "location": { "type": "string" },
+          "segment": { "type": "string" }
+        },
+        "required": ["developerId", "code", "name", "location", "segment"]
+      },
       "ContactInput": {
         "type": "object",
         "properties": {
@@ -8325,44 +8612,6 @@
           "note": { "type": "string" }
         },
         "required": ["requestId", "version", "note"]
-      },
-      "DealInput": {
-        "type": "object",
-        "properties": {
-          "requestId": { "type": "string", "format": "uuid" },
-          "leadId": { "type": "string", "format": "uuid" },
-          "version": { "type": "number" },
-          "title": { "type": "string" },
-          "titleAr": { "type": "string" },
-          "type": { "type": "string" },
-          "valueMinor": {
-            "type": "string",
-            "description": "Integer EGP minor units as a string"
-          }
-        },
-        "required": [
-          "requestId",
-          "leadId",
-          "version",
-          "title",
-          "type",
-          "valueMinor"
-        ]
-      },
-      "DealUpdate": {
-        "type": "object",
-        "properties": {
-          "requestId": { "type": "string", "format": "uuid" },
-          "version": { "type": "number" },
-          "title": { "type": "string" },
-          "titleAr": { "type": "string" },
-          "type": { "type": "string" },
-          "valueMinor": {
-            "type": "string",
-            "description": "Integer EGP minor units as a string"
-          }
-        },
-        "required": ["requestId", "version", "title", "type", "valueMinor"]
       },
       "TaskInput": {
         "type": "object",
