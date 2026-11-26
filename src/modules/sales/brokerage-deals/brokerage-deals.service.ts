@@ -24,6 +24,9 @@ import type {
 } from "./brokerage-deals.dto.js";
 
 const isAdmin = (p: Principal) => p.pool === "company_admin" && !p.workspace;
+/** Deal approval: the owner, or a Sales Admin (company_user, no finance/HR,
+ * cannot touch roles or targets, but can approve/reject deals). */
+const canApprove = (p: Principal) => isAdmin(p) || p.role === "sales_admin";
 const name = (v: any) => (typeof v === "string" ? v : (v?.en ?? v?.ar ?? ""));
 const validDate = (v: unknown) =>
   typeof v === "string" &&
@@ -404,7 +407,7 @@ export class BrokerageDealsService {
         )
       ).rows.map((x) => ({ ...x, name: name(x.name) })),
       unitTypes: UNIT_TYPES,
-      canApprove: isAdmin(p),
+      canApprove: canApprove(p),
       canManageInventory: isAdmin(p) && p.role === "company_owner",
     }));
   }
@@ -535,7 +538,7 @@ export class BrokerageDealsService {
       throw new BadRequestException("At least one document is required");
     return this.db.tenant(p.companyId!, async (c) => {
       const agentId = await this.validateLinks(c, p, b);
-      const approved = isAdmin(p);
+      const approved = canApprove(p);
       const id = (
         await c.query(
           "INSERT INTO tenant.brokerage_deals(company_id,lead_id,agent_id,client_name,client_phone,selling_type,status,approval_status,developer_id,project_id,details,created_by,approved_by,approved_at,approved_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id",
@@ -586,7 +589,7 @@ export class BrokerageDealsService {
         !b.documents?.length
       )
         return dto(old);
-      const approved = isAdmin(p);
+      const approved = canApprove(p);
       await c.query(
         "UPDATE tenant.brokerage_deals SET lead_id=$3,agent_id=$4,client_name=$5,client_phone=$6,selling_type=$7,status=$8,approval_status=$9,rejection_reason=NULL,developer_id=$10,project_id=$11,details=$12,version=version+1,approved_version=$13,approved_by=$14,approved_at=$15,updated_at=now() WHERE company_id=$1 AND id=$2",
         [
@@ -616,7 +619,7 @@ export class BrokerageDealsService {
   }
   async decide(p: Principal, id: string, b: DealDecision) {
     await this.access(p, true);
-    if (!isAdmin(p)) throw new ForbiddenException("Admin approval required");
+    if (!canApprove(p)) throw new ForbiddenException("Admin approval required");
     if (b.decision === "rejected" && !b.reason?.trim())
       throw new BadRequestException("Rejection reason is required");
     return this.db.tenant(p.companyId!, async (c) => {

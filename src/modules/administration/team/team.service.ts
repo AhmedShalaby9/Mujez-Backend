@@ -3,7 +3,10 @@ import {
   COMPANY_ROLE_FIELDS,
   COMPANY_ROLE_DEFINITIONS,
   ASSIGNABLE_COMPANY_ROLES,
+  OFFICE_SALES_ROLES,
+  TEAM_MEMBER_ROLES,
   primaryCompanyRole,
+  isTeamLeadRole,
 } from "../../../common/auth/company-roles.js";
 import {
   Injectable,
@@ -95,8 +98,8 @@ export class TeamService {
   private async roleId(c: PoolClient, companyId: string, role: TeamRole) {
     const definition = COMPANY_ROLE_DEFINITIONS[role];
     await c.query(
-      `INSERT INTO tenant.roles(company_id,key,name,permissions,scope) VALUES($1,$2,$3,$4,'own') ON CONFLICT(company_id,key) DO NOTHING`,
-      [companyId, role, definition.name, definition.permissions],
+      `INSERT INTO tenant.roles(company_id,key,name,permissions,scope) VALUES($1,$2,$3,$4,$5) ON CONFLICT(company_id,key) DO NOTHING`,
+      [companyId, role, definition.name, definition.permissions, definition.scope],
     );
     return (
       await c.query(
@@ -126,12 +129,31 @@ export class TeamService {
     );
     if (
       office &&
-      (!roles.length || roles.some((r) => !["agent", "team_lead"].includes(r)))
+      (!roles.length || roles.some((r) => !OFFICE_SALES_ROLES.includes(r as any)))
     )
       throw new BadRequestException(
         "Real estate offices can assign only Sales Agent and Team Lead",
       );
+    // Brokerage companies are not restricted to the new sales ladder at the
+    // database/provisioning level -- 'brokerage' is this platform's default
+    // company_type, used by plenty of fixtures/tests that have nothing to do
+    // with the CRM sales ladder. The dashboard's employee-invite UI is where
+    // brokerage companies are actually steered toward the ladder roles
+    // instead of Sales Agent/Team Lead.
     return !!office;
+  }
+  /** The role key a team's lead_user_id is promoted to: the brokerage
+   * ladder's team_leader when they're already on that ladder (or already a
+   * team_leader), otherwise the legacy team_lead everyone else uses.
+   * 'brokerage' is this platform's default company_type (plenty of
+   * fixtures/tests use it with no connection to the CRM sales ladder), so
+   * this is driven by the member's own current role, not company_type. */
+  private leadRoleKey(previousRole: string): TeamRole {
+    return (
+      ["property_advisor", "property_consultant", "senior", "expert"].includes(
+        previousRole,
+      ) || previousRole === "team_leader"
+    ) ? "team_leader" : "team_lead";
   }
   async changeRole(p: Principal, accountId: string, role: TeamRole) {
     return this.changeRoles(p, accountId, [role], undefined, true);
@@ -172,7 +194,7 @@ export class TeamService {
           ...(office && user.roles.includes("employee") ? ["employee"] : []),
           ...(legacy
             ? user.roles.filter(
-                (r: string) => !["agent", "team_lead"].includes(r),
+                (r: string) => !(TEAM_MEMBER_ROLES as readonly string[]).includes(r),
               )
             : []),
         ]),
@@ -184,7 +206,7 @@ export class TeamService {
         throw new BadRequestException("Choose supported company roles");
       const primary = primaryCompanyRole(roles);
       if (
-        !roles.includes("team_lead") &&
+        !roles.some(isTeamLeadRole) &&
         (
           await c.query(
             "SELECT 1 FROM tenant.teams WHERE company_id=$1 AND lead_user_id=$2",
@@ -216,7 +238,7 @@ export class TeamService {
           user.id,
           roleIds.get(primary),
           p.id,
-          roles.some((r) => r === "agent" || r === "team_lead"),
+          roles.some((r) => (TEAM_MEMBER_ROLES as readonly string[]).includes(r)),
         ],
       );
       for (const key of roles.filter((r) => r !== primary))
@@ -287,7 +309,7 @@ export class TeamService {
   }
   async myTeam(p: Principal) {
     await this.sales.access(p, "team.self.read");
-    if (p.pool !== "company_user" || p.role !== "team_lead")
+    if (p.pool !== "company_user" || !isTeamLeadRole(p.role))
       throw new ForbiddenException();
     return this.db.tenant(
       p.companyId!,
@@ -336,7 +358,7 @@ export class TeamService {
         members.length !== ids.length ||
         members.some(
           (m) =>
-            !["agent", "team_lead"].includes(m.role) ||
+            !(TEAM_MEMBER_ROLES as readonly string[]).includes(m.role) ||
             !["active", "invited"].includes(m.status),
         )
       )
@@ -388,22 +410,23 @@ export class TeamService {
         "UPDATE tenant.users SET team_id=$3,updated_at=now(),updated_by=$4 WHERE company_id=$1 AND id=ANY($2::uuid[])",
         [p.companyId, ids, team.id, p.id],
       );
-      const leadRole = await this.roleId(c, p.companyId!, "team_lead");
       const previousRole = members.find((m) => m.id === input.leadUserId)!.role;
-      if (previousRole !== "team_lead")
+      const leadRoleKey = this.leadRoleKey(previousRole);
+      const leadRoleId = await this.roleId(c, p.companyId!, leadRoleKey);
+      if (previousRole !== leadRoleKey)
         await c.query(
           "INSERT INTO tenant.user_additional_roles(company_id,user_id,role_id) SELECT company_id,id,role_id FROM tenant.users WHERE company_id=$1 AND id=$2 ON CONFLICT DO NOTHING",
           [p.companyId, input.leadUserId],
         );
       await c.query(
         "DELETE FROM tenant.user_additional_roles WHERE company_id=$1 AND user_id=$2 AND role_id=$3",
-        [p.companyId, input.leadUserId, leadRole],
+        [p.companyId, input.leadUserId, leadRoleId],
       );
       await c.query(
         "UPDATE tenant.users SET role_id=$3,roles_version=roles_version+CASE WHEN role_id IS DISTINCT FROM $3 THEN 1 ELSE 0 END WHERE company_id=$1 AND id=$2",
-        [p.companyId, input.leadUserId, leadRole],
+        [p.companyId, input.leadUserId, leadRoleId],
       );
-      if (previousRole !== "team_lead")
+      if (previousRole !== leadRoleKey)
         await recordTenantEvent(c, {
           companyId: p.companyId!,
           actorId: p.id,
@@ -411,8 +434,8 @@ export class TeamService {
           resourceType: "user",
           resourceId: input.leadUserId,
           before: { role: previousRole },
-          after: { role: "team_lead" },
-          payload: { role: "team_lead" },
+          after: { role: leadRoleKey },
+          payload: { role: leadRoleKey },
         });
       await syncTeamReporting(c, p);
       await recordTenantEvent(c, {

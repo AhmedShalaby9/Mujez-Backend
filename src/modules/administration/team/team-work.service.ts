@@ -1,6 +1,10 @@
 import { CALL_OUTCOMES } from "../../sales/cold-calls/cold-calls.dto.js";
 import { teamSnapshot } from "./insights/team-snapshot.js";
 import {
+  TEAM_MEMBER_ROLES,
+  isTeamLeadRole,
+} from "../../../common/auth/company-roles.js";
+import {
   Injectable,
   ForbiddenException,
   NotFoundException,
@@ -39,7 +43,7 @@ export class TeamWorkService {
     await this.sales.access(p, "team.self.read");
     if (
       p.pool !== "company_user" ||
-      !(p.roles ?? [p.role]).includes("team_lead")
+      !(p.roles ?? [p.role]).some(isTeamLeadRole)
     )
       throw new ForbiddenException();
     await this.sales.access(p, permission);
@@ -76,7 +80,7 @@ export class TeamWorkService {
       (active &&
         (m.status !== "active" ||
           m.account_status !== "active" ||
-          !["agent", "team_lead"].includes(m.role)))
+          !(TEAM_MEMBER_ROLES as readonly string[]).includes(m.role)))
     )
       throw new NotFoundException("Team member unavailable");
     return m;
@@ -285,7 +289,7 @@ export class TeamWorkService {
       canAssign:
         m.status === "active" &&
         m.account_status === "active" &&
-        ["agent", "team_lead"].includes(m.role),
+        (TEAM_MEMBER_ROLES as readonly string[]).includes(m.role),
     }));
     const summary = { ...zero };
     for (const item of items) {
