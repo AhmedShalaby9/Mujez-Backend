@@ -84,6 +84,34 @@ export class InventoryService {
     private readonly db: DatabaseService,
     private readonly sales: SalesService,
   ) {}
+  private brokerageProjectOwner(p: Principal) {
+    if (
+      (p.company?.type ?? p.workspace?.company.type) === "brokerage" &&
+      (p.pool !== "company_admin" ||
+        p.role !== "company_owner" ||
+        !!p.workspace)
+    )
+      throw new ForbiddenException("Company owner only");
+  }
+  private async brokerageDeveloper(
+    c: PoolClient,
+    p: Principal,
+    developer: string,
+  ) {
+    if ((p.company?.type ?? p.workspace?.company.type) !== "brokerage")
+      return null;
+    await c.query(
+      "INSERT INTO tenant.brokerage_developers(company_id,name) VALUES($1,$2) ON CONFLICT DO NOTHING",
+      [p.companyId, developer.trim()],
+    );
+    const row = (
+      await c.query(
+        "SELECT id FROM tenant.brokerage_developers WHERE company_id=$1 AND lower(name)=lower($2) AND archived_at IS NULL",
+        [p.companyId, developer.trim()],
+      )
+    ).rows[0];
+    return row.id as string;
+  }
   async row(c: PoolClient, p: Principal, table: string, id: string) {
     if (table === "units") await expireUnitReservations(c, p.companyId!, id);
     const row = (
@@ -274,11 +302,13 @@ export class InventoryService {
     );
   }
   async createProject(p: Principal, b: ProjectInput) {
+    this.brokerageProjectOwner(p);
     return this.mutate(p, "projects.manage", "project.create", b, async (c) => {
       await this.quota(c, p, "projects");
+      const developerId = await this.brokerageDeveloper(c, p, b.developer);
       const row = (
         await c.query(
-          "INSERT INTO tenant.projects(company_id,code,name,developer,location,segment) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",
+          "INSERT INTO tenant.projects(company_id,code,name,developer,location,segment,brokerage_developer_id) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",
           [
             p.companyId,
             b.code.toUpperCase(),
@@ -286,6 +316,7 @@ export class InventoryService {
             text(b.developer, b.developerAr),
             text(b.location, b.locationAr),
             b.segment,
+            developerId,
           ],
         )
       ).rows[0];
@@ -294,6 +325,7 @@ export class InventoryService {
     });
   }
   async updateProject(p: Principal, id: string, b: ProjectUpdate) {
+    this.brokerageProjectOwner(p);
     return this.mutate(
       p,
       "projects.manage",
@@ -304,9 +336,10 @@ export class InventoryService {
         this.version(old, b.version);
         if (old.archived_at)
           throw new ConflictException("Restore the project before editing");
+        const developerId = await this.brokerageDeveloper(c, p, b.developer);
         const row = (
           await c.query(
-            "UPDATE tenant.projects SET code=$3,name=$4,developer=$5,location=$6,segment=$7,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2 RETURNING *",
+            "UPDATE tenant.projects SET code=$3,name=$4,developer=$5,location=$6,segment=$7,brokerage_developer_id=$8,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2 RETURNING *",
             [
               p.companyId,
               id,
@@ -315,6 +348,7 @@ export class InventoryService {
               text(b.developer, b.developerAr),
               text(b.location, b.locationAr),
               b.segment,
+              developerId,
             ],
           )
         ).rows[0];
@@ -610,6 +644,7 @@ export class InventoryService {
     id: string,
     b: InventoryArchive,
   ) {
+    if (type === "projects") this.brokerageProjectOwner(p);
     const perm = type === "projects" ? "projects.manage" : "units.manage";
     return this.mutate(p, perm, type + ".archive:" + id, b, async (c) => {
       const old = await this.row(c, p, type, id);
