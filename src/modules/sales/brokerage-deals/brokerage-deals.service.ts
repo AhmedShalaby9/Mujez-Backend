@@ -41,6 +41,40 @@ const requiredDetails = [
   "reservationPrice",
   "reservationDate",
 ];
+export const UNIT_TYPES = [
+  "Stand alone",
+  "Apartment",
+  "Duplex",
+  "Town House",
+  "Twin House",
+  "iVilla",
+  "office",
+  "shop",
+  "Administrative",
+  "Medical",
+  "building",
+  "Pent House",
+  "Chalet",
+  "Land",
+  "Villa",
+  "Studio",
+  "Cabin",
+  "Multiple Family",
+  "Multi & Single Family",
+  "Sky Panorama",
+  "Ground Floor",
+  "Hotel Apartments",
+  "Apartment 4BR",
+  "One Story Villa",
+  "I-villa Garden - 3 BRs",
+  "Skyvilla - 3 BRs",
+  "Millennial - 1 BR",
+  "Garden Millennial - 1 BR",
+  "Millennial - 2 BR",
+  "Millennial - 3 BR",
+  "Garden Millennial - 2 BR",
+  "Garden Millennial - 3 BR",
+];
 const mimeTypes = [
   "application/pdf",
   "application/msword",
@@ -87,6 +121,13 @@ function validateDeal(b: DealInput) {
     throw new BadRequestException("Down payment must be 0–100%");
   if (String(b.details["developerSalespersonMobile"]).length > 30)
     throw new BadRequestException("Salesperson mobile is too long");
+  if (
+    b.details["unitType"] !== undefined &&
+    b.details["unitType"] !== null &&
+    String(b.details["unitType"]).trim() !== "" &&
+    !UNIT_TYPES.includes(String(b.details["unitType"]))
+  )
+    throw new BadRequestException("unitType is not a recognized unit type");
   if (JSON.stringify(b.details).length > 16000)
     throw new BadRequestException("Deal details are too large");
 }
@@ -362,6 +403,7 @@ export class BrokerageDealsService {
           [p.companyId],
         )
       ).rows.map((x) => ({ ...x, name: name(x.name) })),
+      unitTypes: UNIT_TYPES,
       canApprove: isAdmin(p),
       canManageInventory: isAdmin(p) && p.role === "company_owner",
     }));
