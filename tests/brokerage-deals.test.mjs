@@ -1,5 +1,6 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { tenantHarness } from "./tenant-harness.mjs";
 
 let h, owner, agent, leadId, developer, project;
@@ -22,6 +23,7 @@ const document = {
   data: Buffer.from("%PDF-1.4\nexample").toString("base64"),
 };
 const deal = (extra = {}) => ({
+  requestId: randomUUID(),
   leadId,
   agentId: agent.id,
   clientName: "Actual buyer",
@@ -70,10 +72,15 @@ before(async () => {
     )
   ).rows[0].id;
   h.state.principal = owner;
-  developer = (await h.post("brokerage/developers", { name: "Developer A" }))
-    .body;
+  developer = (
+    await h.post("brokerage/developers", {
+      requestId: randomUUID(),
+      name: "Developer A",
+    })
+  ).body;
   project = (
     await h.post("brokerage/projects", {
+      requestId: randomUUID(),
       developerId: developer.id,
       code: "DEALPROJ",
       name: "Project A",
@@ -109,12 +116,13 @@ test("sales deal waits for admin approval; approved contracted deal closes the l
   );
   await h.post(
     `brokerage/deals/${created.id}/decision`,
-    { version: 0, decision: "approved" },
+    { requestId: randomUUID(), version: 0, decision: "approved" },
     403,
   );
   h.state.principal = owner;
   const approved = (
     await h.post(`brokerage/deals/${created.id}/decision`, {
+      requestId: randomUUID(),
       version: 0,
       decision: "approved",
     })
@@ -148,11 +156,12 @@ test("sales deal waits for admin approval; approved contracted deal closes the l
   h.state.principal = owner;
   await h.post(
     `brokerage/deals/${created.id}/decision`,
-    { version: 0, decision: "approved" },
+    { requestId: randomUUID(), version: 0, decision: "approved" },
     409,
   );
   const rejected = (
     await h.post(`brokerage/deals/${created.id}/decision`, {
+      requestId: randomUUID(),
       version: 1,
       decision: "rejected",
       reason: "Wrong buyer details",
@@ -172,11 +181,12 @@ test("sales deal waits for admin approval; approved contracted deal closes the l
   assert.equal(adminEdited.approvalStatus, "approved");
   await h.post(
     `brokerage/developers/${developer.id}/archive`,
-    { version: 0 },
+    { requestId: randomUUID(), version: 0 },
     409,
   );
   const renamed = (
     await h.post(`brokerage/developers/${developer.id}/update`, {
+      requestId: randomUUID(),
       name: "Developer B",
       version: 0,
     })

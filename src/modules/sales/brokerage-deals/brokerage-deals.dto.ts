@@ -13,6 +13,7 @@ import {
   Max,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { SalesRequest } from "../leads/leads.dto.js";
 
 export class DealDocumentInput {
   @IsIn(["eoi", "reservation", "contract", "id_copy", "other"]) kind!: string;
@@ -20,7 +21,7 @@ export class DealDocumentInput {
   @IsString() @Length(1, 100) mimeType!: string;
   @IsString() data!: string;
 }
-export class DealInput {
+export class DealInput extends SalesRequest {
   @IsUUID() @ApiProperty() leadId!: string;
   @IsOptional() @IsUUID() @ApiPropertyOptional() agentId?: string;
   @IsString() @Length(2, 200) @ApiProperty() clientName!: string;
@@ -41,7 +42,7 @@ export class DealUpdate extends DealInput {
   @ApiPropertyOptional()
   declare documents: DealDocumentInput[];
 }
-export class DealDecision {
+export class DealDecision extends SalesRequest {
   @IsInt() @Min(0) @ApiProperty() version!: number;
   @IsIn(["approved", "rejected"]) @ApiProperty() decision!:
     "approved" | "rejected";
@@ -61,16 +62,16 @@ export class DealListQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit: number =
     30;
 }
-export class DeveloperInput {
+export class DeveloperInput extends SalesRequest {
   @IsString() @Length(2, 160) @ApiProperty() name!: string;
 }
 export class DeveloperUpdate extends DeveloperInput {
   @IsInt() @Min(0) @ApiProperty() version!: number;
 }
-export class DeveloperArchive {
+export class DeveloperArchive extends SalesRequest {
   @IsInt() @Min(0) @ApiProperty() version!: number;
 }
-export class BrokerageProjectInput {
+export class BrokerageProjectInput extends SalesRequest {
   @IsUUID() @ApiProperty() developerId!: string;
   @IsString() @Length(2, 80) @ApiProperty() code!: string;
   @IsString() @Length(2, 160) @ApiProperty() name!: string;

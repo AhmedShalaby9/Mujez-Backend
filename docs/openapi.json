@@ -8504,40 +8504,56 @@
       "DealDecision": {
         "type": "object",
         "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
           "version": { "type": "number" },
           "decision": { "type": "string" },
           "reason": { "type": "string" }
         },
-        "required": ["version", "decision"]
+        "required": ["requestId", "version", "decision"]
       },
       "DeveloperInput": {
         "type": "object",
-        "properties": { "name": { "type": "string" } },
-        "required": ["name"]
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" }
+        },
+        "required": ["requestId", "name"]
       },
       "DeveloperUpdate": {
         "type": "object",
         "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
           "name": { "type": "string" },
           "version": { "type": "number" }
         },
-        "required": ["name", "version"]
+        "required": ["requestId", "name", "version"]
       },
       "DeveloperArchive": {
         "type": "object",
-        "properties": { "version": { "type": "number" } },
-        "required": ["version"]
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" }
+        },
+        "required": ["requestId", "version"]
       },
       "BrokerageProjectInput": {
         "type": "object",
         "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
           "developerId": { "type": "string" },
           "code": { "type": "string" },
           "name": { "type": "string" },
           "location": { "type": "string" },
           "segment": { "type": "string" }
         },
-        "required": ["developerId", "code", "name", "location", "segment"]
+        "required": [
+          "requestId",
+          "developerId",
+          "code",
+          "name",
+          "location",
+          "segment"
+        ]
       },
       "ContactInput": {
         "type": "object",
