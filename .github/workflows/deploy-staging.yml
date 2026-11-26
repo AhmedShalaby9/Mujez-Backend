@@ -52,11 +52,6 @@ jobs:
           ssh staging-actions "install -d -m 700 $incoming"
           scp "$RUNNER_TEMP/source.tar.gz" "$RUNNER_TEMP/staging.env" deploy/staging/deploy.sh "staging-actions:$incoming/"
           ssh staging-actions "bash $incoming/deploy.sh $BACKEND_PATH $release_id"
-      - name: Configure deal document upload limit
-        run: |
-          trap 'ssh staging-actions "rm -f /tmp/mujez-configure-upload-limit.sh"' EXIT
-          scp deploy/staging/configure-upload-limit.sh staging-actions:/tmp/mujez-configure-upload-limit.sh
-          ssh staging-actions "bash /tmp/mujez-configure-upload-limit.sh"
       - name: Verify public readiness
         env:
           API_URL: ${{ vars.API_URL || 'https://api-stg.mujez.net' }}

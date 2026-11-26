@@ -66,4 +66,5 @@ if [[ ! -L "$backend_path" ]]; then
 fi
 ln -s "$release" "$backend_path-next-$release_id"
 mv -Tf "$backend_path-next-$release_id" "$backend_path"
+bash "$candidate/configure-upload-limit.sh"
 echo "Backend release $release_id deployed and ready"
