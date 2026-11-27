@@ -2,6 +2,7 @@ import { Injectable, ForbiddenException } from "@nestjs/common";
 import { DatabaseService } from "../../../../infrastructure/database/database.service.js";
 import { SalesService } from "../../../sales/leads/sales.service.js";
 import type { Principal } from "../../../../common/auth/access.js";
+import { TEAM_MEMBER_ROLES } from "../../../../common/auth/company-roles.js";
 import { teamSnapshot, type Metric } from "../insights/team-snapshot.js";
 const counts = [
   "leads",
@@ -176,7 +177,7 @@ export class CompanySnapshotService {
           })(),
         ];
         const focusMembers = [...members]
-          .filter((m: any) => ["agent", "team_lead"].includes(m.role))
+          .filter((m: any) => (TEAM_MEMBER_ROLES as readonly string[]).includes(m.role))
           .sort(
             (a: any, b: any) =>
               b.overdueTasks - a.overdueTasks ||
@@ -233,8 +234,9 @@ export class CompanySnapshotService {
           "company.salespeople",
           "Salespeople and team leads",
           "مندوبو المبيعات وقادة الفرق",
-          members.filter((m: any) => ["agent", "team_lead"].includes(m.role))
-            .length,
+          members.filter((m: any) =>
+            (TEAM_MEMBER_ROLES as readonly string[]).includes(m.role),
+          ).length,
         );
         add(
           "company.unassigned_leads",

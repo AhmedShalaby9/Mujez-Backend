@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { reportSchema, hash } from "../insights/team-insights.schema.js";
+import { TEAM_MEMBER_ROLES } from "../../../../common/auth/company-roles.js";
 export {
   insightRequest,
   insightQuery,
@@ -48,7 +49,7 @@ export function companyPromptData(s: any) {
       totalTeams: s.teams.length,
       reviewedTeamKeys: s.focusTeams,
       totalSalespeople: s.members.filter((m: any) =>
-        ["agent", "team_lead"].includes(m.role),
+        (TEAM_MEMBER_ROLES as readonly string[]).includes(m.role),
       ).length,
       reviewedMemberKeys: s.focusMembers,
     },

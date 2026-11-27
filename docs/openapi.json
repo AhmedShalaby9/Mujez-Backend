@@ -3459,6 +3459,28 @@
         "tags": ["BrokerageDeals"]
       }
     },
+    "/api/v1/brokerage/commission-scheme": {
+      "get": {
+        "operationId": "CommissionSchemeController_get",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["CommissionScheme"]
+      },
+      "post": {
+        "operationId": "CommissionSchemeController_save",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CommissionSchemeInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["CommissionScheme"]
+      }
+    },
     "/api/v1/contacts": {
       "get": {
         "operationId": "ContactsController_list",
@@ -8555,6 +8577,58 @@
           "segment"
         ]
       },
+      "CommissionTierInput": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["volume", "percent"] },
+          "threshold": { "type": "number" },
+          "ratePerMillion": { "type": "number" }
+        },
+        "required": ["kind", "threshold", "ratePerMillion"]
+      },
+      "CommissionRoleInput": {
+        "type": "object",
+        "properties": {
+          "roleKey": {
+            "type": "string",
+            "enum": [
+              "property_advisor",
+              "property_consultant",
+              "senior",
+              "expert",
+              "team_leader",
+              "sales_manager",
+              "sales_director",
+              "head_of_sales"
+            ]
+          },
+          "monthlyTarget": { "type": "number" },
+          "quarterlyTarget": { "type": "number" },
+          "version": { "type": "number" },
+          "tiers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CommissionTierInput" }
+          }
+        },
+        "required": [
+          "roleKey",
+          "monthlyTarget",
+          "quarterlyTarget",
+          "version",
+          "tiers"
+        ]
+      },
+      "CommissionSchemeInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "roles": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CommissionRoleInput" }
+          }
+        },
+        "required": ["requestId", "roles"]
+      },
       "ContactInput": {
         "type": "object",
         "properties": {
@@ -9334,6 +9408,15 @@
             "enum": [
               "agent",
               "team_lead",
+              "property_advisor",
+              "property_consultant",
+              "senior",
+              "expert",
+              "team_leader",
+              "sales_manager",
+              "sales_director",
+              "head_of_sales",
+              "sales_admin",
               "employee",
               "hr_officer",
               "hr_manager",
@@ -9355,6 +9438,15 @@
               "enum": [
                 "agent",
                 "team_lead",
+                "property_advisor",
+                "property_consultant",
+                "senior",
+                "expert",
+                "team_leader",
+                "sales_manager",
+                "sales_director",
+                "head_of_sales",
+                "sales_admin",
                 "employee",
                 "hr_officer",
                 "hr_manager",
@@ -9376,6 +9468,15 @@
             "enum": [
               "agent",
               "team_lead",
+              "property_advisor",
+              "property_consultant",
+              "senior",
+              "expert",
+              "team_leader",
+              "sales_manager",
+              "sales_director",
+              "head_of_sales",
+              "sales_admin",
               "employee",
               "hr_officer",
               "hr_manager",
@@ -9391,6 +9492,15 @@
               "enum": [
                 "agent",
                 "team_lead",
+                "property_advisor",
+                "property_consultant",
+                "senior",
+                "expert",
+                "team_leader",
+                "sales_manager",
+                "sales_director",
+                "head_of_sales",
+                "sales_admin",
                 "employee",
                 "hr_officer",
                 "hr_manager",
