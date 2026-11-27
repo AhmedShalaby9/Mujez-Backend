@@ -251,7 +251,7 @@ export class LeaveService {
   async savePolicy(p: Principal, input: unknown) {
     const b = this.hr.parse(policyInput, input);
     if (!this.final(p))
-      throw new ForbiddenException("HR Manager or company owner required");
+      throw new ForbiddenException("HR Manager or company admin required");
     return this.write(p, "leave.policy", b, async (c) => {
       const old = await this.policyRow(c, p);
       if (old.version !== b.version)
@@ -296,7 +296,7 @@ export class LeaveService {
     const policy = await this.policyRow(c, p);
     if (policy.annual_units === null)
       throw new ConflictException(
-        "Ask the company owner or HR Manager to configure annual leave first",
+        "Ask the company admin or HR Manager to configure annual leave first",
       );
     await c.query(
       "INSERT INTO tenant.leave_balances(company_id,employee_id,year,annual_units,carry_expiry) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING",
@@ -394,7 +394,7 @@ export class LeaveService {
   async adjustBalance(p: Principal, input: unknown) {
     const b = this.hr.parse(balanceInput, input);
     if (!this.final(p))
-      throw new ForbiddenException("HR Manager or company owner required");
+      throw new ForbiddenException("HR Manager or company admin required");
     return this.write(p, "leave.balance", b, async (c) => {
       const today = await this.today(c),
         year = Number(today.slice(0, 4));

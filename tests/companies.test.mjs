@@ -69,6 +69,10 @@ test("create persists company with audit/outbox, real owner and queued welcome e
   assert.equal(company.status, "active");
   assert.equal(company.users, 1);
   assert.equal(company.ownerProvisioned, true);
+  assert.deepEqual(
+    (await db.query("SELECT name FROM tenant.roles WHERE company_id=$1 AND key='company_owner'", [company.uuid])).rows[0].name,
+    { en: "Admin", ar: "المسؤول" },
+  );
   assert.equal(company.subscription.status, "active");
   assert.equal(company.subscription.plan, input.plan);
   const subscription = (
