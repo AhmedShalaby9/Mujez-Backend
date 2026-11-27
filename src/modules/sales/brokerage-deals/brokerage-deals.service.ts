@@ -79,6 +79,13 @@ export const UNIT_TYPES = [
   "Garden Millennial - 2 BR",
   "Garden Millennial - 3 BR",
 ];
+export const FINISHING_TYPES = [
+  "Core & Shell",
+  "Semi Finished",
+  "Finished",
+  "Super Lux",
+  "Ultra Super Lux",
+];
 const mimeTypes = [
   "application/pdf",
   "application/msword",
@@ -125,6 +132,8 @@ function validateDeal(b: DealInput) {
     throw new BadRequestException("Down payment must be 0–100%");
   if (String(b.details["developerSalespersonMobile"]).length > 30)
     throw new BadRequestException("Salesperson mobile is too long");
+  if (!FINISHING_TYPES.includes(String(b.details["finishing"])))
+    throw new BadRequestException("finishing is not a recognized option");
   if (
     b.details["unitType"] !== undefined &&
     b.details["unitType"] !== null &&
@@ -408,6 +417,7 @@ export class BrokerageDealsService {
         )
       ).rows.map((x) => ({ ...x, name: name(x.name) })),
       unitTypes: UNIT_TYPES,
+      finishingTypes: FINISHING_TYPES,
       canApprove: canApprove(p),
       canManageInventory: isAdmin(p) && p.role === "company_owner",
     }));
