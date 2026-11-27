@@ -85,6 +85,17 @@ export class SalesTeamUpdate extends SalesTeamInput {
   declare version: number;
 }
 
+export class EmployeeManager {
+  @IsOptional()
+  @IsUUID()
+  @ApiPropertyOptional({
+    format: "uuid",
+    description:
+      "The user's direct manager one rung up the sales ladder (team leader → sales manager → sales director → head of sales); null clears it.",
+  })
+  declare reportsToUserId?: string | null;
+  @IsInt() @Min(0) @ApiProperty({ minimum: 0 }) declare version: number;
+}
 export class EmployeeRoles {
   @IsArray()
   @ArrayMinSize(1)

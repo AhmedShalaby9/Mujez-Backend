@@ -20,6 +20,7 @@ import {
   TeamActivate,
   EmployeeRole,
   EmployeeRoles,
+  EmployeeManager,
   SalesTeamInput,
   SalesTeamUpdate,
 } from "./team.dto.js";
@@ -134,6 +135,13 @@ export class TeamController {
       input.roles,
       input.version,
     );
+  }
+  @Post(":id/manager") @RequireAccess(["company_admin"], "team.manage") manager(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() input: EmployeeManager,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.setManager(req.principal, id, input);
   }
   @Get() @RequireAccess(["company_admin"]) list(@Req() req: AuthRequest) {
     return this.service.list(req.principal);
