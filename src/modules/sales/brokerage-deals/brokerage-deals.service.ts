@@ -26,7 +26,8 @@ import type {
 const isAdmin = (p: Principal) => p.pool === "company_admin" && !p.workspace;
 /** Deal approval: the owner, or a Sales Admin (company_user, no finance/HR,
  * cannot touch roles or targets, but can approve/reject deals). */
-const canApprove = (p: Principal) => isAdmin(p) || p.role === "sales_admin";
+const canApprove = (p: Principal) =>
+  isAdmin(p) || p.role === "sales_admin" || !!p.roles?.includes("sales_admin");
 const name = (v: any) => (typeof v === "string" ? v : (v?.en ?? v?.ar ?? ""));
 const validDate = (v: unknown) =>
   typeof v === "string" &&

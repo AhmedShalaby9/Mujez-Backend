@@ -62,7 +62,7 @@ export class BrokerageDealsController {
     return this.service.update(r.principal, id, b);
   }
   @Post("deals/:id/decision")
-  @RequireAccess(["company_admin"], "leads.manage")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
   decide(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,

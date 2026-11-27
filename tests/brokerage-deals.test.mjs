@@ -201,3 +201,27 @@ test("sales deal waits for admin approval; approved contracted deal closes the l
     1,
   );
 });
+
+test("Sales Admin assigned as an additional role can approve a deal", async () => {
+  h.state.principal = agent;
+  const created = (
+    await h.post("brokerage/deals", deal({ status: "reservation" }))
+  ).body;
+  assert.equal(created.approvalStatus, "pending");
+
+  h.state.principal = {
+    ...agent,
+    role: "sales_manager",
+    roles: ["sales_manager", "sales_admin"],
+    scope: "company",
+  };
+  assert.equal((await h.get("brokerage/deals/options")).body.canApprove, true);
+  const approved = (
+    await h.post(`brokerage/deals/${created.id}/decision`, {
+      requestId: randomUUID(),
+      version: 0,
+      decision: "approved",
+    })
+  ).body;
+  assert.equal(approved.approvalStatus, "approved");
+});
