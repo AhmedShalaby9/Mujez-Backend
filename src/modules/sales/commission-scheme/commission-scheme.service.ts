@@ -1,12 +1,20 @@
-import { ForbiddenException, ConflictException, Injectable } from "@nestjs/common";
+import {
+  ForbiddenException,
+  ConflictException,
+  BadRequestException,
+  Injectable,
+} from "@nestjs/common";
 import type { PoolClient } from "pg";
 import type { Principal } from "../../../common/auth/access.js";
 import { DatabaseService } from "../../../infrastructure/database/database.service.js";
 import { SalesService } from "../leads/sales.service.js";
 import {
   COMMISSION_ROLE_KEYS,
+  COMMISSION_MANAGER_ROLE_KEYS,
   type CommissionSchemeInput,
 } from "./commission-scheme.dto.js";
+const rankIndex = (roleKey: string) =>
+  COMMISSION_ROLE_KEYS.indexOf(roleKey as any);
 
 const isOwner = (p: Principal) =>
   p.pool === "company_admin" && p.role === "company_owner" && !p.workspace;
@@ -32,6 +40,12 @@ export class CommissionSchemeService {
         [companyId],
       )
     ).rows;
+    const absorption = (
+      await c.query(
+        "SELECT role_key,absorbed_role_key,rate_per_million FROM tenant.commission_absorption_rates WHERE company_id=$1",
+        [companyId],
+      )
+    ).rows;
     return {
       roles: COMMISSION_ROLE_KEYS.map((roleKey) => {
         const t = targets.find((x: any) => x.role_key === roleKey);
@@ -45,6 +59,12 @@ export class CommissionSchemeService {
             .map((x: any) => ({
               kind: x.kind,
               threshold: Number(x.threshold),
+              ratePerMillion: Number(x.rate_per_million),
+            })),
+          absorptionRates: absorption
+            .filter((x: any) => x.role_key === roleKey)
+            .map((x: any) => ({
+              roleKey: x.absorbed_role_key,
               ratePerMillion: Number(x.rate_per_million),
             })),
         };
@@ -66,6 +86,26 @@ export class CommissionSchemeService {
       if (seen.has(r.roleKey))
         throw new ConflictException(`Duplicate role in scheme: ${r.roleKey}`);
       seen.add(r.roleKey);
+      const rates = r.absorptionRates ?? [];
+      if (!COMMISSION_MANAGER_ROLE_KEYS.includes(r.roleKey as any)) {
+        if (rates.length)
+          throw new BadRequestException(
+            `${r.roleKey} has no one below it to absorb`,
+          );
+        continue;
+      }
+      const seenAbsorbed = new Set<string>();
+      for (const a of rates) {
+        if (seenAbsorbed.has(a.roleKey))
+          throw new ConflictException(
+            `Duplicate absorbed rank in ${r.roleKey}: ${a.roleKey}`,
+          );
+        seenAbsorbed.add(a.roleKey);
+        if (rankIndex(a.roleKey) >= rankIndex(r.roleKey))
+          throw new BadRequestException(
+            `${r.roleKey} can only absorb a rank below it, not ${a.roleKey}`,
+          );
+      }
     }
     return this.sales.write(
       p,
@@ -96,9 +136,25 @@ export class CommissionSchemeService {
           for (const [i, t] of r.tiers.entries()) {
             await c.query(
               "INSERT INTO tenant.commission_tiers(company_id,role_key,kind,threshold,rate_per_million,position) VALUES($1,$2,$3,$4,$5,$6)",
-              [p.companyId, r.roleKey, t.kind, t.threshold, t.ratePerMillion, i],
+              [
+                p.companyId,
+                r.roleKey,
+                t.kind,
+                t.threshold,
+                t.ratePerMillion,
+                i,
+              ],
             );
           }
+          await c.query(
+            "DELETE FROM tenant.commission_absorption_rates WHERE company_id=$1 AND role_key=$2",
+            [p.companyId, r.roleKey],
+          );
+          for (const a of r.absorptionRates ?? [])
+            await c.query(
+              "INSERT INTO tenant.commission_absorption_rates(company_id,role_key,absorbed_role_key,rate_per_million) VALUES($1,$2,$3,$4)",
+              [p.companyId, r.roleKey, a.roleKey, a.ratePerMillion],
+            );
         }
         return this.buildScheme(c, p.companyId!);
       },

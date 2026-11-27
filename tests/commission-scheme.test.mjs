@@ -4,11 +4,7 @@ import { randomUUID } from "node:crypto";
 import { tenantHarness } from "./tenant-harness.mjs";
 
 let h, owner, advisor;
-const salesPerms = [
-  "leads.read",
-  "leads.manage",
-  "commissions.read",
-];
+const salesPerms = ["leads.read", "leads.manage", "commissions.read"];
 
 before(async () => {
   h = await tenantHarness();
@@ -45,7 +41,11 @@ test("defaults, owner-only edits, per-role optimistic concurrency, and brokerage
   h.state.principal = owner;
   const empty = (await h.get("brokerage/commission-scheme")).body;
   assert.equal(empty.roles.length, 8);
-  assert.ok(empty.roles.every((r) => r.monthlyTarget === 0 && r.version === 0 && r.tiers.length === 0));
+  assert.ok(
+    empty.roles.every(
+      (r) => r.monthlyTarget === 0 && r.version === 0 && r.tiers.length === 0,
+    ),
+  );
 
   h.state.principal = advisor;
   const readAsAdvisor = (await h.get("brokerage/commission-scheme")).body;
@@ -108,7 +108,9 @@ test("defaults, owner-only edits, per-role optimistic concurrency, and brokerage
     {
       requestId: randomUUID(),
       roles: saved.roles.map((r) =>
-        r.roleKey === "property_advisor" ? { ...r, version: 0, monthlyTarget: 1 } : r,
+        r.roleKey === "property_advisor"
+          ? { ...r, version: 0, monthlyTarget: 1 }
+          : r,
       ),
     },
     409,
@@ -117,4 +119,111 @@ test("defaults, owner-only edits, per-role optimistic concurrency, and brokerage
   // Office companies don't use this scheme at all.
   h.state.principal = { ...owner, company: { type: "real_estate_office" } };
   await h.get("brokerage/commission-scheme", 403);
+});
+
+test("only manager ranks absorb lower ranks, each at or above their own rank is rejected", async () => {
+  h.state.principal = owner;
+  const current = (await h.get("brokerage/commission-scheme")).body.roles;
+  // property_advisor has no one below it.
+  await h.post(
+    "brokerage/commission-scheme",
+    {
+      requestId: randomUUID(),
+      roles: current.map((r) =>
+        r.roleKey === "property_advisor"
+          ? {
+              ...r,
+              absorptionRates: [{ roleKey: "senior", ratePerMillion: 1 }],
+            }
+          : r,
+      ),
+    },
+    400,
+  );
+  // A rank cannot absorb itself or a higher rank.
+  await h.post(
+    "brokerage/commission-scheme",
+    {
+      requestId: randomUUID(),
+      roles: current.map((r) =>
+        r.roleKey === "team_leader"
+          ? {
+              ...r,
+              absorptionRates: [{ roleKey: "team_leader", ratePerMillion: 1 }],
+            }
+          : r,
+      ),
+    },
+    400,
+  );
+  await h.post(
+    "brokerage/commission-scheme",
+    {
+      requestId: randomUUID(),
+      roles: current.map((r) =>
+        r.roleKey === "sales_director"
+          ? {
+              ...r,
+              absorptionRates: [
+                { roleKey: "head_of_sales", ratePerMillion: 1 },
+              ],
+            }
+          : r,
+      ),
+    },
+    400,
+  );
+  // No duplicates.
+  await h.post(
+    "brokerage/commission-scheme",
+    {
+      requestId: randomUUID(),
+      roles: current.map((r) =>
+        r.roleKey === "team_leader"
+          ? {
+              ...r,
+              absorptionRates: [
+                { roleKey: "property_advisor", ratePerMillion: 3000 },
+                { roleKey: "property_advisor", ratePerMillion: 4000 },
+              ],
+            }
+          : r,
+      ),
+    },
+    409,
+  );
+  // A valid absorption table for sales_director saves and round-trips.
+  const saved = (
+    await h.post("brokerage/commission-scheme", {
+      requestId: randomUUID(),
+      roles: current.map((r) =>
+        r.roleKey === "sales_director"
+          ? {
+              ...r,
+              absorptionRates: [
+                { roleKey: "property_advisor", ratePerMillion: 2000 },
+                { roleKey: "property_consultant", ratePerMillion: 3000 },
+                { roleKey: "senior", ratePerMillion: 5000 },
+                { roleKey: "expert", ratePerMillion: 7000 },
+                { roleKey: "team_leader", ratePerMillion: 4000 },
+                { roleKey: "sales_manager", ratePerMillion: 3000 },
+              ],
+            }
+          : r,
+      ),
+    })
+  ).body.roles;
+  const director = saved.find((r) => r.roleKey === "sales_director");
+  assert.deepEqual(director.absorptionRates, [
+    { roleKey: "property_advisor", ratePerMillion: 2000 },
+    { roleKey: "property_consultant", ratePerMillion: 3000 },
+    { roleKey: "senior", ratePerMillion: 5000 },
+    { roleKey: "expert", ratePerMillion: 7000 },
+    { roleKey: "team_leader", ratePerMillion: 4000 },
+    { roleKey: "sales_manager", ratePerMillion: 3000 },
+  ]);
+  assert.deepEqual(
+    saved.find((r) => r.roleKey === "property_advisor").absorptionRates,
+    [],
+  );
 });
