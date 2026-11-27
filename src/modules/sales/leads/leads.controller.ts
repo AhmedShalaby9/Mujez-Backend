@@ -25,7 +25,6 @@ import {
   BulkStage,
   BulkStatus,
   BulkTags,
-  BulkDistribute,
 } from "./leads.dto.js";
 @RequireAccess(["company_admin", "company_user"], "leads.read")
 @Controller("api/v1/leads")
@@ -76,11 +75,6 @@ export class LeadsController {
   @RequireAccess(["company_admin", "company_user"], "leads.manage")
   bulkTags(@Req() req: AuthRequest, @Body() b: BulkTags) {
     return this.service.bulkTags(req.principal, b);
-  }
-  @Post("bulk/distribute")
-  @RequireAccess(["company_admin", "company_user"], "leads.manage")
-  bulkDistribute(@Req() req: AuthRequest, @Body() b: BulkDistribute) {
-    return this.service.bulkDistribute(req.principal, b);
   }
   @Post(":id/update")
   @RequireAccess(["company_admin", "company_user"], "leads.manage")

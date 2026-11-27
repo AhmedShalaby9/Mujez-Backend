@@ -371,12 +371,4 @@ export class BulkTags extends BulkLeadsRequest {
   @ApiProperty({ type: [String] })
   declare tags: string[];
 }
-export class BulkDistribute extends BulkLeadsRequest {
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(50)
-  @IsUUID(undefined, { each: true })
-  @ApiProperty({ type: [String] })
-  declare agentIds: string[];
-}
 

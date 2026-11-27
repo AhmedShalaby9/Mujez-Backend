@@ -1295,22 +1295,6 @@
         "tags": ["Leads"]
       }
     },
-    "/api/v1/leads/bulk/distribute": {
-      "post": {
-        "operationId": "LeadsController_bulkDistribute",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/BulkDistribute" }
-            }
-          }
-        },
-        "responses": { "201": { "description": "" } },
-        "tags": ["Leads"]
-      }
-    },
     "/api/v1/leads/{id}/update": {
       "post": {
         "operationId": "LeadsController_update",
@@ -8520,18 +8504,6 @@
           "tags": { "type": "array", "items": { "type": "string" } }
         },
         "required": ["requestId", "items", "tags"]
-      },
-      "BulkDistribute": {
-        "type": "object",
-        "properties": {
-          "requestId": { "type": "string", "format": "uuid" },
-          "items": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/BulkLeadRef" }
-          },
-          "agentIds": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": ["requestId", "items", "agentIds"]
       },
       "LeadUpdate": {
         "type": "object",

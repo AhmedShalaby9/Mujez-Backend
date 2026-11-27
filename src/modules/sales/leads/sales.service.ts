@@ -34,7 +34,6 @@ import {
   type BulkStage,
   type BulkStatus,
   type BulkTags,
-  type BulkDistribute,
 } from "./leads.dto.js";
 export function normalizeTags(tags: readonly string[] | undefined | null) {
   const seen = new Set<string>();
@@ -857,36 +856,6 @@ export class SalesService {
       }
       return { count: rows.size };
     });
-  }
-  async bulkDistribute(p: Principal, input: BulkDistribute) {
-    if (p.scope === "own") throw new ForbiddenException();
-    return this.write(
-      p,
-      "leads.manage",
-      "lead.bulk_distribute",
-      input,
-      async (c) => {
-        const rows = await this.bulkRows(c, p, input.items);
-        const agents: string[] = [];
-        for (const a of input.agentIds) agents.push((await this.owner(c, p, a))!);
-        const ids = [...rows.keys()];
-        for (const [i, id] of ids.entries()) {
-          const old = rows.get(id),
-            owner = agents[i % agents.length]!;
-          await c.query(
-            "UPDATE tenant.leads SET owner_user_id=$3,assigned_at=now(),routing_rule_id=NULL,routing_attempts=0,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
-            [p.companyId, id, owner],
-          );
-          await this.event(c, p, id, "lead.updated", {
-            ownerBefore: old.owner_user_id,
-            ownerAfter: owner,
-            bulk: true,
-            distributed: true,
-          });
-        }
-        return { count: ids.length };
-      },
-    );
   }
   async pipeline(p: Principal, q: SalesQuery) {
     await this.access(p, "pipeline.read");
