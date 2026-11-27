@@ -7,6 +7,7 @@ import { PlatformOverviewModule } from "./modules/platform/overview/overview.mod
 import { PlatformAuditModule } from "./modules/platform/audit/audit.module.js";
 import { SalesLeadsModule } from "./modules/sales/leads/leads.module.js";
 import { BrokerageDealsModule } from "./modules/sales/brokerage-deals/brokerage-deals.module.js";
+import { DealCommissionsModule } from "./modules/sales/deal-commissions/deal-commissions.module.js";
 import { CommissionSchemeModule } from "./modules/sales/commission-scheme/commission-scheme.module.js";
 import { SalesContactsModule } from "./modules/sales/contacts/contacts.module.js";
 import { SalesPipelineModule } from "./modules/sales/pipeline/pipeline.module.js";
@@ -47,6 +48,7 @@ export const DOMAIN_MODULES = [
   PlatformAuditModule,
   SalesLeadsModule,
   BrokerageDealsModule,
+  DealCommissionsModule,
   CommissionSchemeModule,
   SalesContactsModule,
   SalesPipelineModule,

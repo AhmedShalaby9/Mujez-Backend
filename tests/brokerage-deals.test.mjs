@@ -32,6 +32,7 @@ const deal = (extra = {}) => ({
   status: "contracted",
   developerId: developer.id,
   projectId: project.id,
+  unitValueMinor: "8000000",
   details,
   documents: [document],
   ...extra,
@@ -204,9 +205,7 @@ test("sales deal waits for admin approval; approved contracted deal closes the l
 
 test("Sales Admin assigned as an additional role can approve a deal", async () => {
   h.state.principal = agent;
-  const created = (
-    await h.post("brokerage/deals", deal({ status: "reservation" }))
-  ).body;
+  const created = (await h.post("brokerage/deals", deal())).body;
   assert.equal(created.approvalStatus, "pending");
 
   h.state.principal = {
@@ -224,4 +223,28 @@ test("Sales Admin assigned as an additional role can approve a deal", async () =
     })
   ).body;
   assert.equal(approved.approvalStatus, "approved");
+});
+
+test("EOI and reservation changes save straight through for anyone; only the move into a signed contract needs admin approval", async () => {
+  h.state.principal = agent;
+  const eoi = (await h.post("brokerage/deals", deal({ status: "eoi" }))).body;
+  assert.equal(eoi.approvalStatus, "approved");
+  const reserved = (
+    await h.post(`brokerage/deals/${eoi.id}/update`, {
+      ...deal({
+        status: "reservation",
+        clientName: "Still looking",
+        documents: [],
+      }),
+      version: eoi.version,
+    })
+  ).body;
+  assert.equal(reserved.approvalStatus, "approved");
+  const contracted = (
+    await h.post(`brokerage/deals/${eoi.id}/update`, {
+      ...deal({ status: "contracted", documents: [] }),
+      version: reserved.version,
+    })
+  ).body;
+  assert.equal(contracted.approvalStatus, "pending");
 });

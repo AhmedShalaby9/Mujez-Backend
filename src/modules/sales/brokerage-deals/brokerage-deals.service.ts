@@ -11,6 +11,10 @@ import { DatabaseService } from "../../../infrastructure/database/database.servi
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
 import { isDeepStrictEqual } from "node:util";
 import { SalesService } from "../leads/sales.service.js";
+import {
+  bookDeveloperClaim,
+  companyFinanceEnabled,
+} from "./brokerage-developer-claim.js";
 import type {
   BrokerageProjectInput,
   DealDecision,
@@ -200,6 +204,8 @@ function dto(r: any) {
     developer: r.developer_name,
     projectId: r.project_id,
     project: name(r.project_name),
+    unitValueMinor: String(r.unit_value_minor),
+    developerClaimObligationId: r.developer_claim_obligation_id,
     details: r.details,
     version: r.version,
     approvedVersion: r.approved_version,
@@ -210,7 +216,7 @@ function dto(r: any) {
     updatedAt: r.updated_at,
   };
 }
-const SELECT = `SELECT d.*,l.name AS lead_name,l.owner_user_id AS lead_owner_id,a.name AS agent_name,a.team_id AS agent_team_id,dev.name AS developer_name,pj.name AS project_name FROM tenant.brokerage_deals d JOIN tenant.leads l ON l.company_id=d.company_id AND l.id=d.lead_id JOIN tenant.users a ON a.company_id=d.company_id AND a.id=d.agent_id JOIN tenant.brokerage_developers dev ON dev.company_id=d.company_id AND dev.id=d.developer_id JOIN tenant.projects pj ON pj.company_id=d.company_id AND pj.id=d.project_id`;
+const SELECT = `SELECT d.*,d.unit_value_minor::text AS unit_value_minor,l.name AS lead_name,l.owner_user_id AS lead_owner_id,a.name AS agent_name,a.team_id AS agent_team_id,dev.name AS developer_name,pj.name AS project_name FROM tenant.brokerage_deals d JOIN tenant.leads l ON l.company_id=d.company_id AND l.id=d.lead_id JOIN tenant.users a ON a.company_id=d.company_id AND a.id=d.agent_id JOIN tenant.brokerage_developers dev ON dev.company_id=d.company_id AND dev.id=d.developer_id JOIN tenant.projects pj ON pj.company_id=d.company_id AND pj.id=d.project_id`;
 
 @Injectable()
 export class BrokerageDealsService {
@@ -350,7 +356,12 @@ export class BrokerageDealsService {
       },
     });
   }
-  private async syncLead(c: PoolClient, p: Principal, r: any) {
+  private async syncLead(
+    c: PoolClient,
+    p: Principal,
+    r: any,
+    financeEnabled: boolean,
+  ) {
     if (r.approval_status === "approved" && r.status === "contracted") {
       const changed = await c.query(
         "UPDATE tenant.leads SET brokerage_status='closed_deal',stage='won',stage_changed_at=now(),version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2 AND (brokerage_status IS DISTINCT FROM 'closed_deal' OR stage IS DISTINCT FROM 'won')",
@@ -381,6 +392,18 @@ export class BrokerageDealsService {
           payload: { dealId: r.id },
         });
       }
+      await bookDeveloperClaim(
+        this.db,
+        c,
+        p,
+        {
+          id: r.id,
+          developerId: r.developer_id,
+          unitValueMinor: r.unit_value_minor,
+          developerClaimObligationId: r.developer_claim_obligation_id,
+        },
+        financeEnabled,
+      );
     }
   }
   async options(p: Principal) {
@@ -547,12 +570,15 @@ export class BrokerageDealsService {
       throw new BadRequestException("A new deal cannot be cancelled");
     if (!Array.isArray(b.documents) || b.documents.length < 1)
       throw new BadRequestException("At least one document is required");
+    const financeEnabled = await companyFinanceEnabled(this.db, p.companyId!);
     return this.db.tenant(p.companyId!, async (c) => {
       const agentId = await this.validateLinks(c, p, b);
-      const approved = canApprove(p);
+      // Admin approval only gates the move into a signed contract; EOI,
+      // reservation and cancellation save straight through.
+      const approved = b.status === "contracted" ? canApprove(p) : true;
       const id = (
         await c.query(
-          "INSERT INTO tenant.brokerage_deals(company_id,lead_id,agent_id,client_name,client_phone,selling_type,status,approval_status,developer_id,project_id,details,created_by,approved_by,approved_at,approved_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id",
+          "INSERT INTO tenant.brokerage_deals(company_id,lead_id,agent_id,client_name,client_phone,selling_type,status,approval_status,developer_id,project_id,unit_value_minor,details,created_by,approved_by,approved_at,approved_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id",
           [
             p.companyId,
             b.leadId,
@@ -564,6 +590,7 @@ export class BrokerageDealsService {
             approved ? "approved" : "pending",
             b.developerId,
             b.projectId,
+            b.unitValueMinor,
             JSON.stringify(b.details),
             p.id,
             approved ? p.id : null,
@@ -573,15 +600,19 @@ export class BrokerageDealsService {
         )
       ).rows[0].id;
       await this.insertDocs(c, p, id, b.documents);
-      const r = await this.row(c, p, id);
+      let r = await this.row(c, p, id);
       await this.event(c, p, r, "created");
-      if (approved) await this.syncLead(c, p, r);
+      if (approved) {
+        await this.syncLead(c, p, r, financeEnabled);
+        r = await this.row(c, p, id);
+      }
       return dto(r);
     });
   }
   async update(p: Principal, id: string, b: DealUpdate) {
     await this.access(p, true);
     validateDeal(b);
+    const financeEnabled = await companyFinanceEnabled(this.db, p.companyId!);
     return this.db.tenant(p.companyId!, async (c) => {
       const old = await this.row(c, p, id, true);
       if (old.version !== b.version)
@@ -596,13 +627,16 @@ export class BrokerageDealsService {
         old.status === b.status &&
         old.developer_id === b.developerId &&
         old.project_id === b.projectId &&
+        old.unit_value_minor === b.unitValueMinor &&
         isDeepStrictEqual(old.details, b.details) &&
         !b.documents?.length
       )
         return dto(old);
-      const approved = canApprove(p);
+      // Admin approval only gates the move into a signed contract; EOI,
+      // reservation and cancellation save straight through.
+      const approved = b.status === "contracted" ? canApprove(p) : true;
       await c.query(
-        "UPDATE tenant.brokerage_deals SET lead_id=$3,agent_id=$4,client_name=$5,client_phone=$6,selling_type=$7,status=$8,approval_status=$9,rejection_reason=NULL,developer_id=$10,project_id=$11,details=$12,version=version+1,approved_version=$13,approved_by=$14,approved_at=$15,updated_at=now() WHERE company_id=$1 AND id=$2",
+        "UPDATE tenant.brokerage_deals SET lead_id=$3,agent_id=$4,client_name=$5,client_phone=$6,selling_type=$7,status=$8,approval_status=$9,rejection_reason=NULL,developer_id=$10,project_id=$11,unit_value_minor=$12,details=$13,version=version+1,approved_version=$14,approved_by=$15,approved_at=$16,updated_at=now() WHERE company_id=$1 AND id=$2",
         [
           p.companyId,
           id,
@@ -615,6 +649,7 @@ export class BrokerageDealsService {
           approved ? "approved" : "pending",
           b.developerId,
           b.projectId,
+          b.unitValueMinor,
           JSON.stringify(b.details),
           approved ? old.version + 1 : null,
           approved ? p.id : null,
@@ -622,9 +657,12 @@ export class BrokerageDealsService {
         ],
       );
       if (b.documents?.length) await this.insertDocs(c, p, id, b.documents);
-      const r = await this.row(c, p, id);
+      let r = await this.row(c, p, id);
       await this.event(c, p, r, "updated");
-      if (approved) await this.syncLead(c, p, r);
+      if (approved) {
+        await this.syncLead(c, p, r, financeEnabled);
+        r = await this.row(c, p, id);
+      }
       return dto(r);
     });
   }
@@ -633,6 +671,7 @@ export class BrokerageDealsService {
     if (!canApprove(p)) throw new ForbiddenException("Admin approval required");
     if (b.decision === "rejected" && !b.reason?.trim())
       throw new BadRequestException("Rejection reason is required");
+    const financeEnabled = await companyFinanceEnabled(this.db, p.companyId!);
     return this.db.tenant(p.companyId!, async (c) => {
       const old = await this.row(c, p, id, true);
       if (old.version !== b.version)
@@ -651,14 +690,15 @@ export class BrokerageDealsService {
           b.decision === "approved" ? new Date() : null,
         ],
       );
-      const r = await this.row(c, p, id);
+      let r = await this.row(c, p, id);
       await this.event(
         c,
         p,
         r,
         b.decision === "approved" ? "approved" : "rejected",
       );
-      await this.syncLead(c, p, r);
+      await this.syncLead(c, p, r, financeEnabled);
+      r = await this.row(c, p, id);
       return dto(r);
     });
   }
