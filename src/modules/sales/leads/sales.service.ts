@@ -29,7 +29,24 @@ import {
   type DealInput,
   type DealUpdate,
   type BrokerageLeadStatusChange,
+  type LeadTagsChange,
+  type BulkAssign,
+  type BulkStage,
+  type BulkStatus,
+  type BulkTags,
 } from "./leads.dto.js";
+export function normalizeTags(tags: readonly string[] | undefined | null) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of tags ?? []) {
+    const t = String(raw).trim();
+    if (!t || t.length > 40 || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push(t);
+    if (out.length >= 15) break;
+  }
+  return out;
+}
 export function normalizePhone(value: string) {
   if (!/^[+0-9 ()-]+$/.test(value))
     throw new BadRequestException("Use an international phone number");
@@ -75,6 +92,7 @@ export function leadDto(l: any) {
     owner: l.owner_user_id ? { id: l.owner_user_id, name: l.owner_name } : null,
     stage: l.stage,
     score: l.score,
+    tags: l.tags ?? [],
     version: l.version,
     archivedAt: iso(l.archived_at),
     createdAt: iso(l.created_at),
@@ -727,6 +745,117 @@ export class SalesService {
         return leadDto(await this.row(c, p, id));
       },
     );
+  }
+  async tags(p: Principal, id: string, input: LeadTagsChange) {
+    return this.write(
+      p,
+      "leads.manage",
+      "lead.tags:" + id,
+      input,
+      async (c) => {
+        const l = await this.row(c, p, id, true);
+        this.check(l, input.version);
+        const tags = normalizeTags(input.tags);
+        await c.query(
+          "UPDATE tenant.leads SET tags=$3,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
+          [p.companyId, id, tags],
+        );
+        await this.event(c, p, id, "lead.tags_changed", { tags });
+        return leadDto(await this.row(c, p, id));
+      },
+    );
+  }
+  /** Loads and version-checks every referenced lead within the bulk action's
+   * own transaction; the caller still holds FOR UPDATE locks on each row. */
+  private async bulkRows(
+    c: PoolClient,
+    p: Principal,
+    items: { id: string; version: number }[],
+  ) {
+    const rows = new Map<string, any>();
+    for (const it of items) {
+      const l = await this.row(c, p, it.id, true);
+      this.check(l, it.version);
+      rows.set(it.id, l);
+    }
+    return rows;
+  }
+  async bulkAssign(p: Principal, input: BulkAssign) {
+    return this.write(p, "leads.manage", "lead.bulk_assign", input, async (c) => {
+      const rows = await this.bulkRows(c, p, input.items);
+      const owner = await this.owner(c, p, input.ownerId ?? null);
+      for (const [id, old] of rows) {
+        await c.query(
+          `UPDATE tenant.leads SET owner_user_id=$3,assigned_at=CASE WHEN owner_user_id IS DISTINCT FROM $3::uuid THEN CASE WHEN $3::uuid IS NULL THEN NULL ELSE now() END ELSE assigned_at END,routing_rule_id=CASE WHEN owner_user_id IS DISTINCT FROM $3::uuid THEN NULL ELSE routing_rule_id END,routing_attempts=CASE WHEN owner_user_id IS DISTINCT FROM $3::uuid THEN 0 ELSE routing_attempts END,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2`,
+          [p.companyId, id, owner],
+        );
+        await this.event(c, p, id, "lead.updated", {
+          ownerBefore: old.owner_user_id,
+          ownerAfter: owner,
+          bulk: true,
+        });
+      }
+      return { count: rows.size };
+    });
+  }
+  async bulkStage(p: Principal, input: BulkStage) {
+    return this.write(p, "leads.manage", "lead.bulk_stage", input, async (c) => {
+      const rows = await this.bulkRows(c, p, input.items);
+      const next = input.stage === "reopen" ? "new" : input.stage;
+      for (const [id, old] of rows) {
+        if (old.stage === next) continue;
+        await c.query(
+          "UPDATE tenant.leads SET stage=$3,stage_changed_at=now(),version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
+          [p.companyId, id, next],
+        );
+        await this.event(c, p, id, "lead.stage_changed", {
+          from: old.stage,
+          to: next,
+          bulk: true,
+        });
+      }
+      return { count: rows.size };
+    });
+  }
+  async bulkStatus(p: Principal, input: BulkStatus) {
+    if (!brokerageWorkspace(p)) throw new ForbiddenException();
+    return this.write(
+      p,
+      "leads.manage",
+      "lead.bulk_status",
+      input,
+      async (c) => {
+        const rows = await this.bulkRows(c, p, input.items);
+        for (const [id, old] of rows) {
+          if (old.brokerage_status === input.status) continue;
+          await c.query(
+            "UPDATE tenant.leads SET brokerage_status=$3,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
+            [p.companyId, id, input.status],
+          );
+          await this.event(c, p, id, "lead.status_changed", {
+            from: old.brokerage_status,
+            to: input.status,
+            bulk: true,
+          });
+        }
+        return { count: rows.size };
+      },
+    );
+  }
+  async bulkTags(p: Principal, input: BulkTags) {
+    return this.write(p, "leads.manage", "lead.bulk_tags", input, async (c) => {
+      const rows = await this.bulkRows(c, p, input.items);
+      const add = normalizeTags(input.tags);
+      for (const [id, old] of rows) {
+        const tags = normalizeTags([...(old.tags ?? []), ...add]);
+        await c.query(
+          "UPDATE tenant.leads SET tags=$3,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
+          [p.companyId, id, tags],
+        );
+        await this.event(c, p, id, "lead.tags_changed", { tags, bulk: true });
+      }
+      return { count: rows.size };
+    });
   }
   async pipeline(p: Principal, q: SalesQuery) {
     await this.access(p, "pipeline.read");

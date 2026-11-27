@@ -1231,6 +1231,70 @@
         "tags": ["Leads"]
       }
     },
+    "/api/v1/leads/bulk/assign": {
+      "post": {
+        "operationId": "LeadsController_bulkAssign",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BulkAssign" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leads"]
+      }
+    },
+    "/api/v1/leads/bulk/stage": {
+      "post": {
+        "operationId": "LeadsController_bulkStage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BulkStage" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leads"]
+      }
+    },
+    "/api/v1/leads/bulk/status": {
+      "post": {
+        "operationId": "LeadsController_bulkStatus",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BulkStatus" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leads"]
+      }
+    },
+    "/api/v1/leads/bulk/tags": {
+      "post": {
+        "operationId": "LeadsController_bulkTags",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BulkTags" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leads"]
+      }
+    },
     "/api/v1/leads/{id}/update": {
       "post": {
         "operationId": "LeadsController_update",
@@ -1341,6 +1405,29 @@
           "content": {
             "application/json": {
               "schema": { "$ref": "#/components/schemas/LeadNote" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leads"]
+      }
+    },
+    "/api/v1/leads/{id}/tags": {
+      "post": {
+        "operationId": "LeadsController_tags",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LeadTagsChange" }
             }
           }
         },
@@ -1542,6 +1629,28 @@
         "tags": ["ColdCalls"]
       }
     },
+    "/api/v1/cold-calls/columns": {
+      "post": {
+        "operationId": "ColdCallsController_columns",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["ColdCalls"]
+      }
+    },
     "/api/v1/cold-calls/preview": {
       "post": {
         "operationId": "ColdCallsController_preview",
@@ -1552,10 +1661,12 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["file"],
+                "required": ["file", "nameColumn", "phoneColumn"],
                 "properties": {
                   "file": { "type": "string", "format": "binary" },
-                  "ownerId": { "type": "string", "format": "uuid" }
+                  "ownerId": { "type": "string", "format": "uuid" },
+                  "nameColumn": { "type": "integer", "minimum": 1 },
+                  "phoneColumn": { "type": "integer", "minimum": 1 }
                 }
               }
             }
@@ -1575,11 +1686,13 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["file", "requestId"],
+                "required": ["file", "requestId", "nameColumn", "phoneColumn"],
                 "properties": {
                   "file": { "type": "string", "format": "binary" },
                   "ownerId": { "type": "string", "format": "uuid" },
-                  "requestId": { "type": "string", "format": "uuid" }
+                  "requestId": { "type": "string", "format": "uuid" },
+                  "nameColumn": { "type": "integer", "minimum": 1 },
+                  "phoneColumn": { "type": "integer", "minimum": 1 }
                 }
               }
             }
@@ -6819,6 +6932,29 @@
         "tags": ["Companies"]
       }
     },
+    "/admin/api/v1/companies/{id}/users-limit": {
+      "post": {
+        "operationId": "CompaniesController_usersLimit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UsersLimitInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Companies"]
+      }
+    },
     "/admin/api/v1/companies/{id}": {
       "get": {
         "operationId": "CompaniesController_detail",
@@ -8276,6 +8412,99 @@
         },
         "required": ["requestId", "name", "phone", "segment", "want", "source"]
       },
+      "BulkLeadRef": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" }
+        },
+        "required": ["id", "version"]
+      },
+      "BulkAssign": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BulkLeadRef" }
+          },
+          "ownerId": { "type": ["string", "null"], "format": "uuid" }
+        },
+        "required": ["requestId", "items"]
+      },
+      "BulkStage": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BulkLeadRef" }
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "new",
+              "attempting",
+              "contacted",
+              "qualified",
+              "nurturing",
+              "unresponsive",
+              "viewing",
+              "offer",
+              "contract",
+              "won",
+              "lost",
+              "unqualified",
+              "reopen"
+            ]
+          }
+        },
+        "required": ["requestId", "items", "stage"]
+      },
+      "BulkStatus": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BulkLeadRef" }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new_lead",
+              "call_back",
+              "hot_case",
+              "low_budget",
+              "no_answer",
+              "non_potential",
+              "potential",
+              "resale",
+              "wrong_number",
+              "switched_off",
+              "whatsapp",
+              "closed_deal",
+              "closed_outside",
+              "eoi",
+              "meeting_scheduled",
+              "meeting_done"
+            ]
+          }
+        },
+        "required": ["requestId", "items", "status"]
+      },
+      "BulkTags": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BulkLeadRef" }
+          },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["requestId", "items", "tags"]
+      },
       "LeadUpdate": {
         "type": "object",
         "properties": {
@@ -8387,6 +8616,15 @@
           "note": { "type": "string" }
         },
         "required": ["requestId", "version", "note"]
+      },
+      "LeadTagsChange": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "version": { "type": "number" },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["requestId", "version", "tags"]
       },
       "ColdCallLog": {
         "type": "object",
@@ -9554,6 +9792,13 @@
             "default": false,
             "description": "Enable Finance accounting and payroll; CRM commissions remain independent"
           },
+          "maxUsers": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100000,
+            "default": 20,
+            "description": "Maximum active users (seats) allowed for this company; defaults to 20"
+          },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },
           "slug": { "type": "string" },
@@ -9566,6 +9811,14 @@
         }
       },
       "ManagerInput": { "type": "object", "properties": {} },
+      "UsersLimitInput": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "number" },
+          "maxUsers": { "type": "number", "minimum": 1, "maximum": 100000 }
+        },
+        "required": ["version", "maxUsers"]
+      },
       "CompanyInput": {
         "type": "object",
         "properties": {
@@ -9583,6 +9836,13 @@
             "type": "boolean",
             "default": false,
             "description": "Enable Finance accounting and payroll; CRM commissions remain independent"
+          },
+          "maxUsers": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100000,
+            "default": 20,
+            "description": "Maximum active users (seats) allowed for this company; defaults to 20"
           },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },
@@ -9622,6 +9882,13 @@
             "type": "boolean",
             "default": false,
             "description": "Enable Finance accounting and payroll; CRM commissions remain independent"
+          },
+          "maxUsers": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100000,
+            "default": 20,
+            "description": "Maximum active users (seats) allowed for this company; defaults to 20"
           },
           "nameEn": { "type": "string" },
           "nameAr": { "type": "string" },

@@ -809,3 +809,128 @@ test("assigned leads appear without invented deal values and become one detailed
     p = original;
   }
 });
+
+test("lead tags are free text, trimmed, deduped case-insensitively, capped and version-checked", async () => {
+  const created = (
+    await post("leads", draft({ phone: "+12025550900", name: "Tag buyer" }))
+  ).body;
+  const tagged = (
+    await post("leads/" + created.id + "/tags", {
+      requestId: randomUUID(),
+      version: created.version,
+      tags: [" Hot ", "hot", "VIP", ""],
+    })
+  ).body;
+  assert.deepEqual(tagged.tags, ["Hot", "VIP"]);
+  await post(
+    "leads/" + created.id + "/tags",
+    { requestId: randomUUID(), version: created.version, tags: ["Stale"] },
+    409,
+  );
+});
+
+test("bulk assign, stage and tags act on multiple leads and roll back the whole batch on a stale row", async () => {
+  const a = (
+    await post("leads", draft({ phone: "+12025550901", name: "Bulk A" }))
+  ).body;
+  const b = (
+    await post("leads", draft({ phone: "+12025550902", name: "Bulk B" }))
+  ).body;
+  const colleague = (
+    await db.query(
+      "INSERT INTO tenant.users(company_id,oidc_subject,identity_pool,name,email,role_id,status) SELECT company_id,'sales-bulk-colleague','company_user','Bulk colleague','sales-bulk-colleague@example.test',role_id,'active' FROM tenant.users WHERE id=$1 RETURNING id",
+      [U],
+    )
+  ).rows[0].id;
+  const assigned = (
+    await post("leads/bulk/assign", {
+      requestId: randomUUID(),
+      items: [
+        { id: a.id, version: a.version },
+        { id: b.id, version: b.version },
+      ],
+      ownerId: colleague,
+    })
+  ).body;
+  assert.equal(assigned.count, 2);
+  let current = await Promise.all([detail(a.id), detail(b.id)]);
+  assert.ok(current.every((l) => l.owner.id === colleague));
+  const staged = (
+    await post("leads/bulk/stage", {
+      requestId: randomUUID(),
+      items: [
+        { id: a.id, version: current[0].version },
+        { id: b.id, version: current[1].version },
+      ],
+      stage: "qualified",
+    })
+  ).body;
+  assert.equal(staged.count, 2);
+  current = await Promise.all([detail(a.id), detail(b.id)]);
+  assert.ok(current.every((l) => l.stage === "qualified"));
+  const tagged = (
+    await post("leads/bulk/tags", {
+      requestId: randomUUID(),
+      items: [
+        { id: a.id, version: current[0].version },
+        { id: b.id, version: current[1].version },
+      ],
+      tags: ["Hot"],
+    })
+  ).body;
+  assert.equal(tagged.count, 2);
+  current = await Promise.all([detail(a.id), detail(b.id)]);
+  assert.ok(current.every((l) => l.tags.includes("Hot")));
+  await post(
+    "leads/bulk/stage",
+    {
+      requestId: randomUUID(),
+      items: [
+        { id: a.id, version: current[0].version },
+        { id: b.id, version: 0 },
+      ],
+      stage: "won",
+    },
+    409,
+  );
+  const unchanged = await detail(a.id);
+  assert.equal(unchanged.stage, "qualified");
+});
+
+test("bulk status (brokerage lead status) is forbidden outside a brokerage workspace and version-checked inside one", async () => {
+  const f = (
+    await post("leads", draft({ phone: "+12025550910", name: "Bulk F" }))
+  ).body;
+  const g = (
+    await post("leads", draft({ phone: "+12025550911", name: "Bulk G" }))
+  ).body;
+  const original = p;
+  try {
+    await post(
+      "leads/bulk/status",
+      {
+        requestId: randomUUID(),
+        items: [{ id: f.id, version: f.version }],
+        status: "hot_case",
+      },
+      403,
+    );
+    p = { ...original, company: { type: "brokerage" } };
+    const result = (
+      await post("leads/bulk/status", {
+        requestId: randomUUID(),
+        items: [
+          { id: f.id, version: f.version },
+          { id: g.id, version: g.version },
+        ],
+        status: "hot_case",
+      })
+    ).body;
+    assert.equal(result.count, 2);
+    const [df, dg] = await Promise.all([detail(f.id), detail(g.id)]);
+    assert.equal(df.brokerageStatus, "hot_case");
+    assert.equal(dg.brokerageStatus, "hot_case");
+  } finally {
+    p = original;
+  }
+});
