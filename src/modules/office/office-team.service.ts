@@ -37,7 +37,7 @@ export class OfficeTeamService {
     const id = await this.office.team(c, p);
     if (!id)
       throw new NotFoundException(
-        "No team assigned. Ask your company owner to assign a team.",
+        "No team assigned. Ask your company admin to assign a team.",
       );
     const team = (
       await c.query(

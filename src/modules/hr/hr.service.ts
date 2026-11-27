@@ -57,7 +57,7 @@ export class HrService {
       );
     if (p.workspace || !p.companyId || (!this.isOwner(p) && !hrUser))
       throw new ForbiddenException(
-        "HR access requires the company owner or an authorized HR role",
+        "HR access requires the company admin or an authorized HR role",
       );
     await requireHrModule(this.db, p.companyId);
     await this.sales.access(p, this.permission(p, manage));

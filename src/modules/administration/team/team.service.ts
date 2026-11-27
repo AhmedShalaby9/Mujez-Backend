@@ -115,7 +115,7 @@ export class TeamService {
       p.scope !== "company" ||
       p.workspace
     )
-      throw new ForbiddenException("Only the company owner can assign roles");
+      throw new ForbiddenException("Only the company admin can assign roles");
   }
   private async officeRoles(p: Principal, roles: TeamRole[]) {
     const office = await this.db.platform(
