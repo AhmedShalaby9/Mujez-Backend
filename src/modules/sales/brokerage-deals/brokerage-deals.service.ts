@@ -200,6 +200,7 @@ function dto(r: any) {
     developer: r.developer_name,
     projectId: r.project_id,
     project: name(r.project_name),
+    unitValueMinor: String(r.unit_value_minor),
     details: r.details,
     version: r.version,
     approvedVersion: r.approved_version,
@@ -210,7 +211,7 @@ function dto(r: any) {
     updatedAt: r.updated_at,
   };
 }
-const SELECT = `SELECT d.*,l.name AS lead_name,l.owner_user_id AS lead_owner_id,a.name AS agent_name,a.team_id AS agent_team_id,dev.name AS developer_name,pj.name AS project_name FROM tenant.brokerage_deals d JOIN tenant.leads l ON l.company_id=d.company_id AND l.id=d.lead_id JOIN tenant.users a ON a.company_id=d.company_id AND a.id=d.agent_id JOIN tenant.brokerage_developers dev ON dev.company_id=d.company_id AND dev.id=d.developer_id JOIN tenant.projects pj ON pj.company_id=d.company_id AND pj.id=d.project_id`;
+const SELECT = `SELECT d.*,d.unit_value_minor::text AS unit_value_minor,l.name AS lead_name,l.owner_user_id AS lead_owner_id,a.name AS agent_name,a.team_id AS agent_team_id,dev.name AS developer_name,pj.name AS project_name FROM tenant.brokerage_deals d JOIN tenant.leads l ON l.company_id=d.company_id AND l.id=d.lead_id JOIN tenant.users a ON a.company_id=d.company_id AND a.id=d.agent_id JOIN tenant.brokerage_developers dev ON dev.company_id=d.company_id AND dev.id=d.developer_id JOIN tenant.projects pj ON pj.company_id=d.company_id AND pj.id=d.project_id`;
 
 @Injectable()
 export class BrokerageDealsService {
@@ -554,7 +555,7 @@ export class BrokerageDealsService {
       const approved = b.status === "contracted" ? canApprove(p) : true;
       const id = (
         await c.query(
-          "INSERT INTO tenant.brokerage_deals(company_id,lead_id,agent_id,client_name,client_phone,selling_type,status,approval_status,developer_id,project_id,details,created_by,approved_by,approved_at,approved_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id",
+          "INSERT INTO tenant.brokerage_deals(company_id,lead_id,agent_id,client_name,client_phone,selling_type,status,approval_status,developer_id,project_id,unit_value_minor,details,created_by,approved_by,approved_at,approved_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id",
           [
             p.companyId,
             b.leadId,
@@ -566,6 +567,7 @@ export class BrokerageDealsService {
             approved ? "approved" : "pending",
             b.developerId,
             b.projectId,
+            b.unitValueMinor,
             JSON.stringify(b.details),
             p.id,
             approved ? p.id : null,
@@ -598,6 +600,7 @@ export class BrokerageDealsService {
         old.status === b.status &&
         old.developer_id === b.developerId &&
         old.project_id === b.projectId &&
+        old.unit_value_minor === b.unitValueMinor &&
         isDeepStrictEqual(old.details, b.details) &&
         !b.documents?.length
       )
@@ -606,7 +609,7 @@ export class BrokerageDealsService {
       // reservation and cancellation save straight through.
       const approved = b.status === "contracted" ? canApprove(p) : true;
       await c.query(
-        "UPDATE tenant.brokerage_deals SET lead_id=$3,agent_id=$4,client_name=$5,client_phone=$6,selling_type=$7,status=$8,approval_status=$9,rejection_reason=NULL,developer_id=$10,project_id=$11,details=$12,version=version+1,approved_version=$13,approved_by=$14,approved_at=$15,updated_at=now() WHERE company_id=$1 AND id=$2",
+        "UPDATE tenant.brokerage_deals SET lead_id=$3,agent_id=$4,client_name=$5,client_phone=$6,selling_type=$7,status=$8,approval_status=$9,rejection_reason=NULL,developer_id=$10,project_id=$11,unit_value_minor=$12,details=$13,version=version+1,approved_version=$14,approved_by=$15,approved_at=$16,updated_at=now() WHERE company_id=$1 AND id=$2",
         [
           p.companyId,
           id,
@@ -619,6 +622,7 @@ export class BrokerageDealsService {
           approved ? "approved" : "pending",
           b.developerId,
           b.projectId,
+          b.unitValueMinor,
           JSON.stringify(b.details),
           approved ? old.version + 1 : null,
           approved ? p.id : null,

@@ -32,6 +32,7 @@ const deal = (extra = {}) => ({
   status: "contracted",
   developerId: developer.id,
   projectId: project.id,
+  unitValueMinor: "8000000",
   details,
   documents: [document],
   ...extra,

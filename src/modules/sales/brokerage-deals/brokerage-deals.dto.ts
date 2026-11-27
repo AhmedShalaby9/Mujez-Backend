@@ -32,6 +32,12 @@ export class DealInput extends SalesRequest {
   status!: string;
   @IsUUID() @ApiProperty() developerId!: string;
   @IsUUID() @ApiProperty() projectId!: string;
+  @Matches(/^[1-9]\d{0,14}$/)
+  @ApiProperty({
+    description:
+      "Total unit sale price in EGP minor units; the basis for the developer claim and sales commissions",
+  })
+  unitValueMinor!: string;
   @IsObject() @ApiProperty() details!: Record<string, unknown>;
   @IsArray() @ApiProperty() documents!: DealDocumentInput[];
 }
