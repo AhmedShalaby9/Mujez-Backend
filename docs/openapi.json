@@ -1263,6 +1263,22 @@
         "tags": ["Leads"]
       }
     },
+    "/api/v1/leads/bulk/status": {
+      "post": {
+        "operationId": "LeadsController_bulkStatus",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BulkStatus" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Leads"]
+      }
+    },
     "/api/v1/leads/bulk/tags": {
       "post": {
         "operationId": "LeadsController_bulkTags",
@@ -8460,6 +8476,38 @@
           }
         },
         "required": ["requestId", "items", "stage"]
+      },
+      "BulkStatus": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BulkLeadRef" }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new_lead",
+              "call_back",
+              "hot_case",
+              "low_budget",
+              "no_answer",
+              "non_potential",
+              "potential",
+              "resale",
+              "wrong_number",
+              "switched_off",
+              "whatsapp",
+              "closed_deal",
+              "closed_outside",
+              "eoi",
+              "meeting_scheduled",
+              "meeting_done"
+            ]
+          }
+        },
+        "required": ["requestId", "items", "status"]
       },
       "BulkTags": {
         "type": "object",

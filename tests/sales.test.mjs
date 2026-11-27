@@ -897,6 +897,44 @@ test("bulk assign, stage and tags act on multiple leads and roll back the whole 
   assert.equal(unchanged.stage, "qualified");
 });
 
+test("bulk status (brokerage lead status) is forbidden outside a brokerage workspace and version-checked inside one", async () => {
+  const f = (
+    await post("leads", draft({ phone: "+12025550910", name: "Bulk F" }))
+  ).body;
+  const g = (
+    await post("leads", draft({ phone: "+12025550911", name: "Bulk G" }))
+  ).body;
+  const original = p;
+  try {
+    await post(
+      "leads/bulk/status",
+      {
+        requestId: randomUUID(),
+        items: [{ id: f.id, version: f.version }],
+        status: "hot_case",
+      },
+      403,
+    );
+    p = { ...original, company: { type: "brokerage" } };
+    const result = (
+      await post("leads/bulk/status", {
+        requestId: randomUUID(),
+        items: [
+          { id: f.id, version: f.version },
+          { id: g.id, version: g.version },
+        ],
+        status: "hot_case",
+      })
+    ).body;
+    assert.equal(result.count, 2);
+    const [df, dg] = await Promise.all([detail(f.id), detail(g.id)]);
+    assert.equal(df.brokerageStatus, "hot_case");
+    assert.equal(dg.brokerageStatus, "hot_case");
+  } finally {
+    p = original;
+  }
+});
+
 test("bulk distribute round-robins across the chosen agents and is forbidden for own scope", async () => {
   const c = (
     await post("leads", draft({ phone: "+12025550903", name: "Bulk C" }))

@@ -32,6 +32,7 @@ import {
   type LeadTagsChange,
   type BulkAssign,
   type BulkStage,
+  type BulkStatus,
   type BulkTags,
   type BulkDistribute,
 } from "./leads.dto.js";
@@ -816,6 +817,31 @@ export class SalesService {
       }
       return { count: rows.size };
     });
+  }
+  async bulkStatus(p: Principal, input: BulkStatus) {
+    if (!brokerageWorkspace(p)) throw new ForbiddenException();
+    return this.write(
+      p,
+      "leads.manage",
+      "lead.bulk_status",
+      input,
+      async (c) => {
+        const rows = await this.bulkRows(c, p, input.items);
+        for (const [id, old] of rows) {
+          if (old.brokerage_status === input.status) continue;
+          await c.query(
+            "UPDATE tenant.leads SET brokerage_status=$3,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2",
+            [p.companyId, id, input.status],
+          );
+          await this.event(c, p, id, "lead.status_changed", {
+            from: old.brokerage_status,
+            to: input.status,
+            bulk: true,
+          });
+        }
+        return { count: rows.size };
+      },
+    );
   }
   async bulkTags(p: Principal, input: BulkTags) {
     return this.write(p, "leads.manage", "lead.bulk_tags", input, async (c) => {

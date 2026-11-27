@@ -23,6 +23,7 @@ import {
   LeadTagsChange,
   BulkAssign,
   BulkStage,
+  BulkStatus,
   BulkTags,
   BulkDistribute,
 } from "./leads.dto.js";
@@ -65,6 +66,11 @@ export class LeadsController {
   @RequireAccess(["company_admin", "company_user"], "leads.manage")
   bulkStage(@Req() req: AuthRequest, @Body() b: BulkStage) {
     return this.service.bulkStage(req.principal, b);
+  }
+  @Post("bulk/status")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  bulkStatus(@Req() req: AuthRequest, @Body() b: BulkStatus) {
+    return this.service.bulkStatus(req.principal, b);
   }
   @Post("bulk/tags")
   @RequireAccess(["company_admin", "company_user"], "leads.manage")

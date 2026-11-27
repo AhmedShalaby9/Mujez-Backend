@@ -356,6 +356,11 @@ export class BulkStage extends BulkLeadsRequest {
   @ApiProperty({ type: String, enum: [...STAGES, "reopen"] })
   declare stage: string;
 }
+export class BulkStatus extends BulkLeadsRequest {
+  @IsIn(BROKERAGE_LEAD_STATUSES)
+  @ApiProperty({ type: String, enum: BROKERAGE_LEAD_STATUSES })
+  declare status: BrokerageLeadStatus;
+}
 export class BulkTags extends BulkLeadsRequest {
   @IsArray()
   @ArrayMinSize(1)
