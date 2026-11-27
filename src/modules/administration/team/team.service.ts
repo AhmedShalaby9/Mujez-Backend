@@ -29,7 +29,6 @@ import type {
   TeamRole,
   SalesTeamInput,
   SalesTeamUpdate,
-  EmployeeManager,
 } from "./team.dto.js";
 const digest = (s: string) => createHash("sha256").update(s).digest("hex");
 const iso = (v: any) => (v ? new Date(v).toISOString() : null);
@@ -44,7 +43,6 @@ function memberDto(r: any) {
     rolesVersion: r.roles_version ?? 0,
     roleName: r.role_name,
     teamId: r.team_id ?? null,
-    reportsToUserId: r.reports_to_user_id ?? null,
     status: r.status,
     invitationExpiresAt: iso(r.invitation_expires_at),
     lastLoginAt: iso(r.last_login_at),
@@ -79,7 +77,7 @@ export class TeamService {
       async (c) =>
         (
           await c.query(
-            `SELECT u.id AS user_id,u.team_id,u.last_login_at,u.reports_to_user_id,r.key AS role_key,r.name AS role_name,${COMPANY_ROLE_FIELDS} FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=ANY($2::uuid[])`,
+            `SELECT u.id AS user_id,u.team_id,u.last_login_at,r.key AS role_key,r.name AS role_name,${COMPANY_ROLE_FIELDS} FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=ANY($2::uuid[])`,
             [p.companyId, accounts.map((a) => a.user_id)],
           )
         ).rows,
@@ -101,13 +99,7 @@ export class TeamService {
     const definition = COMPANY_ROLE_DEFINITIONS[role];
     await c.query(
       `INSERT INTO tenant.roles(company_id,key,name,permissions,scope) VALUES($1,$2,$3,$4,$5) ON CONFLICT(company_id,key) DO NOTHING`,
-      [
-        companyId,
-        role,
-        definition.name,
-        definition.permissions,
-        definition.scope,
-      ],
+      [companyId, role, definition.name, definition.permissions, definition.scope],
     );
     return (
       await c.query(
@@ -137,8 +129,7 @@ export class TeamService {
     );
     if (
       office &&
-      (!roles.length ||
-        roles.some((r) => !OFFICE_SALES_ROLES.includes(r as any)))
+      (!roles.length || roles.some((r) => !OFFICE_SALES_ROLES.includes(r as any)))
     )
       throw new BadRequestException(
         "Real estate offices can assign only Sales Agent and Team Lead",
@@ -158,14 +149,11 @@ export class TeamService {
    * fixtures/tests use it with no connection to the CRM sales ladder), so
    * this is driven by the member's own current role, not company_type. */
   private leadRoleKey(previousRole: string): TeamRole {
-    return [
-      "property_advisor",
-      "property_consultant",
-      "senior",
-      "expert",
-    ].includes(previousRole) || previousRole === "team_leader"
-      ? "team_leader"
-      : "team_lead";
+    return (
+      ["property_advisor", "property_consultant", "senior", "expert"].includes(
+        previousRole,
+      ) || previousRole === "team_leader"
+    ) ? "team_leader" : "team_lead";
   }
   async changeRole(p: Principal, accountId: string, role: TeamRole) {
     return this.changeRoles(p, accountId, [role], undefined, true);
@@ -206,8 +194,7 @@ export class TeamService {
           ...(office && user.roles.includes("employee") ? ["employee"] : []),
           ...(legacy
             ? user.roles.filter(
-                (r: string) =>
-                  !(TEAM_MEMBER_ROLES as readonly string[]).includes(r),
+                (r: string) => !(TEAM_MEMBER_ROLES as readonly string[]).includes(r),
               )
             : []),
         ]),
@@ -251,9 +238,7 @@ export class TeamService {
           user.id,
           roleIds.get(primary),
           p.id,
-          roles.some((r) =>
-            (TEAM_MEMBER_ROLES as readonly string[]).includes(r),
-          ),
+          roles.some((r) => (TEAM_MEMBER_ROLES as readonly string[]).includes(r)),
         ],
       );
       for (const key of roles.filter((r) => r !== primary))
@@ -276,80 +261,6 @@ export class TeamService {
         status: "updated",
         role: primary,
         roles,
-        rolesVersion: user.roles_version + 1,
-      };
-    });
-  }
-  /** The sales-ladder manager one rung up: team leader -> sales manager ->
-   * sales director -> head of sales. A company missing a rank may point
-   * past it, or leave this null to stop the chain there. */
-  async setManager(p: Principal, accountId: string, b: EmployeeManager) {
-    this.owner(p);
-    await this.sales.access(p, "team.manage");
-    const account = (
-      await this.db.platform((c) =>
-        c.query(
-          "SELECT user_id FROM platform.company_employee_accounts WHERE company_id=$1 AND id=$2",
-          [p.companyId, accountId],
-        ),
-      )
-    ).rows[0];
-    if (!account) throw new NotFoundException("Employee not found");
-    return this.db.tenant(p.companyId!, async (c) => {
-      await this.lock(c, p.companyId!);
-      const user = (
-        await c.query(
-          "SELECT * FROM tenant.users WHERE company_id=$1 AND id=$2 AND identity_pool='company_user' AND deleted_at IS NULL FOR UPDATE",
-          [p.companyId, account.user_id],
-        )
-      ).rows[0];
-      if (!user) throw new NotFoundException("Employee not found");
-      if (b.version !== user.roles_version)
-        throw new ConflictException("Roles changed. Refresh before saving.");
-      const managerId = b.reportsToUserId ?? null;
-      if (managerId) {
-        if (managerId === user.id)
-          throw new BadRequestException("A user cannot report to themselves");
-        const manager = (
-          await c.query(
-            "SELECT id FROM tenant.users WHERE company_id=$1 AND id=$2 AND identity_pool='company_user' AND deleted_at IS NULL AND status<>'disabled'",
-            [p.companyId, managerId],
-          )
-        ).rows[0];
-        if (!manager)
-          throw new BadRequestException(
-            "Choose an active company user as manager",
-          );
-        let cursor: string | null = managerId;
-        for (let hop = 0; cursor && hop < 20; hop++) {
-          if (cursor === user.id)
-            throw new ConflictException("That would create a reporting loop");
-          cursor =
-            (
-              await c.query(
-                "SELECT reports_to_user_id FROM tenant.users WHERE company_id=$1 AND id=$2",
-                [p.companyId, cursor],
-              )
-            ).rows[0]?.reports_to_user_id ?? null;
-        }
-      }
-      await c.query(
-        "UPDATE tenant.users SET reports_to_user_id=$3,roles_version=roles_version+1,updated_at=now(),updated_by=$4 WHERE company_id=$1 AND id=$2",
-        [p.companyId, user.id, managerId, p.id],
-      );
-      await recordTenantEvent(c, {
-        companyId: p.companyId!,
-        actorId: p.id,
-        action: "employee.manager_changed",
-        resourceType: "user",
-        resourceId: user.id,
-        before: { reportsToUserId: user.reports_to_user_id ?? null },
-        after: { reportsToUserId: managerId },
-        payload: { reportsToUserId: managerId },
-      });
-      return {
-        status: "updated",
-        reportsToUserId: managerId,
         rolesVersion: user.roles_version + 1,
       };
     });
