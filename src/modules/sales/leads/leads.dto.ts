@@ -1,6 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsIn,
   IsEmail,
   IsInt,
@@ -12,9 +15,14 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
 const trim = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim() : value;
+const trimTags = ({ value }: { value: unknown }) =>
+  Array.isArray(value)
+    ? value.map((v) => String(v).trim()).filter(Boolean)
+    : value;
 export const STAGES = [
   "new",
   "attempting",
@@ -313,5 +321,57 @@ export class DealUpdate extends SalesRequest {
     description: "Integer EGP minor units as a string",
   })
   declare valueMinor: string;
+}
+export class LeadTagsChange extends SalesRequest {
+  @IsInt() @Min(0) @ApiProperty({ type: Number }) declare version: number;
+  @IsArray()
+  @ArrayMaxSize(15)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  @Transform(trimTags)
+  @ApiProperty({ type: [String] })
+  declare tags: string[];
+}
+export class BulkLeadRef {
+  @IsUUID() @ApiProperty({ type: String, format: "uuid" }) declare id: string;
+  @IsInt() @Min(0) @ApiProperty({ type: Number }) declare version: number;
+}
+export class BulkLeadsRequest extends SalesRequest {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => BulkLeadRef)
+  @ApiProperty({ type: [BulkLeadRef] })
+  declare items: BulkLeadRef[];
+}
+export class BulkAssign extends BulkLeadsRequest {
+  @IsOptional()
+  @IsUUID()
+  @ApiPropertyOptional({ type: String, nullable: true, format: "uuid" })
+  ownerId?: string | null;
+}
+export class BulkStage extends BulkLeadsRequest {
+  @IsIn([...STAGES, "reopen"])
+  @ApiProperty({ type: String, enum: [...STAGES, "reopen"] })
+  declare stage: string;
+}
+export class BulkTags extends BulkLeadsRequest {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  @Transform(trimTags)
+  @ApiProperty({ type: [String] })
+  declare tags: string[];
+}
+export class BulkDistribute extends BulkLeadsRequest {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @IsUUID(undefined, { each: true })
+  @ApiProperty({ type: [String] })
+  declare agentIds: string[];
 }
 

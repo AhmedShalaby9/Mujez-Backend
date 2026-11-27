@@ -809,3 +809,149 @@ test("assigned leads appear without invented deal values and become one detailed
     p = original;
   }
 });
+
+test("lead tags are free text, trimmed, deduped case-insensitively, capped and version-checked", async () => {
+  const created = (
+    await post("leads", draft({ phone: "+12025550900", name: "Tag buyer" }))
+  ).body;
+  const tagged = (
+    await post("leads/" + created.id + "/tags", {
+      requestId: randomUUID(),
+      version: created.version,
+      tags: [" Hot ", "hot", "VIP", ""],
+    })
+  ).body;
+  assert.deepEqual(tagged.tags, ["Hot", "VIP"]);
+  await post(
+    "leads/" + created.id + "/tags",
+    { requestId: randomUUID(), version: created.version, tags: ["Stale"] },
+    409,
+  );
+});
+
+test("bulk assign, stage and tags act on multiple leads and roll back the whole batch on a stale row", async () => {
+  const a = (
+    await post("leads", draft({ phone: "+12025550901", name: "Bulk A" }))
+  ).body;
+  const b = (
+    await post("leads", draft({ phone: "+12025550902", name: "Bulk B" }))
+  ).body;
+  const colleague = (
+    await db.query(
+      "INSERT INTO tenant.users(company_id,oidc_subject,identity_pool,name,email,role_id,status) SELECT company_id,'sales-bulk-colleague','company_user','Bulk colleague','sales-bulk-colleague@example.test',role_id,'active' FROM tenant.users WHERE id=$1 RETURNING id",
+      [U],
+    )
+  ).rows[0].id;
+  const assigned = (
+    await post("leads/bulk/assign", {
+      requestId: randomUUID(),
+      items: [
+        { id: a.id, version: a.version },
+        { id: b.id, version: b.version },
+      ],
+      ownerId: colleague,
+    })
+  ).body;
+  assert.equal(assigned.count, 2);
+  let current = await Promise.all([detail(a.id), detail(b.id)]);
+  assert.ok(current.every((l) => l.owner.id === colleague));
+  const staged = (
+    await post("leads/bulk/stage", {
+      requestId: randomUUID(),
+      items: [
+        { id: a.id, version: current[0].version },
+        { id: b.id, version: current[1].version },
+      ],
+      stage: "qualified",
+    })
+  ).body;
+  assert.equal(staged.count, 2);
+  current = await Promise.all([detail(a.id), detail(b.id)]);
+  assert.ok(current.every((l) => l.stage === "qualified"));
+  const tagged = (
+    await post("leads/bulk/tags", {
+      requestId: randomUUID(),
+      items: [
+        { id: a.id, version: current[0].version },
+        { id: b.id, version: current[1].version },
+      ],
+      tags: ["Hot"],
+    })
+  ).body;
+  assert.equal(tagged.count, 2);
+  current = await Promise.all([detail(a.id), detail(b.id)]);
+  assert.ok(current.every((l) => l.tags.includes("Hot")));
+  await post(
+    "leads/bulk/stage",
+    {
+      requestId: randomUUID(),
+      items: [
+        { id: a.id, version: current[0].version },
+        { id: b.id, version: 0 },
+      ],
+      stage: "won",
+    },
+    409,
+  );
+  const unchanged = await detail(a.id);
+  assert.equal(unchanged.stage, "qualified");
+});
+
+test("bulk distribute round-robins across the chosen agents and is forbidden for own scope", async () => {
+  const c = (
+    await post("leads", draft({ phone: "+12025550903", name: "Bulk C" }))
+  ).body;
+  const d = (
+    await post("leads", draft({ phone: "+12025550904", name: "Bulk D" }))
+  ).body;
+  const e = (
+    await post("leads", draft({ phone: "+12025550905", name: "Bulk E" }))
+  ).body;
+  const agent1 = (
+    await db.query(
+      "INSERT INTO tenant.users(company_id,oidc_subject,identity_pool,name,email,role_id,status) SELECT company_id,'sales-distribute-1','company_user','Agent 1','sales-distribute-1@example.test',role_id,'active' FROM tenant.users WHERE id=$1 RETURNING id",
+      [U],
+    )
+  ).rows[0].id;
+  const agent2 = (
+    await db.query(
+      "INSERT INTO tenant.users(company_id,oidc_subject,identity_pool,name,email,role_id,status) SELECT company_id,'sales-distribute-2','company_user','Agent 2','sales-distribute-2@example.test',role_id,'active' FROM tenant.users WHERE id=$1 RETURNING id",
+      [U],
+    )
+  ).rows[0].id;
+  const original = p;
+  try {
+    p = { ...original, scope: "own" };
+    await post(
+      "leads/bulk/distribute",
+      {
+        requestId: randomUUID(),
+        items: [{ id: c.id, version: c.version }],
+        agentIds: [agent1],
+      },
+      403,
+    );
+  } finally {
+    p = original;
+  }
+  const result = (
+    await post("leads/bulk/distribute", {
+      requestId: randomUUID(),
+      items: [
+        { id: c.id, version: c.version },
+        { id: d.id, version: d.version },
+        { id: e.id, version: e.version },
+      ],
+      agentIds: [agent1, agent2],
+    })
+  ).body;
+  assert.equal(result.count, 3);
+  const [dc, dd, de] = await Promise.all([
+    detail(c.id),
+    detail(d.id),
+    detail(e.id),
+  ]);
+  const owners = [dc.owner.id, dd.owner.id, de.owner.id];
+  assert.ok(owners.includes(agent1) && owners.includes(agent2));
+  assert.equal(new Set(owners).size, 2);
+});
