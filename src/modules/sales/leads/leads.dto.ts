@@ -58,6 +58,49 @@ export const BROKERAGE_LEAD_STATUSES = [
 export type BrokerageLeadStatus = (typeof BROKERAGE_LEAD_STATUSES)[number];
 /** Stages that take a lead out of the active pipeline. */
 export const CLOSED_STAGES = ["won", "lost", "unqualified"] as const;
+/** Property types; shared by brokerage deal units and the lead "what they
+ * want" dropdown so both use the same vocabulary. */
+export const UNIT_TYPES = [
+  "Stand alone",
+  "Apartment",
+  "Duplex",
+  "Town House",
+  "Twin House",
+  "iVilla",
+  "office",
+  "shop",
+  "Administrative",
+  "Medical",
+  "building",
+  "Pent House",
+  "Chalet",
+  "Land",
+  "Villa",
+  "Studio",
+  "Cabin",
+  "Multiple Family",
+  "Multi & Single Family",
+  "Sky Panorama",
+  "Ground Floor",
+  "Hotel Apartments",
+  "Apartment 4BR",
+  "One Story Villa",
+  "I-villa Garden - 3 BRs",
+  "Skyvilla - 3 BRs",
+  "Millennial - 1 BR",
+  "Garden Millennial - 1 BR",
+  "Millennial - 2 BR",
+  "Millennial - 3 BR",
+  "Garden Millennial - 2 BR",
+  "Garden Millennial - 3 BR",
+];
+export const FINISHING_TYPES = [
+  "Core & Shell",
+  "Semi Finished",
+  "Finished",
+  "Super Lux",
+  "Ultra Super Lux",
+];
 export class SalesQuery {
   @IsOptional()
   @Matches(/^(0|[1-9][0-9]{0,17})$/)
@@ -136,7 +179,20 @@ export class LeadInput extends SalesRequest {
   @MaxLength(40)
   @ApiProperty({ type: String })
   declare phone: string;
-  @IsIn(["res", "com"]) @ApiProperty({ type: String }) declare segment: string;
+  @IsOptional()
+  @IsIn(["res", "com"])
+  @ApiPropertyOptional({ type: String, nullable: true })
+  segment?: string | null;
+  @IsOptional()
+  @IsUUID()
+  @ApiPropertyOptional({ type: String, nullable: true, format: "uuid" })
+  projectId?: string | null;
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  @MaxLength(2000)
+  @ApiPropertyOptional({ type: String })
+  firstComment?: string;
   @IsString()
   @Transform(trim)
   @MaxLength(1000)

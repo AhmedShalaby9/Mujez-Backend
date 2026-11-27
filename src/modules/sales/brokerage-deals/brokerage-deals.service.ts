@@ -26,6 +26,7 @@ import type {
   DeveloperUpdate,
   DeveloperArchive,
 } from "./brokerage-deals.dto.js";
+import { UNIT_TYPES, FINISHING_TYPES } from "../leads/leads.dto.js";
 
 const isAdmin = (p: Principal) => p.pool === "company_admin" && !p.workspace;
 /** Deal approval: the owner, or a Sales Admin (company_user, no finance/HR,
@@ -48,47 +49,6 @@ const requiredDetails = [
   "expectedContractDate",
   "reservationPrice",
   "reservationDate",
-];
-export const UNIT_TYPES = [
-  "Stand alone",
-  "Apartment",
-  "Duplex",
-  "Town House",
-  "Twin House",
-  "iVilla",
-  "office",
-  "shop",
-  "Administrative",
-  "Medical",
-  "building",
-  "Pent House",
-  "Chalet",
-  "Land",
-  "Villa",
-  "Studio",
-  "Cabin",
-  "Multiple Family",
-  "Multi & Single Family",
-  "Sky Panorama",
-  "Ground Floor",
-  "Hotel Apartments",
-  "Apartment 4BR",
-  "One Story Villa",
-  "I-villa Garden - 3 BRs",
-  "Skyvilla - 3 BRs",
-  "Millennial - 1 BR",
-  "Garden Millennial - 1 BR",
-  "Millennial - 2 BR",
-  "Millennial - 3 BR",
-  "Garden Millennial - 2 BR",
-  "Garden Millennial - 3 BR",
-];
-export const FINISHING_TYPES = [
-  "Core & Shell",
-  "Semi Finished",
-  "Finished",
-  "Super Lux",
-  "Ultra Super Lux",
 ];
 const mimeTypes = [
   "application/pdf",

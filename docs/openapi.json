@@ -3572,6 +3572,36 @@
         "tags": ["BrokerageDeals"]
       }
     },
+    "/api/v1/brokerage/commissions/options": {
+      "get": {
+        "operationId": "DealCommissionsController_options",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["DealCommissions"]
+      }
+    },
+    "/api/v1/brokerage/commissions": {
+      "get": {
+        "operationId": "DealCommissionsController_list",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["DealCommissions"]
+      },
+      "post": {
+        "operationId": "DealCommissionsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DealCommissionInput" }
+            }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["DealCommissions"]
+      }
+    },
     "/api/v1/brokerage/commission-scheme": {
       "get": {
         "operationId": "CommissionSchemeController_get",
@@ -8396,7 +8426,9 @@
           "name": { "type": "string" },
           "nameAr": { "type": "string" },
           "phone": { "type": "string" },
-          "segment": { "type": "string" },
+          "segment": { "type": ["string", "null"] },
+          "projectId": { "type": ["string", "null"], "format": "uuid" },
+          "firstComment": { "type": "string" },
           "want": { "type": "string" },
           "wantAr": { "type": "string" },
           "budgetMinor": {
@@ -8410,7 +8442,7 @@
           "duplicateOf": { "type": "string", "format": "uuid" },
           "reason": { "type": "string" }
         },
-        "required": ["requestId", "name", "phone", "segment", "want", "source"]
+        "required": ["requestId", "name", "phone", "want", "source"]
       },
       "BulkLeadRef": {
         "type": "object",
@@ -8514,7 +8546,9 @@
           "name": { "type": "string" },
           "nameAr": { "type": "string" },
           "phone": { "type": "string" },
-          "segment": { "type": "string" },
+          "segment": { "type": ["string", "null"] },
+          "projectId": { "type": ["string", "null"], "format": "uuid" },
+          "firstComment": { "type": "string" },
           "want": { "type": "string" },
           "wantAr": { "type": "string" },
           "budgetMinor": {
@@ -8529,15 +8563,7 @@
           "reason": { "type": "string" },
           "version": { "type": "number" }
         },
-        "required": [
-          "requestId",
-          "name",
-          "phone",
-          "segment",
-          "want",
-          "source",
-          "version"
-        ]
+        "required": ["requestId", "name", "phone", "want", "source", "version"]
       },
       "StageChange": {
         "type": "object",
@@ -8814,6 +8840,30 @@
           "location",
           "segment"
         ]
+      },
+      "CommissionEntryInput": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" },
+          "amountMinor": {
+            "type": "string",
+            "description": "Commission amount in EGP minor units"
+          },
+          "note": { "type": "string" }
+        },
+        "required": ["userId", "amountMinor"]
+      },
+      "DealCommissionInput": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": "string", "format": "uuid" },
+          "dealId": { "type": "string" },
+          "entries": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CommissionEntryInput" }
+          }
+        },
+        "required": ["requestId", "dealId", "entries"]
       },
       "CommissionTierInput": {
         "type": "object",
