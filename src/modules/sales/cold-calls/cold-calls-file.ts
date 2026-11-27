@@ -6,8 +6,9 @@ import { createHash } from "node:crypto";
 import { normalizePhone } from "../leads/sales.service.js";
 export type ColdFile = { buffer: Buffer; originalname: string; size: number };
 export type ColdRow = { row: number; name: string; phone: string };
+export type ColdColumnMapping = { nameColumn: number; phoneColumn: number };
 export const MAX_ROWS = 2000;
-export async function parseColdFile(file: ColdFile | undefined) {
+async function readColdSheet(file: ColdFile | undefined) {
   if (!file?.buffer?.length || file.buffer.length > 5 * 1024 * 1024)
     throw new BadRequestException(
       "Upload an XLSX or UTF-8 CSV file up to 5 MB",
@@ -54,7 +55,7 @@ export async function parseColdFile(file: ColdFile | undefined) {
     } else {
       const raw = new TextDecoder("utf-8", { fatal: true })
         .decode(file.buffer)
-        .replace(/^\uFEFF/, "");
+        .replace(/^﻿/, "");
       const first = raw.split(/\r?\n/, 1)[0] ?? "";
       sheet = await workbook.csv.read(Readable.from([raw]), {
         map: (v: string) => v,
@@ -66,18 +67,55 @@ export async function parseColdFile(file: ColdFile | undefined) {
     }
   } catch {
     throw new BadRequestException(
-      "Cannot read file. Use one worksheet, the template headers, UTF-8 CSV or a valid XLSX (maximum 2,000 rows).",
+      "Cannot read file. Use one worksheet, a header row, UTF-8 CSV or a valid XLSX (maximum 2,000 rows).",
     );
   }
   if (sheet.rowCount > MAX_ROWS + 1)
     throw new BadRequestException("Maximum 2,000 rows per import");
-  const header = sheet.getRow(1);
-  const names = [header.getCell(1).value, header.getCell(2).value].map((v) =>
-    typeof v === "string" ? v.trim().toLowerCase() : "",
-  );
-  if (names.join(",") !== "name,phone" || sheet.columnCount > 2)
+  if (sheet.columnCount < 2)
     throw new BadRequestException(
-      "The first row must contain exactly two columns in order: name, phone",
+      "The file needs at least two columns: one for the name and one for the phone number",
+    );
+  return sheet;
+}
+function cellText(v: ExcelJS.CellValue) {
+  return v === null || v === undefined ? "" : String(v).trim();
+}
+/** Reads the header row and a few sample rows so the caller can pick which column is which. */
+export async function inspectColdFile(file: ColdFile | undefined) {
+  const sheet = await readColdSheet(file);
+  const header = sheet.getRow(1);
+  const columns = Array.from({ length: sheet.columnCount }, (_, i) => {
+    const label = cellText(header.getCell(i + 1).value);
+    return { index: i + 1, label: label || null };
+  });
+  const sample: string[][] = [];
+  for (let r = 2; r <= Math.min(sheet.rowCount, 4); r++) {
+    const row = sheet.getRow(r);
+    sample.push(
+      Array.from({ length: sheet.columnCount }, (_, i) =>
+        cellText(row.getCell(i + 1).value),
+      ),
+    );
+  }
+  return { columns, sample, totalRows: sheet.rowCount - 1 };
+}
+export async function parseColdFile(
+  file: ColdFile | undefined,
+  mapping: ColdColumnMapping,
+) {
+  const sheet = await readColdSheet(file);
+  if (
+    !Number.isInteger(mapping.nameColumn) ||
+    !Number.isInteger(mapping.phoneColumn) ||
+    mapping.nameColumn < 1 ||
+    mapping.phoneColumn < 1 ||
+    mapping.nameColumn > sheet.columnCount ||
+    mapping.phoneColumn > sheet.columnCount ||
+    mapping.nameColumn === mapping.phoneColumn
+  )
+    throw new BadRequestException(
+      "Choose two different columns for the name and the phone number",
     );
   const rows: ColdRow[] = [],
     errors: { row: number; reason: string }[] = [];
@@ -86,8 +124,8 @@ export async function parseColdFile(file: ColdFile | undefined) {
   let duplicate = 0;
   for (let i = 2; i <= sheet.rowCount; i++) {
     const row = sheet.getRow(i),
-      n = row.getCell(1).value,
-      p = row.getCell(2).value;
+      n = row.getCell(mapping.nameColumn).value,
+      p = row.getCell(mapping.phoneColumn).value;
     if ((n === null || n === "") && (p === null || p === "")) {
       empty++;
       continue;
@@ -139,7 +177,7 @@ export async function parseColdFile(file: ColdFile | undefined) {
     empty,
     duplicate,
     total: sheet.rowCount - 1,
-    hash: createHash("sha256").update(file.buffer).digest("hex"),
+    hash: createHash("sha256").update(file!.buffer).digest("hex"),
   };
 }
 export async function coldTemplate() {

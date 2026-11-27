@@ -36,7 +36,9 @@ async function contact(name, ownerId) {
     .post("/api/v1/cold-calls/import")
     .set("Origin", h.origin)
     .set("Cookie", "__Host-mujez_session=" + "a".repeat(64))
-    .field("requestId", randomUUID());
+    .field("requestId", randomUUID())
+    .field("nameColumn", 1)
+    .field("phoneColumn", 2);
   if (ownerId) r = r.field("ownerId", ownerId);
   await r
     .attach(

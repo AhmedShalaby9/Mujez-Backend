@@ -23,7 +23,9 @@ const upload = (
     .post("/api/v1/cold-calls/" + path)
     .set("Origin", h.origin)
     .set("Cookie", "__Host-mujez_session=" + "a".repeat(64));
-  for (const [k, v] of Object.entries(fields)) r = r.field(k, v);
+  const merged =
+    path === "columns" ? fields : { nameColumn: 1, phoneColumn: 2, ...fields };
+  for (const [k, v] of Object.entries(merged)) r = r.field(k, v);
   return r
     .attach("file", Buffer.from(raw), {
       filename: name,
@@ -42,11 +44,12 @@ afterEach(() => {
   h.state.principal = p;
   h.state.failAudit = false;
 });
-test("CSV and XLSX validate exact headers, preserve phone text, reject formulas/numbers/oversized sheets", async () => {
-  const parsed = await parseColdFile({
-    buffer: Buffer.from("\uFEFF" + data),
-    originalname: "data.csv",
-  });
+const mapping = { nameColumn: 1, phoneColumn: 2 };
+test("CSV and XLSX honor the chosen column mapping in any order, preserve phone text, reject formulas/numbers/oversized/too-narrow sheets", async () => {
+  const parsed = await parseColdFile(
+    { buffer: Buffer.from("\uFEFF" + data), originalname: "data.csv" },
+    mapping,
+  );
   assert.equal(parsed.rows.length, 2);
   assert.equal(parsed.duplicate, 1);
   assert.equal(parsed.errors.length, 2);
@@ -57,35 +60,81 @@ test("CSV and XLSX validate exact headers, preserve phone text, reject formulas/
   s.addRow(["Arabic", "٠١٢١٢٣٤٥٦٧٨"]);
   s.addRow(["Number", 1012345678]);
   s.addRow(["Formula", { formula: "1+1", result: "01000000000" }]);
-  const x = await parseColdFile({
-    buffer: Buffer.from(await w.xlsx.writeBuffer()),
-    originalname: "contacts.xlsx",
-  });
+  const x = await parseColdFile(
+    {
+      buffer: Buffer.from(await w.xlsx.writeBuffer()),
+      originalname: "contacts.xlsx",
+    },
+    mapping,
+  );
   assert.equal(x.rows.length, 1);
   assert.equal(x.errors.length, 2);
+  const swapped = await parseColdFile(
+    {
+      buffer: Buffer.from("phone,name\n01012345678,Someone"),
+      originalname: "swapped.csv",
+    },
+    { nameColumn: 2, phoneColumn: 1 },
+  );
+  assert.equal(swapped.rows[0].name, "Someone");
+  assert.equal(swapped.rows[0].phone, "+201012345678");
   await assert.rejects(
-    parseColdFile({
-      buffer: Buffer.from("phone,name\n01012345678,Name"),
-      originalname: "bad.csv",
-    }),
+    parseColdFile(
+      { buffer: Buffer.from("name\nOnlyOneColumn"), originalname: "one.csv" },
+      mapping,
+    ),
     (e) => e.getStatus() === 400,
   );
   await assert.rejects(
-    parseColdFile({
-      buffer: Buffer.from(
-        "name,phone\n" + "Someone,01012345678\n".repeat(2001),
-      ),
-      originalname: "large.csv",
-    }),
+    parseColdFile(
+      { buffer: Buffer.from(data), originalname: "data.csv" },
+      { nameColumn: 1, phoneColumn: 1 },
+    ),
     (e) => e.getStatus() === 400,
   );
   await assert.rejects(
-    parseColdFile({ buffer: Buffer.from("binary"), originalname: "old.xls" }),
+    parseColdFile(
+      {
+        buffer: Buffer.from(
+          "name,phone\n" + "Someone,01012345678\n".repeat(2001),
+        ),
+        originalname: "large.csv",
+      },
+      mapping,
+    ),
+    (e) => e.getStatus() === 400,
+  );
+  await assert.rejects(
+    parseColdFile(
+      { buffer: Buffer.from("binary"), originalname: "old.xls" },
+      mapping,
+    ),
     (e) => e.getStatus() === 400,
   );
   const t = new ExcelJS.Workbook();
   await t.xlsx.load(await coldTemplate());
   assert.equal(t.worksheets[0].getColumn(2).numFmt, "@");
+});
+test("the columns endpoint reports headers and sample rows so the caller can map any layout, including extra columns", async () => {
+  const raw =
+    "full name,city,mobile\nSara,Cairo,01055555555\nKhaled,Giza,01066666666\n";
+  const cols = (await upload("columns", raw, {})).body;
+  assert.deepEqual(cols.columns, [
+    { index: 1, label: "full name" },
+    { index: 2, label: "city" },
+    { index: 3, label: "mobile" },
+  ]);
+  assert.deepEqual(cols.sample, [
+    ["Sara", "Cairo", "01055555555"],
+    ["Khaled", "Giza", "01066666666"],
+  ]);
+  assert.equal(cols.totalRows, 2);
+  const preview = (
+    await upload("preview", raw, { nameColumn: 1, phoneColumn: 3 })
+  ).body;
+  assert.equal(preview.valid, 2);
+  assert.equal(preview.sample[0].name, "Sara");
+  assert.equal(preview.sample[0].phone, "+201055555555");
 });
 test("preview has no CRM writes; importing is scoped, deduplicated and idempotent without adding pipeline leads", async () => {
   const preview = (await upload("preview")).body;

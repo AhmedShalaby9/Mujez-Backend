@@ -43,6 +43,11 @@ before(async () => {
     else if (slug === "trial") trial = c;
     else empty = c;
   }
+  // The super-admin-set per-company seat limit (not the plan) now drives the
+  // "near limit" alert; keep it tight so the fixture still trips it.
+  await db.query("UPDATE platform.companies SET max_users=2 WHERE id=$1", [
+    monthly,
+  ]);
   await db.exec(
     `INSERT INTO platform.subscription_plans(key) VALUES ('starter');INSERT INTO platform.plan_versions(plan_key,revision,name,description,monthly_minor,annual_minor,limits,features) VALUES ('starter',1,'{"en":"Starter","ar":"Starter"}','{}',10000,120001,'{"users":2}','{}');`,
   );

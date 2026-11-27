@@ -18,10 +18,10 @@ import type {
   CompanyDraftInput,
   ManagerInput,
   CompanyQuoteInput,
+  UsersLimitInput,
 } from "./companies.dto.js";
 const SELECT = `SELECT c.*,coalesce(u.users,0) AS users,ss.plan_key AS subscription_plan,ss.mrr AS subscription_mrr,ss.cycle AS subscription_cycle,
  (SELECT CASE WHEN s.status NOT IN ('canceled','expired') AND s.period_end<=now() THEN CASE WHEN s.cancel_at_period_end THEN 'canceled' ELSE 'expired' END ELSE s.status END FROM platform.subscriptions s WHERE s.company_id=c.id ORDER BY s.created_at DESC,s.id LIMIT 1) AS subscription_status,
- (SELECT (v.limits->>'users')::numeric FROM platform.subscriptions s JOIN platform.plan_versions v ON v.id=s.plan_version_id WHERE s.company_id=c.id ORDER BY s.created_at DESC,s.id LIMIT 1) AS seat_limit,
  (SELECT s.period_end FROM platform.subscriptions s WHERE s.company_id=c.id AND s.status='trialing' ORDER BY s.created_at DESC LIMIT 1) AS trial_ends_at,
  (SELECT a.last_active_at FROM platform.company_activity_summary a WHERE a.company_id=c.id) AS last_active_at,
  (SELECT jsonb_build_object('id',u.id,'name',u.name) FROM platform.users u WHERE u.id=c.success_manager_id) AS success_manager
@@ -47,10 +47,7 @@ export function companyDto(c: any) {
     statusReasonCode: c.status_reason_code ?? null,
     statusAcknowledged: !!c.status_acknowledged,
     subscriptionStatus: c.subscription_status ?? null,
-    seatLimit:
-      c.seat_limit === null || c.seat_limit === undefined
-        ? null
-        : Number(c.seat_limit),
+    maxUsers: Number(c.max_users),
     lastActiveAt: c.last_active_at
       ? new Date(c.last_active_at).toISOString()
       : null,
@@ -153,7 +150,7 @@ export class CompaniesService {
         const id = randomUUID();
         const row = (
           await c.query(
-            `INSERT INTO platform.companies(id,public_id,slug,name,company_type,city,admin_email,phone,website,selected_plan,status,country,address,company_email,tax_number,cr_number,owner_profile,hr_enabled,finance_enabled,ai_enabled) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+            `INSERT INTO platform.companies(id,public_id,slug,name,company_type,city,admin_email,phone,website,selected_plan,status,country,address,company_email,tax_number,cr_number,owner_profile,hr_enabled,finance_enabled,ai_enabled,max_users) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
             [
               id,
               "MJ-" + id.toUpperCase(),
@@ -174,6 +171,7 @@ export class CompaniesService {
               input.hrEnabled ?? false,
               input.financeEnabled ?? false,
               input.aiEnabled ?? false,
+              input.maxUsers ?? 20,
             ],
           )
         ).rows[0];
@@ -328,6 +326,21 @@ export class CompaniesService {
       },
     );
   }
+  usersLimit(id: string, input: UsersLimitInput, actor: string) {
+    return this.change(
+      id,
+      input.version,
+      actor,
+      "company.users_limit_changed",
+      async (c, b) =>
+        (
+          await c.query(
+            "UPDATE platform.companies SET max_users=$2,version=version+1,updated_at=now() WHERE id=$1 RETURNING *",
+            [b.id, input.maxUsers],
+          )
+        ).rows[0],
+    );
+  }
   onboardingSummary() {
     return this.db.platform(async (c) => {
       const r = (
@@ -391,7 +404,7 @@ export class CompaniesService {
           throw new ConflictException("Archived company is read-only");
         return (
           await c.query(
-            `UPDATE platform.companies SET slug=$2,name=$3,company_type=$4,city=$5,admin_email=$6,phone=$7,website=$8,selected_plan=$9,country=coalesce($10,country),address=coalesce($11,address),company_email=coalesce($12,company_email),tax_number=coalesce($13,tax_number),cr_number=coalesce($14,cr_number),hr_enabled=coalesce($15,hr_enabled),finance_enabled=coalesce($16,finance_enabled),ai_enabled=coalesce($17,ai_enabled),updated_at=now(),version=version+1 WHERE id=$1 RETURNING *`,
+            `UPDATE platform.companies SET slug=$2,name=$3,company_type=$4,city=$5,admin_email=$6,phone=$7,website=$8,selected_plan=$9,country=coalesce($10,country),address=coalesce($11,address),company_email=coalesce($12,company_email),tax_number=coalesce($13,tax_number),cr_number=coalesce($14,cr_number),hr_enabled=coalesce($15,hr_enabled),finance_enabled=coalesce($16,finance_enabled),ai_enabled=coalesce($17,ai_enabled),max_users=coalesce($18,max_users),updated_at=now(),version=version+1 WHERE id=$1 RETURNING *`,
             [
               b.id,
               input.slug,
@@ -410,6 +423,7 @@ export class CompaniesService {
               input.hrEnabled ?? null,
               input.financeEnabled ?? null,
               input.aiEnabled ?? null,
+              input.maxUsers ?? null,
             ],
           )
         ).rows[0];

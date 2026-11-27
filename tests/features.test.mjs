@@ -28,7 +28,7 @@ before(async () => {
   ).rows[0].id;
   company = (
     await db.query(
-      "INSERT INTO platform.companies(public_id,slug,name,status) VALUES ('MJ-POLICY','policy','{\"en\":\"Policy\",\"ar\":\"سياسة\"}','active') RETURNING *",
+      "INSERT INTO platform.companies(public_id,slug,name,status,max_users) VALUES ('MJ-POLICY','policy','{\"en\":\"Policy\",\"ar\":\"سياسة\"}','active',5) RETURNING *",
     )
   ).rows[0];
   await db.exec(
