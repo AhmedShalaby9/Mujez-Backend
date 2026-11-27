@@ -392,6 +392,8 @@ test("notes and opportunity edits persist with actual actor and paginated activi
     note: "Buyer confirmed appointment by phone",
   };
   lead = (await post("leads/" + lead.id + "/notes", body)).body;
+  assert.equal(lead.lastComment, body.note);
+  assert.equal((await detail(lead.id)).lastComment, body.note);
   await post("leads/" + lead.id + "/notes", body);
   const a = (await get("leads/" + lead.id + "/activities?limit=1")).body;
   assert.equal(a.items[0].kind, "lead.note_added");
