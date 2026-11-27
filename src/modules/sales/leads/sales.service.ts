@@ -18,6 +18,7 @@ import {
   STAGES,
   BROKERAGE_LEAD_STATUSES,
   CLOSED_STAGES,
+  UNIT_TYPES,
   type SalesQuery,
   type SalesRequest,
   type LeadInput,
@@ -59,7 +60,7 @@ export function normalizePhone(value: string) {
     );
   return s;
 }
-const LEAD = `SELECT l.*,(SELECT max(a.created_at) FROM tenant.lead_activities a WHERE a.company_id=l.company_id AND a.lead_id=l.id) AS last_activity_at,(SELECT a.details->>'note' FROM tenant.lead_activities a WHERE a.company_id=l.company_id AND a.lead_id=l.id AND a.details ? 'note' ORDER BY a.created_at DESC LIMIT 1) AS last_comment,l.budget_minor::text AS budget_minor,u.name AS owner_name,o.id AS opportunity_id,o.public_id AS deal_ref,o.title AS deal_title,o.value_minor::text AS deal_value,o.deal_type,o.version AS deal_version,mc.name AS campaign_name,rr.name AS routing_rule_name,CASE WHEN ${NOT_CONTACTED_SQL} AND rr.active AND rr.archived_at IS NULL AND rr.sla_minutes>0 THEN l.assigned_at+make_interval(mins=>rr.sla_minutes) ELSE NULL END AS sla_due_at FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id LEFT JOIN tenant.marketing_campaigns mc ON mc.company_id=l.company_id AND mc.id=l.campaign_id LEFT JOIN tenant.routing_rules rr ON rr.company_id=l.company_id AND rr.id=l.routing_rule_id`;
+const LEAD = `SELECT l.*,(SELECT max(a.created_at) FROM tenant.lead_activities a WHERE a.company_id=l.company_id AND a.lead_id=l.id) AS last_activity_at,(SELECT a.details->>'note' FROM tenant.lead_activities a WHERE a.company_id=l.company_id AND a.lead_id=l.id AND a.details ? 'note' ORDER BY a.created_at DESC LIMIT 1) AS last_comment,l.budget_minor::text AS budget_minor,u.name AS owner_name,o.id AS opportunity_id,o.public_id AS deal_ref,o.title AS deal_title,o.value_minor::text AS deal_value,o.deal_type,o.version AS deal_version,mc.name AS campaign_name,rr.name AS routing_rule_name,pr.name AS project_name,CASE WHEN ${NOT_CONTACTED_SQL} AND rr.active AND rr.archived_at IS NULL AND rr.sla_minutes>0 THEN l.assigned_at+make_interval(mins=>rr.sla_minutes) ELSE NULL END AS sla_due_at FROM tenant.leads l LEFT JOIN tenant.users u ON u.company_id=l.company_id AND u.id=l.owner_user_id LEFT JOIN tenant.opportunities o ON o.company_id=l.company_id AND o.lead_id=l.id LEFT JOIN tenant.marketing_campaigns mc ON mc.company_id=l.company_id AND mc.id=l.campaign_id LEFT JOIN tenant.routing_rules rr ON rr.company_id=l.company_id AND rr.id=l.routing_rule_id LEFT JOIN tenant.projects pr ON pr.company_id=l.company_id AND pr.id=l.project_id`;
 const ref = (prefix: string) =>
   prefix + "-" + randomBytes(6).toString("hex").toUpperCase();
 const brokerageWorkspace = (p: Principal) =>
@@ -94,6 +95,7 @@ export function leadDto(l: any) {
     score: l.score,
     tags: l.tags ?? [],
     lastComment: l.last_comment ?? null,
+    project: l.project_id ? { id: l.project_id, name: l.project_name } : null,
     version: l.version,
     archivedAt: iso(l.archived_at),
     createdAt: iso(l.created_at),
@@ -221,6 +223,7 @@ export class SalesService {
         leadCount: r.lead_count,
       })),
       canManage: p.permissions.includes("leads.manage"),
+      wantTypes: UNIT_TYPES,
     }));
   }
   async list(p: Principal, q: SalesQuery) {
@@ -485,6 +488,18 @@ export class SalesService {
       );
     return id;
   }
+  async project(c: PoolClient, p: Principal, id: string | null | undefined) {
+    if (!id) return null;
+    if (!p.permissions.includes("projects.read")) throw new ForbiddenException();
+    const row = (
+      await c.query(
+        "SELECT id FROM tenant.projects WHERE company_id=$1 AND id=$2 AND archived_at IS NULL",
+        [p.companyId, id],
+      )
+    ).rows[0];
+    if (!row) throw new BadRequestException("Choose an active company project");
+    return id;
+  }
   async create(p: Principal, input: LeadInput) {
     return this.write(p, "leads.manage", "lead.create", input, (c) =>
       this.createWithin(c, p, input),
@@ -496,7 +511,12 @@ export class SalesService {
       duplicate = await this.duplicate(c, p, phone, input);
     const routed =
       input.ownerId === undefined && p.scope !== "own"
-        ? await pickRoute(c, p.companyId!, input, true)
+        ? await pickRoute(
+            c,
+            p.companyId!,
+            { ...input, segment: input.segment ?? null },
+            true,
+          )
         : null;
     const owner = await this.owner(
       c,
@@ -509,16 +529,17 @@ export class SalesService {
       input.campaignId ?? null,
       input.source,
     );
+    const project = await this.project(c, p, input.projectId ?? null);
     await requireCrmSlot(c, p.companyId!, "leads");
     const l = (
       await c.query(
-        `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,score,campaign_id,routing_rule_id,assigned_at,email,brokerage_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END,$13,$14) RETURNING id`,
+        `INSERT INTO tenant.leads(company_id,public_id,name,phone,segment,want,budget_minor,source,owner_user_id,score,campaign_id,routing_rule_id,assigned_at,email,brokerage_status,project_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END,$13,$14,$15) RETURNING id`,
         [
           p.companyId,
           ref("L"),
           { en: input.name, ar: input.nameAr ?? input.name },
           phone,
-          input.segment,
+          input.segment ?? null,
           { en: input.want, ar: input.wantAr ?? input.want },
           input.budgetMinor ?? null,
           input.source,
@@ -528,9 +549,16 @@ export class SalesService {
           routed?.ruleId ?? null,
           input.email?.toLowerCase() ?? null,
           brokerageWorkspace(p) ? "new_lead" : null,
+          project,
         ],
       )
     ).rows[0];
+    if (input.firstComment?.trim())
+      await this.event(c, p, l.id, "lead.note_added", {
+        note: input.firstComment.trim(),
+        kind: "note",
+        outcome: null,
+      });
     if (routed)
       await this.event(c, p, l.id, "lead.routed", {
         ruleId: routed.ruleId,
@@ -579,19 +607,24 @@ export class SalesService {
           input.source,
           old.campaign_id,
         );
+        const project = await this.project(
+          c,
+          p,
+          input.projectId === undefined ? old.project_id : input.projectId,
+        );
         const duplicate =
           phone !== old.phone ||
           (input.email !== undefined && input.email !== old.email)
             ? await this.duplicate(c, p, phone, input, id)
             : null;
         await c.query(
-          `UPDATE tenant.leads SET name=$3,phone=$4,segment=$5,want=$6,budget_minor=$7,source=$8,owner_user_id=$9,score=$10,campaign_id=$11,email=CASE WHEN $13::boolean THEN $12 ELSE email END,assigned_at=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END ELSE assigned_at END,routing_rule_id=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN NULL ELSE routing_rule_id END,routing_attempts=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN 0 ELSE routing_attempts END,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2`,
+          `UPDATE tenant.leads SET name=$3,phone=$4,segment=$5,want=$6,budget_minor=$7,source=$8,owner_user_id=$9,score=$10,campaign_id=$11,project_id=$14,email=CASE WHEN $13::boolean THEN $12 ELSE email END,assigned_at=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN CASE WHEN $9::uuid IS NULL THEN NULL ELSE now() END ELSE assigned_at END,routing_rule_id=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN NULL ELSE routing_rule_id END,routing_attempts=CASE WHEN owner_user_id IS DISTINCT FROM $9::uuid THEN 0 ELSE routing_attempts END,version=version+1,updated_at=now() WHERE company_id=$1 AND id=$2`,
           [
             p.companyId,
             id,
             { en: input.name, ar: input.nameAr ?? input.name },
             phone,
-            input.segment,
+            input.segment ?? null,
             { en: input.want, ar: input.wantAr ?? input.want },
             input.budgetMinor ?? null,
             input.source,
@@ -600,6 +633,7 @@ export class SalesService {
             campaign,
             input.email?.toLowerCase() ?? null,
             input.email !== undefined,
+            project,
           ],
         );
         if (duplicate && input.duplicateMode === "link")

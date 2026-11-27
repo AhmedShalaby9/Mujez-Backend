@@ -2,7 +2,7 @@ import { tenantFeature } from "../../../common/auth/tenant-features.js";
 import type { PoolClient } from "pg";
 export interface RoutingSample {
   source: string;
-  segment: string;
+  segment: string | null;
   budgetMinor?: string | null;
 }
 export async function pickRoute(

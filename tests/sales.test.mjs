@@ -812,6 +812,64 @@ test("assigned leads appear without invented deal values and become one detailed
   }
 });
 
+test("segment is optional (Not set), an optional project links to an active company project, and a first comment is logged on create", async () => {
+  const project = (
+    await db.query(
+      "INSERT INTO tenant.projects(company_id,code,name,developer,location,segment) VALUES($1,'PRJ-TEST',$2,$2,$2,'res') RETURNING id",
+      [A, { en: "Test Towers", ar: "Test Towers" }],
+    )
+  ).rows[0].id;
+  const archivedProject = (
+    await db.query(
+      "INSERT INTO tenant.projects(company_id,code,name,developer,location,segment,archived_at) VALUES($1,'PRJ-OLD',$2,$2,$2,'res',now()) RETURNING id",
+      [A, { en: "Old Towers", ar: "Old Towers" }],
+    )
+  ).rows[0].id;
+  const noSegment = (
+    await post("leads", draft({ phone: "+12025550920", segment: undefined }))
+  ).body;
+  assert.equal(noSegment.segment, null);
+  await post(
+    "leads",
+    draft({ phone: "+12025550921", projectId: project }),
+    403,
+  );
+  const original = p;
+  try {
+    p = { ...original, permissions: [...original.permissions, "projects.read"] };
+    await post(
+      "leads",
+      draft({ phone: "+12025550922", projectId: archivedProject }),
+      400,
+    );
+    const withProject = (
+      await post(
+        "leads",
+        draft({
+          phone: "+12025550923",
+          projectId: project,
+          firstComment: "Walked in asking about Test Towers",
+        }),
+      )
+    ).body;
+    assert.equal(withProject.project.id, project);
+    assert.equal(withProject.project.name.en, "Test Towers");
+    assert.equal(withProject.lastComment, "Walked in asking about Test Towers");
+    const activity = (
+      await get("leads/" + withProject.id + "/activities")
+    ).body;
+    assert.ok(
+      activity.items.some(
+        (a) =>
+          a.kind === "lead.note_added" &&
+          a.details.note === "Walked in asking about Test Towers",
+      ),
+    );
+  } finally {
+    p = original;
+  }
+});
+
 test("lead tags are free text, trimmed, deduped case-insensitively, capped and version-checked", async () => {
   const created = (
     await post("leads", draft({ phone: "+12025550900", name: "Tag buyer" }))
