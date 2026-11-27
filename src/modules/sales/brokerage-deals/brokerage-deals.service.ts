@@ -549,7 +549,9 @@ export class BrokerageDealsService {
       throw new BadRequestException("At least one document is required");
     return this.db.tenant(p.companyId!, async (c) => {
       const agentId = await this.validateLinks(c, p, b);
-      const approved = canApprove(p);
+      // Admin approval only gates the move into a signed contract; EOI,
+      // reservation and cancellation save straight through.
+      const approved = b.status === "contracted" ? canApprove(p) : true;
       const id = (
         await c.query(
           "INSERT INTO tenant.brokerage_deals(company_id,lead_id,agent_id,client_name,client_phone,selling_type,status,approval_status,developer_id,project_id,details,created_by,approved_by,approved_at,approved_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id",
@@ -600,7 +602,9 @@ export class BrokerageDealsService {
         !b.documents?.length
       )
         return dto(old);
-      const approved = canApprove(p);
+      // Admin approval only gates the move into a signed contract; EOI,
+      // reservation and cancellation save straight through.
+      const approved = b.status === "contracted" ? canApprove(p) : true;
       await c.query(
         "UPDATE tenant.brokerage_deals SET lead_id=$3,agent_id=$4,client_name=$5,client_phone=$6,selling_type=$7,status=$8,approval_status=$9,rejection_reason=NULL,developer_id=$10,project_id=$11,details=$12,version=version+1,approved_version=$13,approved_by=$14,approved_at=$15,updated_at=now() WHERE company_id=$1 AND id=$2",
         [
