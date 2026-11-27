@@ -113,9 +113,29 @@ export class ColdCallsController {
     schema: {
       type: "object",
       required: ["file"],
+      properties: { file: { type: "string", format: "binary" } },
+    },
+  })
+  @Post("columns")
+  @RequireAccess(["company_admin", "company_user"], "leads.manage")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 0 },
+    }),
+  )
+  columns(@Req() r: AuthRequest, @UploadedFile() f: ColdFile) {
+    return this.s.columns(r.principal, f);
+  }
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["file", "nameColumn", "phoneColumn"],
       properties: {
         file: { type: "string", format: "binary" },
         ownerId: { type: "string", format: "uuid" },
+        nameColumn: { type: "integer", minimum: 1 },
+        phoneColumn: { type: "integer", minimum: 1 },
       },
     },
   })
@@ -126,7 +146,7 @@ export class ColdCallsController {
       limits: {
         fileSize: 5 * 1024 * 1024,
         files: 1,
-        fields: 2,
+        fields: 3,
         fieldSize: 100,
       },
     }),
@@ -142,11 +162,13 @@ export class ColdCallsController {
   @ApiBody({
     schema: {
       type: "object",
-      required: ["file", "requestId"],
+      required: ["file", "requestId", "nameColumn", "phoneColumn"],
       properties: {
         file: { type: "string", format: "binary" },
         ownerId: { type: "string", format: "uuid" },
         requestId: { type: "string", format: "uuid" },
+        nameColumn: { type: "integer", minimum: 1 },
+        phoneColumn: { type: "integer", minimum: 1 },
       },
     },
   })
@@ -157,7 +179,7 @@ export class ColdCallsController {
       limits: {
         fileSize: 5 * 1024 * 1024,
         files: 1,
-        fields: 3,
+        fields: 4,
         fieldSize: 100,
       },
     }),

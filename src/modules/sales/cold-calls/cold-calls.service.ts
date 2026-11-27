@@ -10,7 +10,11 @@ import { DatabaseService } from "../../../infrastructure/database/database.servi
 import type { Principal } from "../../../common/auth/access.js";
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
 import { SalesService } from "../leads/sales.service.js";
-import { parseColdFile, type ColdFile } from "./cold-calls-file.js";
+import {
+  parseColdFile,
+  inspectColdFile,
+  type ColdFile,
+} from "./cold-calls-file.js";
 import type {
   ColdQuery,
   ColdImport,
@@ -445,9 +449,16 @@ export class ColdCallsService {
       ).rows.map((r) => r.phone),
     );
   }
+  async columns(p: Principal, file: ColdFile | undefined) {
+    await this.sales.access(p, "leads.manage");
+    return inspectColdFile(file);
+  }
   async preview(p: Principal, file: ColdFile | undefined, b: ColdPreview) {
     await this.sales.access(p, "leads.manage");
-    const data = await parseColdFile(file);
+    const data = await parseColdFile(file, {
+      nameColumn: b.nameColumn,
+      phoneColumn: b.phoneColumn,
+    });
     return this.db.tenant(p.companyId!, async (c) => {
       await this.owner(c, p, b.ownerId ?? p.id);
       const existing = await this.existing(
@@ -470,7 +481,10 @@ export class ColdCallsService {
   }
   async import(p: Principal, file: ColdFile | undefined, b: ColdImport) {
     await this.sales.access(p, "leads.manage");
-    const data = await parseColdFile(file);
+    const data = await parseColdFile(file, {
+      nameColumn: b.nameColumn,
+      phoneColumn: b.phoneColumn,
+    });
     return this.sales.write(
       p,
       "leads.manage",

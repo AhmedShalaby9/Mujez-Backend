@@ -53,9 +53,33 @@ export class ColdQuery {
 }
 export class ColdImport extends SalesRequest {
   @IsOptional() @IsUUID() @ApiPropertyOptional() ownerId?: string;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @ApiProperty({ description: "1-based index of the column with the name" })
+  nameColumn!: number;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @ApiProperty({
+    description: "1-based index of the column with the phone number",
+  })
+  phoneColumn!: number;
 }
 export class ColdPreview {
   @IsOptional() @IsUUID() @ApiPropertyOptional() ownerId?: string;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @ApiProperty({ description: "1-based index of the column with the name" })
+  nameColumn!: number;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @ApiProperty({
+    description: "1-based index of the column with the phone number",
+  })
+  phoneColumn!: number;
 }
 export class ColdConvert extends SalesRequest {
   @IsInt() @Min(0) @ApiProperty() version!: number;
