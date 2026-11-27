@@ -381,8 +381,11 @@ export class FeaturesService {
                         0,
                     ) / 1073741824;
         const base =
-          company.limits?.[resource === "storage" ? "storageGb" : resource] ??
-          null;
+          resource === "users"
+            ? company.max_users
+            : (company.limits?.[
+                resource === "storage" ? "storageGb" : resource
+              ] ?? null);
         const override = overrides.find(
           (o) => o.company_id === company.id && o.resource === resource,
         );

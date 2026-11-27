@@ -6,6 +6,7 @@ import {
   IsInt,
   IsString,
   Length,
+  Max,
   MaxLength,
   Min,
   IsBoolean,
@@ -76,6 +77,19 @@ export class CompanyInput {
       "Enable Finance accounting and payroll; CRM commissions remain independent",
   })
   financeEnabled?: boolean;
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100000)
+  @ApiProperty({
+    required: false,
+    minimum: 1,
+    maximum: 100000,
+    default: 20,
+    description:
+      "Maximum active users (seats) allowed for this company; defaults to 20",
+  })
+  maxUsers?: number;
   @IsOptional() @IsUUID() planVersionId?: string;
   @IsOptional() @IsISO31661Alpha2() country?: string;
   @IsOptional() @IsString() @MaxLength(500) address?: string;
@@ -152,6 +166,14 @@ export class CompanyDraftInput extends PartialType(CompanyInput) {
 export class ManagerInput {
   @IsInt() @Min(0) version!: number;
   @IsOptional() @IsUUID() managerId?: string | null;
+}
+export class UsersLimitInput {
+  @IsInt() @Min(0) @ApiProperty() declare version: number;
+  @IsInt()
+  @Min(1)
+  @Max(100000)
+  @ApiProperty({ minimum: 1, maximum: 100000 })
+  declare maxUsers: number;
 }
 export class StatusInput {
   @IsOptional()

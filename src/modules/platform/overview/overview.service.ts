@@ -227,7 +227,7 @@ export class OverviewService {
       add(
         (
           await c.query(
-            `SELECT c.id,c.name,u.users,(v.limits->>'users')::numeric AS quota FROM platform.companies c JOIN platform.company_user_counts u ON u.company_id=c.id JOIN platform.subscriptions s ON s.company_id=c.id JOIN platform.plan_versions v ON v.id=s.plan_version_id LEFT JOIN platform.limit_overrides o ON o.company_id=c.id AND o.resource='users' AND o.revoked_at IS NULL AND o.expires_at>now() WHERE c.status IN ('active','trial') AND s.status IN ('active','trialing') AND s.period_end>now() AND coalesce(o.limit_value,(v.limits->>'users')::numeric)>0 AND u.users>=coalesce(o.limit_value,(v.limits->>'users')::numeric)*0.9 ORDER BY u.users DESC,c.id LIMIT 5`,
+            `SELECT c.id,c.name,u.users,coalesce(o.limit_value,c.max_users) AS quota FROM platform.companies c JOIN platform.company_user_counts u ON u.company_id=c.id JOIN platform.subscriptions s ON s.company_id=c.id LEFT JOIN platform.limit_overrides o ON o.company_id=c.id AND o.resource='users' AND o.revoked_at IS NULL AND o.expires_at>now() WHERE c.status IN ('active','trial') AND s.status IN ('active','trialing') AND s.period_end>now() AND coalesce(o.limit_value,c.max_users)>0 AND u.users>=coalesce(o.limit_value,c.max_users)*0.9 ORDER BY u.users DESC,c.id LIMIT 5`,
           )
         ).rows,
         "user_limit",

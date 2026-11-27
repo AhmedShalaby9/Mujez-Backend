@@ -21,6 +21,7 @@ import {
   CompanyDraftInput,
   ManagerInput,
   CompanyQuoteInput,
+  UsersLimitInput,
 } from "./companies.dto.js";
 @Controller("admin/api/v1/companies")
 export class CompaniesController {
@@ -76,6 +77,15 @@ export class CompaniesController {
     @Req() req: AuthRequest,
   ) {
     return this.service.manager(id, input, req.principal.id);
+  }
+  @RequireAccess(["platform"], "co.create")
+  @Post(":id/users-limit")
+  usersLimit(
+    @Param("id") id: string,
+    @Body() input: UsersLimitInput,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.usersLimit(id, input, req.principal.id);
   }
   @RequireAccess(["platform"], "co.view") @Get(":id") detail(
     @Param("id") id: string,
