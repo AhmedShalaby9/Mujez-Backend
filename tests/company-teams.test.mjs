@@ -62,6 +62,7 @@ test("invites and activates a team lead with exactly sales permissions plus rost
   assert.equal(p.scope, "own");
   assert.equal(p.pool, "company_user");
   assert.ok(p.permissions.includes("team.self.read"));
+  assert.ok(p.permissions.includes("leave.self"));
   assert.ok(!p.permissions.includes("team.manage"));
   assert.ok(!p.permissions.includes("reports.read"));
   const sales = (
@@ -71,7 +72,9 @@ test("invites and activates a team lead with exactly sales permissions plus rost
     )
   ).rows[0].permissions;
   assert.deepEqual(
-    p.permissions.filter((x) => x !== "team.self.read").sort(),
+    p.permissions
+      .filter((x) => x !== "team.self.read" && x !== "leave.self")
+      .sort(),
     sales.sort(),
   );
   h.state.principal = p;

@@ -91,7 +91,7 @@ test("legacy role payloads and existing single-role accounts remain supported", 
   const r = (await h.get("team")).body.items.find(
     (x) => x.id === legacy.accountId,
   );
-  assert.deepEqual(r.roles, ["agent"]);
+  assert.deepEqual(r.roles, ["agent", "employee"]);
   assert.equal(r.role, "agent");
   await h.post(
     "team/invite",

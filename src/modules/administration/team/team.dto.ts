@@ -43,6 +43,20 @@ export class TeamInvite {
   @IsIn(TEAM_ROLES, { each: true })
   @ApiPropertyOptional({ type: [String], enum: TEAM_ROLES })
   declare roles?: TeamRole[];
+  @IsOptional()
+  @IsIn(["marketing", "sales", "hr", "finance"])
+  @ApiPropertyOptional({
+    type: String,
+    enum: ["marketing", "sales", "hr", "finance"],
+  })
+  declare department?: "marketing" | "sales" | "hr" | "finance";
+  @IsOptional()
+  @Matches(/^[1-9]\d{0,14}$/)
+  @ApiPropertyOptional({
+    description:
+      "Starting salary in EGP minor units; only applied when HR and Finance are both on and configured",
+  })
+  declare salaryMinor?: string;
 }
 export class TeamStatus {
   @IsIn(["disable", "enable"])

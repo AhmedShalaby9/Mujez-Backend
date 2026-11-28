@@ -117,6 +117,12 @@ test("migration adds Employee to existing company users without changing primary
       [invited.accountId],
     )
   ).rows[0].user_id;
+  // team/invite now adds Employee itself; strip it back off to simulate a
+  // genuinely pre-migration legacy user for this backfill test.
+  await h.db.query(
+    "DELETE FROM tenant.user_additional_roles WHERE user_id=$1 AND role_id=(SELECT id FROM tenant.roles WHERE company_id=$2 AND key='employee')",
+    [u, owner.companyId],
+  );
   const before = (
     await h.db.query(
       "SELECT role_id,roles_version,team_id,status FROM tenant.users WHERE id=$1",
