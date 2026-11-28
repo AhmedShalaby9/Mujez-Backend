@@ -497,7 +497,10 @@ export class OfficeService {
             [p.companyId, userId],
           )
         ).rows[0]?.version ?? 0;
-      return { ...(await this.agentPermissions(c, p.companyId!, userId)), version };
+      return {
+        ...(await this.agentPermissions(c, p.companyId!, userId)),
+        version,
+      };
     });
   }
   async saveAgentPermissions(p: Principal, userId: string, b: OfficeWrite) {
@@ -817,7 +820,8 @@ export class OfficeService {
           ];
           add(`x.data->>'purpose'=ANY(?::text[])`, purposes);
         }
-        if (perm && !perm.allCities) add(`x.city_id=ANY(?::uuid[])`, perm.cityIds);
+        if (perm && !perm.allCities)
+          add(`x.city_id=ANY(?::uuid[])`, perm.cityIds);
         if (q.q) {
           const expr =
             view === "properties"
@@ -887,6 +891,18 @@ export class OfficeService {
             if ((q as any)[key] !== undefined)
               add(`${expr}${op}?`, (q as any)[key]);
           if (view === "properties") {
+            if (q.listingType)
+              add(
+                "coalesce(x.data->>'listingType',CASE WHEN x.data->>'purpose'='sale' THEN 'sale_cash' WHEN x.data->>'purpose'='rent' AND x.data->>'furnishing'='furnished' THEN 'rent_furnished' WHEN x.data->>'purpose'='rent' THEN 'rent' END)=?",
+                q.listingType,
+              );
+            if (q.groupName)
+              add(
+                "x.data->>'groupName' ILIKE ?",
+                "%" + q.groupName.replace(/[\\%_]/g, "\\$&") + "%",
+              );
+            if (q.deliveryYear !== undefined)
+              add("(x.data->>'deliveryYear')::int=?", q.deliveryYear);
             if (q.city)
               add("(x.data->>'cityId'=? OR x.data->>'city' ILIKE ?)", q.city);
             if (q.finish)
