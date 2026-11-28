@@ -172,6 +172,8 @@ function dto(r: any) {
     createdBy: r.created_by,
     approvedBy: r.approved_by,
     approvedAt: r.approved_at,
+    contractedAt: r.contracted_at,
+    contractModifiedAt: r.contract_modified_at,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -461,22 +463,45 @@ export class BrokerageDealsService {
         args.push(q.approval);
         where.push(`d.approval_status=$${args.length}`);
       }
+      if (q.agentId) {
+        args.push(q.agentId);
+        where.push(`d.agent_id=$${args.length}`);
+      }
+      if (q.leadId) {
+        args.push(q.leadId);
+        where.push(`d.lead_id=$${args.length}`);
+      }
+      if (q.contracts) where.push("d.contracted_at IS NOT NULL");
+      if (q.contractedFrom) {
+        args.push(q.contractedFrom);
+        where.push(
+          `d.contracted_at>=($${args.length}::date::timestamp AT TIME ZONE 'Africa/Cairo')`,
+        );
+      }
+      if (q.contractedTo) {
+        args.push(q.contractedTo);
+        where.push(
+          `d.contracted_at<(($${args.length}::date+1)::timestamp AT TIME ZONE 'Africa/Cairo')`,
+        );
+      }
       if (q.search) {
         args.push(`%${q.search.replace(/[%_]/g, "\\$&")}%`);
         where.push(
-          `(d.client_name ILIKE $${args.length} OR pj.name->>'en' ILIKE $${args.length})`,
+          `(d.client_name ILIKE $${args.length} OR d.client_phone ILIKE $${args.length} OR pj.name->>'en' ILIKE $${args.length} OR l.name->>'en' ILIKE $${args.length} OR l.name->>'ar' ILIKE $${args.length})`,
         );
       }
       const condition = where.join(" AND ");
       const count = (
         await c.query(
-          `SELECT count(*)::int AS n FROM tenant.brokerage_deals d JOIN tenant.projects pj ON pj.company_id=d.company_id AND pj.id=d.project_id WHERE ${condition}`,
+          `SELECT count(*)::int AS n FROM tenant.brokerage_deals d JOIN tenant.projects pj ON pj.company_id=d.company_id AND pj.id=d.project_id JOIN tenant.leads l ON l.company_id=d.company_id AND l.id=d.lead_id WHERE ${condition}`,
           args,
         )
       ).rows[0].n;
+      // Contracts read newest contract first.
+      const order = q.contracts ? "d.contracted_at" : "d.created_at";
       const rows = (
         await c.query(
-          `${SELECT} WHERE ${condition} ORDER BY d.created_at DESC,d.id LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
+          `${SELECT} WHERE ${condition} ORDER BY ${order} DESC,d.id LIMIT $${args.length + 1} OFFSET $${args.length + 2}`,
           [...args, q.limit, (q.page - 1) * q.limit],
         )
       ).rows;
