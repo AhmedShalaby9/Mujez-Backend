@@ -68,7 +68,8 @@ test("HR Officer and HR Manager receive only current HR permissions, combined wi
     assert.ok(p.roles.includes("employee"));
     h.state.principal = p;
     await h.get("hr/employees");
-    await h.get("team", 403);
+    // With the HR module on, HR staff manage the team.
+    await h.get("team");
     await h.get("leads", 403);
     await h.get("company-overview", 403);
     await h.get("company-ai-insights/snapshot", 403);
@@ -211,7 +212,7 @@ test("Sales Agent plus HR Manager retains personal CRM scope while explicitly ac
   assert.equal(leads.total, 1);
   assert.equal(leads.items[0].id, own.id);
   assert.equal((await h.get("hr/employees")).body.total, 5);
-  await h.get("team/groups", 403);
+  await h.get("team/groups");
   await h.get("company-ai-insights/snapshot", 403);
   h.state.principal = owner;
   await change(mixed, ["agent", "employee"]);

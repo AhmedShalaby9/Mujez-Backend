@@ -37,6 +37,14 @@ export const ASSIGNABLE_COMPANY_ROLES = [
   "finance_manager",
 ] as const;
 export type CompanyRoleKey = (typeof ASSIGNABLE_COMPANY_ROLES)[number];
+/** Roles only the company owner may grant or remove, even when HR manages the
+ * team: they open finance, approve deals, or control HR itself. */
+export const ADMIN_ONLY_ROLES: readonly string[] = [
+  "finance_manager",
+  "accountant",
+  "hr_manager",
+  "sales_admin",
+];
 /** Any role that can be a "my team" member/lead for the shared team-work
  * (tasks/performance) pages, across both company types. */
 export const TEAM_MEMBER_ROLES = [

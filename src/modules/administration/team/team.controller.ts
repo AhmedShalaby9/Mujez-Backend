@@ -91,7 +91,7 @@ export class TeamController {
   ) {
     return this.work.assign(req.principal, id, input);
   }
-  @Get("groups") @RequireAccess(["company_admin"], "team.read") groups(
+  @Get("groups") @RequireAccess(["company_admin", "company_user"]) groups(
     @Req() req: AuthRequest,
   ) {
     return this.service.groups(req.principal);
@@ -101,14 +101,14 @@ export class TeamController {
   ) {
     return this.service.myTeam(req.principal);
   }
-  @Post("groups") @RequireAccess(["company_admin"], "team.manage") createGroup(
+  @Post("groups") @RequireAccess(["company_admin", "company_user"]) createGroup(
     @Body() input: SalesTeamInput,
     @Req() req: AuthRequest,
   ) {
     return this.service.saveGroup(req.principal, input);
   }
   @Post("groups/:id")
-  @RequireAccess(["company_admin"], "team.manage")
+  @RequireAccess(["company_admin", "company_user"])
   updateGroup(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() input: SalesTeamUpdate,
@@ -116,14 +116,14 @@ export class TeamController {
   ) {
     return this.service.saveGroup(req.principal, input, id);
   }
-  @Post(":id/role") @RequireAccess(["company_admin"], "team.manage") role(
+  @Post(":id/role") @RequireAccess(["company_admin", "company_user"]) role(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() input: EmployeeRole,
     @Req() req: AuthRequest,
   ) {
     return this.service.changeRole(req.principal, id, input.role);
   }
-  @Post(":id/roles") @RequireAccess(["company_admin"], "team.manage") roles(
+  @Post(":id/roles") @RequireAccess(["company_admin", "company_user"]) roles(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() input: EmployeeRoles,
     @Req() req: AuthRequest,
@@ -135,28 +135,30 @@ export class TeamController {
       input.version,
     );
   }
-  @Get() @RequireAccess(["company_admin"]) list(@Req() req: AuthRequest) {
+  @Get() @RequireAccess(["company_admin", "company_user"]) list(
+    @Req() req: AuthRequest,
+  ) {
     return this.service.list(req.principal);
   }
-  @Post("invite") @RequireAccess(["company_admin"]) invite(
+  @Post("invite") @RequireAccess(["company_admin", "company_user"]) invite(
     @Body() input: TeamInvite,
     @Req() req: AuthRequest,
   ) {
     return this.service.invite(req.principal, input);
   }
-  @Post(":id/resend") @RequireAccess(["company_admin"]) resend(
+  @Post(":id/resend") @RequireAccess(["company_admin", "company_user"]) resend(
     @Param("id") id: string,
     @Req() req: AuthRequest,
   ) {
     return this.service.resend(req.principal, id);
   }
-  @Post(":id/revoke") @RequireAccess(["company_admin"]) revoke(
+  @Post(":id/revoke") @RequireAccess(["company_admin", "company_user"]) revoke(
     @Param("id") id: string,
     @Req() req: AuthRequest,
   ) {
     return this.service.revoke(req.principal, id);
   }
-  @Post(":id/status") @RequireAccess(["company_admin"]) status(
+  @Post(":id/status") @RequireAccess(["company_admin", "company_user"]) status(
     @Param("id") id: string,
     @Body() input: TeamStatus,
     @Req() req: AuthRequest,
