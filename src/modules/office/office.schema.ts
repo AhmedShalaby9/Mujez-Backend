@@ -82,19 +82,29 @@ export const propertySchema = z
       "studio",
       "duplex",
       "office",
+      "clinic",
       "retail",
       "warehouse",
       "land",
       "other",
     ]),
     purpose: z.enum(["sale", "rent", "both"]),
+    listingType: z
+      .enum(["sale_cash", "sale_installments", "rent", "rent_furnished"])
+      .optional(),
     furnishing: z.enum(["furnished", "semi", "unfurnished"]),
+    groupName: text.default(""),
+    buildingNumber: text.default(""),
+    unitNumber: text.default(""),
+    additions: z.string().trim().max(2000).default(""),
+    deliveryYear: z.number().int().min(1900).max(2100).nullable().default(null),
     bedrooms: z.number().int().min(0).max(50).nullable().default(null),
     bathrooms: z.number().int().min(0).max(50).nullable().default(null),
     area: z.number().positive().max(1000000),
     floor: z.number().int().min(-10).max(300).nullable().default(null),
     finish: text.default(""),
     saleMinor: money.nullable().default(null),
+    downPaymentMinor: money.nullable().default(null),
     rentMinor: money.nullable().default(null),
     depositMinor: money.nullable().default(null),
     minLeaseMonths: z.number().int().min(1).max(120).default(1),
@@ -115,6 +125,23 @@ export const propertySchema = z
       (v.purpose === "sale" ||
         (v.rentMinor !== null && BigInt(v.rentMinor) > 0n)),
     "Enter a positive price for each listing purpose",
+  )
+  .refine(
+    (v) =>
+      !v.listingType ||
+      (v.listingType.startsWith("sale_")
+        ? v.purpose === "sale" &&
+          (v.listingType === "sale_cash"
+            ? v.downPaymentMinor === null
+            : v.downPaymentMinor !== null &&
+              BigInt(v.downPaymentMinor) > 0n &&
+              v.saleMinor !== null &&
+              BigInt(v.downPaymentMinor) <= BigInt(v.saleMinor))
+        : v.purpose === "rent" &&
+          (v.listingType !== "rent_furnished" ||
+            v.furnishing === "furnished") &&
+          v.downPaymentMinor === null),
+    "Listing type, payment and furnishing must match",
   );
 export const querySchema = z
   .object({
@@ -135,9 +162,14 @@ export const querySchema = z
     createdBy: z.uuid().optional(),
     status: text.optional(),
     purpose: z.enum(["sale", "rent", "both"]).optional(),
+    listingType: z
+      .enum(["sale_cash", "sale_installments", "rent", "rent_furnished"])
+      .optional(),
     furnishing: text.optional(),
     type: text.optional(),
     areaName: text.optional(),
+    groupName: text.optional(),
+    deliveryYear: z.coerce.number().int().min(1900).max(2100).optional(),
     city: text.optional(),
     source: text.optional(),
     finish: text.optional(),
