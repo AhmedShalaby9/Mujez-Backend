@@ -248,3 +248,168 @@ test("EOI and reservation changes save straight through for anyone; only the mov
   ).body;
   assert.equal(contracted.approvalStatus, "pending");
 });
+
+test("contracts list filters by first approval date, agent and lead", async () => {
+  h.state.principal = agent;
+  const created = (await h.post("brokerage/deals", deal())).body;
+  const base = "brokerage/deals?contracts=true";
+  const ids = async (query = "") =>
+    (await h.get(base + query)).body.items.map((x) => x.id);
+  assert.equal(created.contractedAt, null);
+  assert.equal((await ids()).includes(created.id), false);
+  h.state.principal = owner;
+  const approved = (
+    await h.post(`brokerage/deals/${created.id}/decision`, {
+      requestId: randomUUID(),
+      version: 0,
+      decision: "approved",
+    })
+  ).body;
+  assert.equal(approved.contractedAt, approved.approvedAt);
+  assert.equal(approved.contractModifiedAt, null);
+  // 22:30 UTC on the 9th is already the 10th in Cairo. The trigger keeps the
+  // date fixed, so it is lifted to move this fixture into the past.
+  await h.db.exec(
+    "ALTER TABLE tenant.brokerage_deals DISABLE TRIGGER brokerage_contract_dates",
+  );
+  await h.db.query(
+    "UPDATE tenant.brokerage_deals SET contracted_at='2026-01-09T22:30:00Z' WHERE id=$1",
+    [created.id],
+  );
+  await h.db.exec(
+    "ALTER TABLE tenant.brokerage_deals ENABLE TRIGGER brokerage_contract_dates",
+  );
+  assert.deepEqual(
+    await ids("&contractedFrom=2026-01-10&contractedTo=2026-01-10"),
+    [created.id],
+  );
+  assert.deepEqual(await ids("&contractedTo=2026-01-09"), []);
+  assert.equal(
+    (await ids(`&agentId=${agent.id}&leadId=${leadId}`)).includes(created.id),
+    true,
+  );
+  assert.deepEqual(await ids(`&agentId=${owner.id}`), []);
+  assert.deepEqual(await ids(`&leadId=${randomUUID()}`), []);
+  assert.equal((await ids("&search=Lead")).includes(created.id), true);
+  await h.get(base + "&contractedFrom=2026-13-01", 400);
+});
+
+test("a contract keeps its first date and records later changes", async () => {
+  h.state.principal = owner;
+  const created = (await h.post("brokerage/deals", deal())).body;
+  assert.ok(created.contractedAt);
+  assert.equal(created.contractModifiedAt, null);
+  const listed = async () =>
+    (await h.get("brokerage/deals?contracts=true&limit=100")).body.items.find(
+      (x) => x.id === created.id,
+    );
+
+  // A salesperson adding only a document sends it back for approval.
+  h.state.principal = agent;
+  const changed = (
+    await h.post(`brokerage/deals/${created.id}/update`, {
+      ...deal(),
+      version: 0,
+    })
+  ).body;
+  assert.equal(changed.approvalStatus, "pending");
+  assert.equal(changed.contractedAt, created.contractedAt);
+  assert.ok(changed.contractModifiedAt);
+  assert.equal((await listed()).contractedAt, created.contractedAt);
+  assert.equal(
+    (await h.get(`brokerage/deals/${created.id}`)).body.documents.length,
+    2,
+  );
+
+  h.state.principal = owner;
+  const again = (
+    await h.post(`brokerage/deals/${created.id}/decision`, {
+      requestId: randomUUID(),
+      version: 1,
+      decision: "approved",
+    })
+  ).body;
+  assert.equal(again.contractedAt, created.contractedAt);
+  assert.ok(
+    Date.parse(again.contractModifiedAt) >=
+      Date.parse(changed.contractModifiedAt),
+  );
+
+  const cancelled = (
+    await h.post(`brokerage/deals/${created.id}/update`, {
+      ...deal({ status: "cancelled", documents: [] }),
+      version: 1,
+    })
+  ).body;
+  assert.equal(cancelled.contractedAt, created.contractedAt);
+  assert.equal((await listed()).status, "cancelled");
+});
+
+test("the owner and Sales Admins are notified about every deal step", async () => {
+  async function member(key, additional) {
+    const roleId = async (k) =>
+      (
+        await h.db.query(
+          "INSERT INTO tenant.roles(company_id,key,name,permissions,scope) VALUES($1,$2,'{}',ARRAY['leads.read','leads.manage'],'company') ON CONFLICT(company_id,key) DO UPDATE SET key=excluded.key RETURNING id",
+          [owner.companyId, k],
+        )
+      ).rows[0].id;
+    const id = (
+      await h.db.query(
+        "INSERT INTO tenant.users(company_id,oidc_subject,identity_pool,name,email,role_id,status) VALUES($1,$2,'company_user',$2,$3,$4,'active') RETURNING id",
+        [
+          owner.companyId,
+          key,
+          key + "@deals.test",
+          await roleId(additional ? "sales_manager" : "sales_admin"),
+        ],
+      )
+    ).rows[0].id;
+    if (additional)
+      await h.db.query(
+        "INSERT INTO tenant.user_additional_roles(company_id,user_id,role_id) VALUES($1,$2,$3)",
+        [owner.companyId, id, await roleId("sales_admin")],
+      );
+    return id;
+  }
+  const primary = await member("notify-primary", false);
+  const extra = await member("notify-extra", true);
+  const received = async (dealId, kind) =>
+    (
+      await h.db.query(
+        "SELECT n.user_id,n.title FROM tenant.notifications n JOIN tenant.outbox_events e ON e.id=n.event_id WHERE e.aggregate_id=$1 AND n.kind=$2",
+        [dealId, kind],
+      )
+    ).rows;
+  const sorted = (rows) => rows.map((x) => x.user_id).sort();
+
+  h.state.principal = agent;
+  const created = (await h.post("brokerage/deals", deal())).body;
+  const onCreate = await received(created.id, "brokerage.deal.created");
+  assert.deepEqual(sorted(onCreate), [owner.id, primary, extra].sort());
+  assert.match(
+    onCreate[0].title,
+    /New deal \(pending approval\) · Actual buyer · by Agent/,
+  );
+
+  await h.post(`brokerage/deals/${created.id}/update`, {
+    ...deal({ clientName: "Updated buyer", documents: [] }),
+    version: 0,
+  });
+  assert.equal(
+    (await received(created.id, "brokerage.deal.updated")).length,
+    3,
+  );
+
+  h.state.principal = owner;
+  await h.post(`brokerage/deals/${created.id}/decision`, {
+    requestId: randomUUID(),
+    version: 1,
+    decision: "approved",
+  });
+  // The approver does not notify themselves.
+  assert.deepEqual(
+    sorted(await received(created.id, "brokerage.deal.approved")),
+    [primary, extra].sort(),
+  );
+});

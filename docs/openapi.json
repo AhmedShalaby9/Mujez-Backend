@@ -9797,6 +9797,14 @@
                 "finance_manager"
               ]
             }
+          },
+          "department": {
+            "type": "string",
+            "enum": ["marketing", "sales", "hr", "finance"]
+          },
+          "salaryMinor": {
+            "type": "string",
+            "description": "Starting salary in EGP minor units; only applied when HR and Finance are both on and configured"
           }
         }
       },

@@ -3,6 +3,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsISO8601,
   IsObject,
   IsOptional,
   IsString,
@@ -64,6 +65,19 @@ export class DealListQuery {
   status?: string;
   @IsOptional() @IsIn(["pending", "approved", "rejected"]) approval?: string;
   @IsOptional() @IsString() @Length(1, 100) search?: string;
+  @IsOptional() @IsUUID() agentId?: string;
+  @IsOptional() @IsUUID() leadId?: string;
+  /** Only deals that have been approved as contracted at least once. */
+  @IsOptional() @IsIn(["true"]) contracts?: string;
+  /** First contract approval date range, inclusive, as Africa/Cairo days. */
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsISO8601({ strict: true })
+  contractedFrom?: string;
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsISO8601({ strict: true })
+  contractedTo?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page: number = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit: number =
     30;
