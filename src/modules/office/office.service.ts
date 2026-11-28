@@ -1,4 +1,9 @@
 import {
+  allowedProjects,
+  clientProjectSql,
+  projectLimit,
+} from "./office-projects.js";
+import {
   Injectable,
   BadRequestException,
   ForbiddenException,
@@ -80,7 +85,9 @@ export class OfficeService {
   }
   async client(c: PoolClient, p: Principal, id: string, lock = false) {
     const a: any[] = [p.companyId, id],
-      s = await this.scope(c, p, "x", a);
+      owned = await this.scope(c, p, "x", a),
+      s =
+        owned + " AND " + clientProjectSql("x", await allowedProjects(c, p), a);
     const r = (
       await c.query(
         `SELECT x.*,u.name AS owner_name FROM tenant.office_clients x JOIN tenant.users u ON u.company_id=x.company_id AND u.id=x.owner_id WHERE x.company_id=$1 AND x.id=$2 AND ${s}${lock ? " FOR UPDATE OF x" : ""}`,
@@ -456,10 +463,12 @@ export class OfficeService {
   async options(p: Principal) {
     await this.access(p);
     return this.db.tenant(p.companyId!, async (c) => ({
+      // A limited salesperson is only offered their own projects.
+      restrictedProjects: !!(await allowedProjects(c, p)),
       cities: (
         await c.query(
-          `SELECT id,name_en AS "nameEn",name_ar AS "nameAr",archived FROM tenant.office_cities WHERE company_id=$1 ORDER BY name_en,id`,
-          [p.companyId],
+          `SELECT id,name_en AS "nameEn",name_ar AS "nameAr",archived FROM tenant.office_cities WHERE company_id=$1 AND ($2::uuid[] IS NULL OR id=ANY($2::uuid[])) ORDER BY name_en,id`,
+          [p.companyId, await allowedProjects(c, p)],
         )
       ).rows,
       staff: (
@@ -605,6 +614,26 @@ export class OfficeService {
         throw new ConflictException(
           "This phone already exists in the office client list",
         );
+      const needs = {
+        ...x.needs,
+        projectIds: await this.clientProjects(
+          c,
+          p,
+          x.needs.projectIds,
+          r ? (r.needs.projectIds ?? []) : null,
+        ),
+      };
+      // Never hand a client to a salesperson who could not then see them.
+      if (
+        needs.projectIds.length &&
+        (!r || ownerId !== r.owner_id || x.needs.projectIds)
+      ) {
+        const limit = await projectLimit(c, p.companyId!, ownerId);
+        if (limit && !needs.projectIds.some((v) => limit.includes(v)))
+          throw new BadRequestException(
+            "The responsible salesperson has no access to these projects",
+          );
+      }
       const due = await this.localTime(c, x.followUpAt);
       let result: any;
       if (r) {
@@ -619,7 +648,7 @@ export class OfficeService {
               x.email || null,
               x.source,
               x.status,
-              x.needs,
+              needs,
               due,
               ownerId,
             ],
@@ -643,7 +672,7 @@ export class OfficeService {
               x.email || null,
               x.source,
               x.status,
-              x.needs,
+              needs,
               due,
               ownerId,
             ],
@@ -659,6 +688,42 @@ export class OfficeService {
       );
       return { id: result.id, version: result.version };
     });
+  }
+  /** The projects to store on a client. A limited salesperson picks only their
+   * own; projects they cannot see are carried over untouched. */
+  private async clientProjects(
+    c: PoolClient,
+    p: Principal,
+    chosen: string[] | undefined,
+    saved: string[] | null,
+  ) {
+    const allowed = await allowedProjects(c, p);
+    // Older apps send no projects: keep the saved ones, or use the only choice.
+    let next = chosen ?? saved ?? (allowed?.length === 1 ? allowed : []);
+    if (allowed) {
+      if (chosen) {
+        if (chosen.some((v) => !allowed.includes(v) && !saved?.includes(v)))
+          throw new ForbiddenException("You don't have access to this project");
+        const mine = chosen.filter((v) => allowed.includes(v));
+        if (!mine.length && (saved === null || saved.length))
+          throw new BadRequestException("Choose one of your projects");
+        next = [...mine, ...(saved ?? []).filter((v) => !allowed.includes(v))];
+      } else if (saved === null && !next.length)
+        throw new BadRequestException("Choose one of your projects");
+    }
+    next = [...new Set(next)];
+    const added = next.filter((v) => !saved?.includes(v));
+    if (
+      added.length &&
+      (
+        await c.query(
+          "SELECT 1 FROM tenant.office_cities WHERE company_id=$1 AND id=ANY($2::uuid[]) AND NOT archived",
+          [p.companyId, added],
+        )
+      ).rowCount !== added.length
+    )
+      throw new BadRequestException("Choose an available project");
+    return next;
   }
   async cap(
     c: PoolClient,
@@ -717,6 +782,9 @@ export class OfficeService {
       ).rows[0];
       if (!city || (city.archived && r?.data.cityId !== city.id))
         throw new BadRequestException("Choose an available city");
+      const limit = await allowedProjects(c, p);
+      if (limit && r?.city_id !== city.id && !limit.includes(city.id))
+        throw new ForbiddenException("You don't have access to this project");
       const phones = x.ownerPhones.map(normalizePhone);
       const dup = (
         await c.query(
@@ -809,6 +877,14 @@ export class OfficeService {
         };
         if (view !== "properties") where.push(await this.scope(c, p, "x", a));
         if (view === "deals") where.push(await this.scope(c, p, "cl", a));
+        if (view !== "properties")
+          where.push(
+            clientProjectSql(
+              view === "clients" ? "x" : "cl",
+              await allowedProjects(c, p),
+              a,
+            ),
+          );
         const perm =
           view === "properties" && p.scope !== "company"
             ? await this.agentPermissions(c, p.companyId!, p.id)
@@ -1339,6 +1415,7 @@ export class OfficeService {
           AND ($10::numeric IS NULL OR (p.data->>'area')::numeric>=$10) AND ($11::numeric IS NULL OR (p.data->>'area')::numeric<=$11)
           AND (cardinality($12::text[])=0 OR EXISTS(SELECT 1 FROM unnest($12::text[]) need WHERE strpos(translate(lower(concat_ws(' ',p.data->>'areaName',p.data->>'city',p.data->>'address')),'أإآى','اااي'),translate(lower(need),'أإآى','اااي'))>0))
           AND ($13::boolean OR p.city_id=ANY($14::uuid[]))
+          AND ($15::uuid[] IS NULL OR p.city_id=ANY($15::uuid[]))
           ORDER BY (p.data->>$3)::bigint,p.id LIMIT 1000`,
             [
               p.companyId,
@@ -1355,6 +1432,7 @@ export class OfficeService {
               n.areas ?? [],
               !perm || perm.allCities,
               perm?.cityIds ?? [],
+              n.projectIds?.length ? n.projectIds : null,
             ],
           )
         ).rows;

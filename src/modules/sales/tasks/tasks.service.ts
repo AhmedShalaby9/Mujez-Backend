@@ -1,4 +1,8 @@
 import {
+  allowedProjects,
+  clientProjectSql,
+} from "../../office/office-projects.js";
+import {
   isOfficeCompany,
   officeMembers,
   officeRelatedRow,
@@ -25,7 +29,7 @@ import {
   type TaskUpdate,
   type TaskStatus,
 } from "./tasks.dto.js";
-const SELECT = `SELECT t.*,t.due_date::text AS due_date,l.public_id AS lead_ref,l.name AS lead_name,l.segment AS lead_segment,l.archived_at AS lead_archived_at,oc.id AS office_client_ref_id,oc.code AS office_client_ref,oc.name AS office_client_name,oc.owner_id AS office_client_owner,u.name AS assignee_name,creator.name AS creator_name,finisher.name AS finisher_name FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.office_clients oc ON oc.company_id=t.company_id AND oc.id=t.office_client_id LEFT JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id LEFT JOIN tenant.users creator ON creator.company_id=t.company_id AND creator.id=t.created_by LEFT JOIN tenant.users finisher ON finisher.company_id=t.company_id AND finisher.id=t.completed_by`;
+const SELECT = `SELECT t.*,t.due_date::text AS due_date,l.public_id AS lead_ref,l.name AS lead_name,l.segment AS lead_segment,l.archived_at AS lead_archived_at,oc.id AS office_client_ref_id,oc.code AS office_client_ref,oc.name AS office_client_name,oc.owner_id AS office_client_owner,oc.needs AS office_client_needs,u.name AS assignee_name,creator.name AS creator_name,finisher.name AS finisher_name FROM tenant.tasks t LEFT JOIN tenant.leads l ON l.company_id=t.company_id AND l.id=t.lead_id LEFT JOIN tenant.office_clients oc ON oc.company_id=t.company_id AND oc.id=t.office_client_id LEFT JOIN tenant.users u ON u.company_id=t.company_id AND u.id=t.assignee_id LEFT JOIN tenant.users creator ON creator.company_id=t.company_id AND creator.id=t.created_by LEFT JOIN tenant.users finisher ON finisher.company_id=t.company_id AND finisher.id=t.completed_by`;
 const iso = (v: any) => (v ? new Date(v).toISOString() : null);
 export function taskGroup(due: string, today: string) {
   const delta =
@@ -149,7 +153,9 @@ export class TasksService {
         : !!t.office_client_id || (p.scope === "own" && t.assignee_id !== p.id))
     )
       throw new NotFoundException("Task not found");
-    return office ? officeRelatedRow(t, members, p) : t;
+    return office
+      ? officeRelatedRow(t, members, p, await allowedProjects(c, p))
+      : t;
   }
   async options(p: Principal) {
     await this.sales.access(p, "tasks.read");
@@ -190,15 +196,24 @@ export class TasksService {
         p.companyId!,
         async (c) => {
           const members = await officeMembers(c, p);
-          const args = [p.companyId, members, q.q ?? ""];
+          const args: unknown[] = [p.companyId, members, q.q ?? ""];
+          const projects = clientProjectSql(
+            "office_clients",
+            await allowedProjects(c, p),
+            args,
+          );
           const where =
-            "company_id=$1 AND ($2::uuid[] IS NULL OR owner_id=ANY($2::uuid[])) AND ($3='' OR strpos(lower(name||' '||code||' '||phone),lower($3))>0)";
+            "company_id=$1 AND ($2::uuid[] IS NULL OR owner_id=ANY($2::uuid[])) AND ($3='' OR strpos(lower(name||' '||code||' '||phone),lower($3))>0) AND " +
+            projects;
           return {
             items: (
               await c.query(
                 "SELECT id,code AS reference,jsonb_build_object('en',name,'ar',name) AS name FROM tenant.office_clients WHERE " +
                   where +
-                  " ORDER BY created_at DESC,id LIMIT $4 OFFSET $5",
+                  " ORDER BY created_at DESC,id LIMIT $" +
+                  (args.length + 1) +
+                  " OFFSET $" +
+                  (args.length + 2),
                 [...args, q.limit, (q.page - 1) * q.limit],
               )
             ).rows,
@@ -255,6 +270,7 @@ export class TasksService {
       p.companyId!,
       async (c) => {
         const members = office ? await officeMembers(c, p) : null;
+        const projects = office ? await allowedProjects(c, p) : null;
         const now = await this.clock(c),
           args: any[] = [p.companyId, now.today],
           where = ["t.company_id=$1", "$2::date IS NOT NULL"];
@@ -287,8 +303,10 @@ export class TasksService {
         if (q.q) {
           args.push("%" + q.q.replace(/[\\%_]/g, "\\$&") + "%");
           const n = "$" + args.length;
+          // Hidden clients must not be findable by name through their tasks.
+          const visible = clientProjectSql("oc", projects, args);
           where.push(
-            `(t.title->>'en' ILIKE ${n} OR t.title->>'ar' ILIKE ${n} OR t.description ILIKE ${n} OR t.public_id ILIKE ${n} OR l.name->>'en' ILIKE ${n} OR l.name->>'ar' ILIKE ${n} OR ${office && members !== null ? "(oc.owner_id=ANY($3::uuid[]) AND oc.name ILIKE " + n + ")" : "oc.name ILIKE " + n})`,
+            `(t.title->>'en' ILIKE ${n} OR t.title->>'ar' ILIKE ${n} OR t.description ILIKE ${n} OR t.public_id ILIKE ${n} OR l.name->>'en' ILIKE ${n} OR l.name->>'ar' ILIKE ${n} OR ${office && members !== null ? "(oc.owner_id=ANY($3::uuid[]) AND " + visible + " AND oc.name ILIKE " + n + ")" : "oc.name ILIKE " + n})`,
           );
         }
         const joins =
@@ -339,7 +357,10 @@ export class TasksService {
         ).rows;
         return {
           items: rows.map((t) =>
-            taskDto(office ? officeRelatedRow(t, members, p) : t, now.today),
+            taskDto(
+              office ? officeRelatedRow(t, members, p, projects) : t,
+              now.today,
+            ),
           ),
           total: q.group ? summary[q.group] : all,
           summary: { ...summary, all, byAssignee },

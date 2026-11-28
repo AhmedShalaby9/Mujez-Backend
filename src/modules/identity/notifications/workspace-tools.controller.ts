@@ -15,6 +15,10 @@ import { IsString, Length, IsObject, IsInt, Min } from "class-validator";
 import { RequireAccess } from "../../../common/auth/access.js";
 import type { AuthRequest } from "../../../common/auth/access.guard.js";
 import { DatabaseService } from "../../../infrastructure/database/database.service.js";
+import {
+  allowedProjects,
+  clientProjectSql,
+} from "../../office/office-projects.js";
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
 class SavedViewInput {
   @IsString() @Length(2, 80) name!: string;
@@ -61,12 +65,16 @@ export class WorkspaceToolsController {
       if (office) {
         const items: any[] = [];
         const pattern = "%" + q.replace(/[\\%_]/g, "\\$&") + "%";
+        const allowed = await allowedProjects(c, p);
         if (p.permissions.includes("leads.read")) {
-          const r = await c.query(
-            `SELECT id,name FROM tenant.office_clients WHERE company_id=$1 AND concat_ws(' ',name,phone,code) ILIKE $2 ${p.scope === "company" ? "" : "AND owner_id=$3"} ORDER BY updated_at DESC LIMIT 10`,
+          const args: unknown[] =
             p.scope === "company"
               ? [p.companyId, pattern]
-              : [p.companyId, pattern, p.id],
+              : [p.companyId, pattern, p.id];
+          const projects = clientProjectSql("office_clients", allowed, args);
+          const r = await c.query(
+            `SELECT id,name FROM tenant.office_clients WHERE company_id=$1 AND concat_ws(' ',name,phone,code) ILIKE $2 ${p.scope === "company" ? "" : "AND owner_id=$3"} AND ${projects} ORDER BY updated_at DESC LIMIT 10`,
+            args,
           );
           items.push(
             ...r.rows.map((x) => ({
@@ -77,9 +85,19 @@ export class WorkspaceToolsController {
           );
         }
         if (p.permissions.includes("units.read")) {
+          // Same limits as the property list: allowed purposes and projects.
+          const purposes =
+            p.scope === "company"
+              ? null
+              : ((
+                  await c.query(
+                    "SELECT array_remove(ARRAY[CASE WHEN view_sale THEN 'sale' END,CASE WHEN view_rent THEN 'rent' END,CASE WHEN view_sale OR view_rent THEN 'both' END],NULL) AS v FROM tenant.office_agent_permissions WHERE company_id=$1 AND user_id=$2",
+                    [p.companyId, p.id],
+                  )
+                ).rows[0]?.v ?? null);
           const r = await c.query(
-            "SELECT id,title AS name FROM tenant.office_properties WHERE company_id=$1 AND concat_ws(' ',title,code,data->>'address') ILIKE $2 ORDER BY updated_at DESC LIMIT 10",
-            [p.companyId, pattern],
+            "SELECT id,title AS name FROM tenant.office_properties WHERE company_id=$1 AND concat_ws(' ',title,code,data->>'address') ILIKE $2 AND ($3::uuid[] IS NULL OR city_id=ANY($3::uuid[])) AND ($4::text[] IS NULL OR data->>'purpose'=ANY($4::text[])) ORDER BY updated_at DESC LIMIT 10",
+            [p.companyId, pattern, allowed, purposes],
           );
           items.push(
             ...r.rows.map((x) => ({

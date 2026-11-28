@@ -29,6 +29,8 @@ export const needsSchema = z
   .object({
     purpose: z.enum(["sale", "rent", "both"]),
     areas: z.array(text.min(1)).max(10).default([]),
+    /** Office projects the client is interested in. Omitted keeps the saved ones. */
+    projectIds: z.array(z.uuid()).max(10).optional(),
     type: text.default(""),
     furnishing: z.enum(["", "furnished", "semi", "unfurnished"]).default(""),
     saleBudgetMinor: money.nullable().default(null),

@@ -2,6 +2,10 @@ import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import type { PoolClient } from "pg";
 import type { Principal } from "../../common/auth/access.js";
 import type { DatabaseService } from "../../infrastructure/database/database.service.js";
+import {
+  allowedProjects,
+  clientInProjects,
+} from "../office/office-projects.js";
 export async function isOfficeCompany(db: DatabaseService, p: Principal) {
   if (!p.companyId) return false;
   return db.platform(
@@ -33,12 +37,13 @@ export function officeRelatedRow(
   row: any,
   members: string[] | null,
   p: Principal,
+  projects: string[] | null,
 ) {
   const r = { ...row };
   if (
     r.office_client_id &&
-    members !== null &&
-    !members.includes(r.office_client_owner)
+    ((members !== null && !members.includes(r.office_client_owner)) ||
+      !clientInProjects(projects, r.office_client_needs))
   ) {
     r.office_client_id = null;
     r.office_client_name = null;
@@ -60,11 +65,15 @@ export async function officeClientLink(
   const members = await officeMembers(c, p);
   const client = (
     await c.query(
-      "SELECT id,owner_id FROM tenant.office_clients WHERE company_id=$1 AND id=$2",
+      "SELECT id,owner_id,needs FROM tenant.office_clients WHERE company_id=$1 AND id=$2",
       [p.companyId, id],
     )
   ).rows[0];
-  if (!client || (members !== null && !members.includes(client.owner_id)))
+  if (
+    !client ||
+    (members !== null && !members.includes(client.owner_id)) ||
+    !clientInProjects(await allowedProjects(c, p), client.needs)
+  )
     throw new BadRequestException("Choose a client in your office scope");
   if (target && target !== p.id && target !== client.owner_id)
     throw new BadRequestException(
