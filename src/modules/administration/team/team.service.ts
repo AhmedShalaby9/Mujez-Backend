@@ -3,6 +3,7 @@ import {
   COMPANY_ROLE_FIELDS,
   COMPANY_ROLE_DEFINITIONS,
   ASSIGNABLE_COMPANY_ROLES,
+  ADMIN_ONLY_ROLES,
   OFFICE_SALES_ROLES,
   TEAM_MEMBER_ROLES,
   primaryCompanyRole,
@@ -62,7 +63,7 @@ export class TeamService {
     private readonly sales: SalesService,
   ) {}
   async list(p: Principal) {
-    await this.sales.access(p, "team.read");
+    await this.actor(p, "team.read");
     const accounts = await this.db.platform(
       async (c) =>
         (
@@ -115,14 +116,76 @@ export class TeamService {
       )
     ).rows[0].id;
   }
-  private owner(p: Principal) {
+  private isOwner(p: Principal) {
+    return (
+      p.pool === "company_admin" &&
+      p.role === "company_owner" &&
+      p.scope === "company" &&
+      !p.workspace
+    );
+  }
+  /** The company admin side keeps its team permissions. With the HR module on,
+   * HR staff manage employees and teams too, within the limits below. */
+  private async actor(p: Principal, permission: "team.read" | "team.manage") {
+    if (p.pool !== "company_user") {
+      await this.sales.access(p, permission);
+      return { hr: false };
+    }
     if (
-      p.pool !== "company_admin" ||
-      p.role !== "company_owner" ||
-      p.scope !== "company" ||
-      p.workspace
+      p.workspace ||
+      !(p.roles ?? [p.role]).some(
+        (r) => r === "hr_manager" || r === "hr_officer",
+      )
     )
+      throw new ForbiddenException();
+    await this.sales.access(p, "hr.manage");
+    const enabled = await this.db.platform(
+      async (c) =>
+        (
+          await c.query(
+            "SELECT 1 FROM platform.companies WHERE id=$1 AND hr_enabled",
+            [p.companyId],
+          )
+        ).rowCount,
+    );
+    if (!enabled) throw new ForbiddenException("The HR module is off");
+    return { hr: true };
+  }
+  private async assigner(p: Principal) {
+    if (p.pool === "company_admin" && !this.isOwner(p))
       throw new ForbiddenException("Only the company admin can assign roles");
+    return this.actor(p, "team.manage");
+  }
+  /** HR cannot act on their own account, nor on someone holding an admin-only
+   * role: suspending or re-inviting them would bypass the role limits. */
+  private async guardAccount(p: Principal, userId: string) {
+    if (userId === p.id)
+      throw new ForbiddenException("HR cannot change their own account");
+    const protectedRole = await this.db.tenant(
+      p.companyId!,
+      async (c) =>
+        (
+          await c.query(
+            "SELECT 1 FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id WHERE u.company_id=$1 AND u.id=$2 AND r.key=ANY($3::text[]) AND (r.id=u.role_id OR EXISTS(SELECT 1 FROM tenant.user_additional_roles ar WHERE ar.company_id=u.company_id AND ar.user_id=u.id AND ar.role_id=r.id))",
+            [p.companyId, userId, ADMIN_ONLY_ROLES],
+          )
+        ).rowCount,
+    );
+    if (protectedRole)
+      throw new ForbiddenException(
+        "Only the company admin can manage this account",
+      );
+  }
+  private async guardAccountById(p: Principal, accountId: string) {
+    const account = (
+      await this.db.platform((c) =>
+        c.query(
+          "SELECT user_id FROM platform.company_employee_accounts WHERE company_id=$1 AND id=$2",
+          [p.companyId, accountId],
+        ),
+      )
+    ).rows[0];
+    if (account) await this.guardAccount(p, account.user_id);
   }
   private async officeRoles(p: Principal, roles: TeamRole[]) {
     const office = await this.db.platform(
@@ -176,8 +239,7 @@ export class TeamService {
     version?: number,
     legacy = false,
   ) {
-    this.owner(p);
-    await this.sales.access(p, "team.manage");
+    const { hr } = await this.assigner(p);
     const office = await this.officeRoles(p, selected);
     const account = (
       await this.db.platform((c) =>
@@ -188,6 +250,8 @@ export class TeamService {
       )
     ).rows[0];
     if (!account) throw new NotFoundException("Employee not found");
+    if (hr && account.user_id === p.id)
+      throw new ForbiddenException("HR cannot change their own roles");
     return this.db.tenant(p.companyId!, async (c) => {
       await this.lock(c, p.companyId!);
       const user = (
@@ -216,6 +280,15 @@ export class TeamService {
         roles.some((r) => !ASSIGNABLE_COMPANY_ROLES.includes(r))
       )
         throw new BadRequestException("Choose supported company roles");
+      if (
+        hr &&
+        ADMIN_ONLY_ROLES.some(
+          (r) => user.roles.includes(r) !== roles.includes(r as TeamRole),
+        )
+      )
+        throw new ForbiddenException(
+          "Only the company admin can grant or remove this role",
+        );
       const primary = primaryCompanyRole(roles);
       if (
         !roles.some(isTeamLeadRole) &&
@@ -314,7 +387,7 @@ export class TeamService {
     };
   }
   async groups(p: Principal) {
-    await this.sales.access(p, "team.read");
+    await this.actor(p, "team.read");
     return this.db.tenant(
       p.companyId!,
       (c) => this.readGroups(c, p.companyId!),
@@ -336,7 +409,7 @@ export class TeamService {
     input: SalesTeamInput | SalesTeamUpdate,
     id?: string,
   ) {
-    await this.sales.access(p, "team.manage");
+    const { hr } = await this.actor(p, "team.manage");
     // Validate account lifecycle as well as the tenant identity; revoked invitations
     // must not be assignable even when their tenant row still says invited.
     const eligible = new Set(
@@ -362,6 +435,9 @@ export class TeamService {
       if (id && !before) throw new NotFoundException("Team not found");
       if (before && before.version !== (input as SalesTeamUpdate).version)
         throw new ConflictException("Team changed. Refresh before saving.");
+      // Leading a team grants a role, so HR cannot appoint themselves.
+      if (hr && input.leadUserId === p.id && before?.lead_user_id !== p.id)
+        throw new ForbiddenException("HR cannot appoint themselves team lead");
       const members = (
         await c.query(
           `SELECT u.id,u.team_id,u.status,r.key AS role FROM tenant.users u JOIN tenant.roles r ON r.company_id=u.company_id AND r.id=u.role_id WHERE u.company_id=$1 AND u.id=ANY($2::uuid[]) AND u.identity_pool='company_user' AND u.deleted_at IS NULL FOR UPDATE OF u`,
@@ -472,7 +548,7 @@ export class TeamService {
     });
   }
   async invite(p: Principal, input: TeamInvite) {
-    this.owner(p);
+    const { hr } = await this.assigner(p);
     if ((input.role && input.roles) || (!input.role && !input.roles))
       throw new BadRequestException("Provide either role or roles");
     const inputRoles = input.roles ?? [input.role!];
@@ -483,7 +559,12 @@ export class TeamService {
     const roles = office
       ? inputRoles
       : [...new Set([...inputRoles, "employee"])];
-    await this.sales.access(p, "team.manage");
+    if (hr && roles.some((r) => ADMIN_ONLY_ROLES.includes(r)))
+      throw new ForbiddenException(
+        "Only the company admin can grant or remove this role",
+      );
+    if (hr && input.salaryMinor)
+      throw new ForbiddenException("Only the company admin can set a salary");
     const result = await this.db
       .platform(async (c) => {
         await c.query(
@@ -546,7 +627,8 @@ export class TeamService {
     return result;
   }
   async resend(p: Principal, accountId: string) {
-    await this.sales.access(p, "team.manage");
+    if ((await this.actor(p, "team.manage")).hr)
+      await this.guardAccountById(p, accountId);
     return this.db.platform(async (c) => {
       await c.query(
         "SELECT pg_advisory_xact_lock(hashtextextended($1,80425114))",
@@ -581,7 +663,8 @@ export class TeamService {
     });
   }
   async revoke(p: Principal, accountId: string) {
-    await this.sales.access(p, "team.manage");
+    if ((await this.actor(p, "team.manage")).hr)
+      await this.guardAccountById(p, accountId);
     return this.db.platform(async (c) => {
       await c.query(
         "SELECT pg_advisory_xact_lock(hashtextextended($1,80425114))",
@@ -610,7 +693,8 @@ export class TeamService {
     });
   }
   async status(p: Principal, accountId: string, input: TeamStatus) {
-    await this.sales.access(p, "team.manage");
+    if ((await this.actor(p, "team.manage")).hr)
+      await this.guardAccountById(p, accountId);
     return this.db.platform(async (c) => {
       await c.query(
         "SELECT pg_advisory_xact_lock(hashtextextended($1,80425114))",

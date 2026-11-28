@@ -28,6 +28,20 @@ export class HrController {
   @Get("options") options(@Req() r: AuthRequest) {
     return this.s.options(r.principal);
   }
+  @Get("employees/export") async exportEmployees(
+    @Req() r: AuthRequest,
+    @Query() q: Record<string, string>,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const file = await this.s.exportEmployees(r.principal, q);
+    res.setHeader("Content-Type", file.contentType);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${file.fileName}"`,
+    );
+    res.setHeader("Cache-Control", "private, no-store");
+    return new StreamableFile(file.content);
+  }
   @Get("employees") employees(
     @Req() r: AuthRequest,
     @Query() q: Record<string, string>,

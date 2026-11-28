@@ -1,5 +1,6 @@
 import { EmployeeAccessService } from "./employee-access.service.js";
 import { requireHrModule } from "./hr-module-access.js";
+import { employeeSheet, type EmployeeExportRow } from "./employee-export.js";
 import { syncTeamReporting } from "./team-reporting.js";
 import {
   Injectable,
@@ -175,6 +176,44 @@ export class HrService {
           )
         ).rows[0],
     );
+  }
+  /** Every employee with position and current salary profile, for HR. The
+   * export is audited because it carries salaries. */
+  async exportEmployees(p: Principal, query: Record<string, string>) {
+    await this.access(p);
+    const format = query.format ?? "xlsx",
+      lang = query.lang ?? "en";
+    if (
+      (format !== "xlsx" && format !== "csv") ||
+      (lang !== "en" && lang !== "ar")
+    )
+      throw new BadRequestException("Choose xlsx or csv, in en or ar");
+    const rows = await this.db.tenant(p.companyId!, async (c) => {
+      const found = (
+        await c.query<EmployeeExportRow>(
+          `SELECT e.employee_code AS code,e.name,e.job_title AS position,coalesce((SELECT string_agg(coalesce(r.name->>$2,r.name->>'en',r.key),', ' ORDER BY r.key) FROM tenant.roles r WHERE r.company_id=u.company_id AND (r.id=u.role_id OR EXISTS(SELECT 1 FROM tenant.user_additional_roles ar WHERE ar.company_id=u.company_id AND ar.user_id=u.id AND ar.role_id=r.id))),'') AS roles,coalesce(d.name,'') AS department,e.status,s.base_minor::text AS "baseMinor",s.allowance_minor::text AS "allowanceMinor",s.deduction_minor::text AS "deductionMinor" FROM tenant.hr_employees e LEFT JOIN tenant.hr_departments d ON d.company_id=e.company_id AND d.id=e.department_id LEFT JOIN tenant.users u ON u.company_id=e.company_id AND u.id=e.user_id AND u.deleted_at IS NULL LEFT JOIN tenant.fin_salary_profiles s ON s.company_id=e.company_id AND s.employee_id=e.id AND s.active WHERE e.company_id=$1 ORDER BY e.name,e.id`,
+          [p.companyId, lang],
+        )
+      ).rows;
+      await recordTenantEvent(c, {
+        companyId: p.companyId!,
+        actorId: p.id,
+        action: "hr.employees.exported",
+        resourceType: "hr",
+        resourceId: p.companyId!,
+        after: { format, employees: found.length },
+        payload: { format, employees: found.length },
+      });
+      return found;
+    });
+    return {
+      content: await employeeSheet(rows, format, lang),
+      fileName: `employees.${format}`,
+      contentType:
+        format === "csv"
+          ? "text/csv;charset=utf-8"
+          : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    };
   }
   async list(p: Principal, kind: string, query: unknown) {
     await this.access(p);
