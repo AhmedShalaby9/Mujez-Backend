@@ -22,6 +22,7 @@ import { DatabaseService } from "../../../infrastructure/database/database.servi
 import { SalesService } from "../../sales/leads/sales.service.js";
 import { hashPassword } from "../../../common/auth/password.js";
 import { recordTenantEvent } from "../../../infrastructure/outbox/domain-events.js";
+import { applyInviteDetails } from "./team-onboarding.js";
 import type {
   TeamInvite,
   TeamStatus,
@@ -99,7 +100,13 @@ export class TeamService {
     const definition = COMPANY_ROLE_DEFINITIONS[role];
     await c.query(
       `INSERT INTO tenant.roles(company_id,key,name,permissions,scope) VALUES($1,$2,$3,$4,$5) ON CONFLICT(company_id,key) DO NOTHING`,
-      [companyId, role, definition.name, definition.permissions, definition.scope],
+      [
+        companyId,
+        role,
+        definition.name,
+        definition.permissions,
+        definition.scope,
+      ],
     );
     return (
       await c.query(
@@ -129,7 +136,8 @@ export class TeamService {
     );
     if (
       office &&
-      (!roles.length || roles.some((r) => !OFFICE_SALES_ROLES.includes(r as any)))
+      (!roles.length ||
+        roles.some((r) => !OFFICE_SALES_ROLES.includes(r as any)))
     )
       throw new BadRequestException(
         "Real estate offices can assign only Sales Agent and Team Lead",
@@ -149,11 +157,14 @@ export class TeamService {
    * fixtures/tests use it with no connection to the CRM sales ladder), so
    * this is driven by the member's own current role, not company_type. */
   private leadRoleKey(previousRole: string): TeamRole {
-    return (
-      ["property_advisor", "property_consultant", "senior", "expert"].includes(
-        previousRole,
-      ) || previousRole === "team_leader"
-    ) ? "team_leader" : "team_lead";
+    return [
+      "property_advisor",
+      "property_consultant",
+      "senior",
+      "expert",
+    ].includes(previousRole) || previousRole === "team_leader"
+      ? "team_leader"
+      : "team_lead";
   }
   async changeRole(p: Principal, accountId: string, role: TeamRole) {
     return this.changeRoles(p, accountId, [role], undefined, true);
@@ -194,7 +205,8 @@ export class TeamService {
           ...(office && user.roles.includes("employee") ? ["employee"] : []),
           ...(legacy
             ? user.roles.filter(
-                (r: string) => !(TEAM_MEMBER_ROLES as readonly string[]).includes(r),
+                (r: string) =>
+                  !(TEAM_MEMBER_ROLES as readonly string[]).includes(r),
               )
             : []),
         ]),
@@ -238,7 +250,9 @@ export class TeamService {
           user.id,
           roleIds.get(primary),
           p.id,
-          roles.some((r) => (TEAM_MEMBER_ROLES as readonly string[]).includes(r)),
+          roles.some((r) =>
+            (TEAM_MEMBER_ROLES as readonly string[]).includes(r),
+          ),
         ],
       );
       for (const key of roles.filter((r) => r !== primary))
@@ -461,10 +475,16 @@ export class TeamService {
     this.owner(p);
     if ((input.role && input.roles) || (!input.role && !input.roles))
       throw new BadRequestException("Provide either role or roles");
-    const roles = input.roles ?? [input.role!];
-    await this.officeRoles(p, roles);
+    const inputRoles = input.roles ?? [input.role!];
+    const office = await this.officeRoles(p, inputRoles);
+    // Real estate offices are restricted to the two office sales roles --
+    // "employee" doesn't apply there; every other company type gets it
+    // automatically, since anyone invited is an employee first and foremost.
+    const roles = office
+      ? inputRoles
+      : [...new Set([...inputRoles, "employee"])];
     await this.sales.access(p, "team.manage");
-    return this.db
+    const result = await this.db
       .platform(async (c) => {
         await c.query(
           "SELECT pg_advisory_xact_lock(hashtextextended($1,80425114))",
@@ -516,6 +536,14 @@ export class TeamService {
           );
         throw e;
       });
+    await applyInviteDetails(
+      this.db,
+      p,
+      result.userId,
+      input.department,
+      input.salaryMinor,
+    );
+    return result;
   }
   async resend(p: Principal, accountId: string) {
     await this.sales.access(p, "team.manage");
