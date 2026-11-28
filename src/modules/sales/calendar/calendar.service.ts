@@ -1,4 +1,8 @@
 import {
+  allowedProjects,
+  clientProjectSql,
+} from "../../office/office-projects.js";
+import {
   isOfficeCompany,
   officeMembers,
   officeRelatedRow,
@@ -23,7 +27,7 @@ import {
   type EventUpdate,
   type EventStatus,
 } from "./calendar.dto.js";
-const SELECT = `SELECT e.*,u.name AS owner_name,ct.public_id AS contact_ref,ct.name AS contact_name,l.public_id AS lead_ref,l.name AS lead_name,ct.owner_user_id AS contact_owner,oc.code AS office_client_ref,oc.name AS office_client_name,oc.owner_id AS office_client_owner FROM tenant.events e LEFT JOIN tenant.users u ON u.company_id=e.company_id AND u.id=e.owner_user_id LEFT JOIN tenant.contacts ct ON ct.company_id=e.company_id AND ct.id=e.contact_id LEFT JOIN tenant.leads l ON l.company_id=e.company_id AND l.id=e.lead_id LEFT JOIN tenant.office_clients oc ON oc.company_id=e.company_id AND oc.id=e.office_client_id`;
+const SELECT = `SELECT e.*,u.name AS owner_name,ct.public_id AS contact_ref,ct.name AS contact_name,l.public_id AS lead_ref,l.name AS lead_name,ct.owner_user_id AS contact_owner,oc.code AS office_client_ref,oc.name AS office_client_name,oc.owner_id AS office_client_owner,oc.needs AS office_client_needs FROM tenant.events e LEFT JOIN tenant.users u ON u.company_id=e.company_id AND u.id=e.owner_user_id LEFT JOIN tenant.contacts ct ON ct.company_id=e.company_id AND ct.id=e.contact_id LEFT JOIN tenant.leads l ON l.company_id=e.company_id AND l.id=e.lead_id LEFT JOIN tenant.office_clients oc ON oc.company_id=e.company_id AND oc.id=e.office_client_id`;
 const iso = (v: any) => (v ? new Date(v).toISOString() : null);
 export function eventDto(e: any) {
   return {
@@ -88,13 +92,24 @@ export class CalendarService {
           (p.scope === "own" && row.owner_user_id !== p.id))
     )
       throw new NotFoundException("Event not found");
-    return office ? officeRelatedRow(row, members, p) : row;
+    return office
+      ? officeRelatedRow(row, members, p, await allowedProjects(c, p))
+      : row;
   }
   async options(p: Principal) {
     await this.sales.access(p, "calendar.read");
     if (await isOfficeCompany(this.db, p))
       return this.db.tenant(p.companyId!, async (c) => {
         const members = await officeMembers(c, p);
+        const clientArgs: unknown[] = [p.companyId, members];
+        const clientChoices =
+          "SELECT id,code AS reference,jsonb_build_object('en',name,'ar',name) AS name FROM tenant.office_clients WHERE company_id=$1 AND ($2::uuid[] IS NULL OR owner_id=ANY($2::uuid[])) AND " +
+          clientProjectSql(
+            "office_clients",
+            await allowedProjects(c, p),
+            clientArgs,
+          ) +
+          " ORDER BY created_at DESC,id LIMIT 1000";
         return {
           owners: (
             await c.query(
@@ -111,12 +126,7 @@ export class CalendarService {
               ).rows
             : [],
           leads: p.permissions.includes("leads.read")
-            ? (
-                await c.query(
-                  "SELECT id,code AS reference,jsonb_build_object('en',name,'ar',name) AS name FROM tenant.office_clients WHERE company_id=$1 AND ($2::uuid[] IS NULL OR owner_id=ANY($2::uuid[])) ORDER BY created_at DESC,id LIMIT 1000",
-                  [p.companyId, members],
-                )
-              ).rows
+            ? (await c.query(clientChoices, clientArgs)).rows
             : [],
           canManage: p.permissions.includes("calendar.manage"),
         };
@@ -193,9 +203,10 @@ export class CalendarService {
             args,
           )
         ).rows;
+        const projects = office ? await allowedProjects(c, p) : null;
         return {
           items: rows.map((r) =>
-            eventDto(office ? officeRelatedRow(r, members, p) : r),
+            eventDto(office ? officeRelatedRow(r, members, p, projects) : r),
           ),
           from: q.from,
           to: q.to,

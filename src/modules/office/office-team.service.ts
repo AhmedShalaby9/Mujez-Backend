@@ -7,6 +7,7 @@ import type { PoolClient } from "pg";
 import type { Principal } from "../../common/auth/access.js";
 import { DatabaseService } from "../../infrastructure/database/database.service.js";
 import { OfficeService } from "./office.service.js";
+import { allowedProjects, clientProjectSql } from "./office-projects.js";
 import { parse } from "./office.service.js";
 import { z } from "zod";
 const listQuery = z
@@ -85,7 +86,14 @@ export class OfficeTeamService {
           kind === "clients"
             ? "FROM tenant.office_clients x JOIN tenant.users u ON u.company_id=x.company_id AND u.id=x.owner_id WHERE x.company_id=$1 AND x.owner_id=ANY($2::uuid[]) AND ($3::text IS NULL OR x.status=$3) AND ($4::text IS NULL OR concat_ws(' ',x.name,x.code,x.phone,x.email) ILIKE $4)"
             : "FROM tenant.tasks x JOIN tenant.users u ON u.company_id=x.company_id AND u.id=x.assignee_id WHERE x.company_id=$1 AND x.assignee_id=ANY($2::uuid[]) AND x.lead_id IS NULL AND ($3::text IS NULL OR x.status=$3) AND ($4::text IS NULL OR concat_ws(' ',x.title->>'en',x.title->>'ar',x.public_id) ILIKE $4)";
-        const total = (await c.query("SELECT count(*)::int n " + from, args))
+        // The team lead's own project limit applies to what they can read.
+        const scoped =
+          kind === "clients"
+            ? from +
+              " AND " +
+              clientProjectSql("x", await allowedProjects(c, p), args)
+            : from;
+        const total = (await c.query("SELECT count(*)::int n " + scoped, args))
           .rows[0].n;
         const fields =
           kind === "clients"
@@ -96,12 +104,15 @@ export class OfficeTeamService {
             "SELECT " +
               fields +
               " " +
-              from +
+              scoped +
               " ORDER BY " +
               (kind === "clients"
                 ? "x.created_at DESC"
                 : "x.due_date ASC NULLS LAST") +
-              ",x.id LIMIT $5 OFFSET $6",
+              ",x.id LIMIT $" +
+              (args.length + 1) +
+              " OFFSET $" +
+              (args.length + 2),
             [...args, q.limit, (q.page - 1) * q.limit],
           )
         ).rows;
@@ -154,10 +165,16 @@ export class OfficeTeamService {
           )
         ).rows[0];
         const args = [p.companyId, ids, clock.since, clock.at];
+        const clientArgs: unknown[] = [...args];
+        const visible = clientProjectSql(
+          "office_clients",
+          await allowedProjects(c, p),
+          clientArgs,
+        );
         const clients = (
           await c.query(
-            `SELECT owner_id AS id,count(*)::int AS clients,count(*) FILTER(WHERE status NOT IN ('closed','lost'))::int AS "openClients",count(*) FILTER(WHERE status='lost')::int AS "lostClients",count(*) FILTER(WHERE created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND created_at<=$4::timestamptz)::int AS "newClients",count(*) FILTER(WHERE status NOT IN ('closed','lost') AND follow_up_at<$4::timestamptz)::int AS "overdueCallbacks" FROM tenant.office_clients WHERE company_id=$1 AND owner_id=ANY($2::uuid[]) GROUP BY owner_id`,
-            args,
+            `SELECT owner_id AS id,count(*)::int AS clients,count(*) FILTER(WHERE status NOT IN ('closed','lost'))::int AS "openClients",count(*) FILTER(WHERE status='lost')::int AS "lostClients",count(*) FILTER(WHERE created_at>=($3::date::timestamp AT TIME ZONE 'Africa/Cairo') AND created_at<=$4::timestamptz)::int AS "newClients",count(*) FILTER(WHERE status NOT IN ('closed','lost') AND follow_up_at<$4::timestamptz)::int AS "overdueCallbacks" FROM tenant.office_clients WHERE company_id=$1 AND owner_id=ANY($2::uuid[]) AND ${visible} GROUP BY owner_id`,
+            clientArgs,
           )
         ).rows;
         const tasks = (
